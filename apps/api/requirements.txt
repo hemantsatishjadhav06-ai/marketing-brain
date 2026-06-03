@@ -19,3 +19,6 @@ python-slugify==8.0.4
 tenacity==9.0.0
 pytest==8.3.4
 pytest-asyncio==0.25.0
+# optional — Phase 3 (skip if your deploy doesn't use them)
+boto3==1.35.85
+stripe==12.1.0

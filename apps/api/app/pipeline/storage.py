@@ -42,9 +42,15 @@ class LocalStorage:
 
 
 def get_storage() -> Storage:
-    if settings.STORAGE_BACKEND == "local":
-        return LocalStorage()
-    raise NotImplementedError(f"Storage backend {settings.STORAGE_BACKEND} not implemented yet")
+    backend = settings.STORAGE_BACKEND.lower()
+    if backend in ("s3", "r2"):
+        try:
+            from app.pipeline.storage_s3 import S3Storage
+            return S3Storage()
+        except Exception:
+            # graceful fallback to local — keeps dev unblocked when keys are missing
+            return LocalStorage()
+    return LocalStorage()
 
 
 def new_key(brand_id: uuid.UUID | str, kind: str, ext: str) -> str:

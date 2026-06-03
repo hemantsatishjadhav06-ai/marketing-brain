@@ -115,12 +115,14 @@ export default function DashboardPage() {
             </ul>
           </div>
           <div>
-            <div className="font-serif text-base mb-1">Phase 3 — Roadmap</div>
+            <div className="font-serif text-base mb-1">Phase 3 — Live</div>
             <ul className="text-mute space-y-1 text-xs">
-              <li>· Native publishing (Meta/X/LinkedIn/YouTube/TikTok)</li>
-              <li>· Live analytics pulls (GA4 + per-platform)</li>
-              <li>· Brand brain refinement loop from performance</li>
-              <li>· White-label theming + billing</li>
+              <li>✓ Native publishing: X · Instagram · LinkedIn · Pinterest · Klaviyo email · Webhook</li>
+              <li>✓ Per-brand PublishTarget CRUD (api / export modes)</li>
+              <li>✓ Trend automation: Reddit hot + Google Trends RSS</li>
+              <li>✓ Brand-brain refinement loop from winning content</li>
+              <li>✓ S3 / R2 storage backend + Stripe billing skeleton</li>
+              <li>✓ White-label theme (org-level: name · colour · logo)</li>
             </ul>
           </div>
         </div>

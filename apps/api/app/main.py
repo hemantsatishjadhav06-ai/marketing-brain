@@ -12,6 +12,8 @@ from app.routers import (
     analytics,
     assets,
     auth,
+    billing,
+    brain_refine,
     brands,
     brand_brain,
     calendar,
@@ -20,11 +22,13 @@ from app.routers import (
     jobs,
     orgs,
     products,
+    publish_targets,
     publishing,
     repurpose,
     reviews,
     scoring,
     sse,
+    trend_ingest,
     trends,
 )
 
@@ -34,9 +38,9 @@ def create_app() -> FastAPI:
         title="Marketing Brain API",
         description=(
             "AI Marketing Content Brain for racket-sport e-commerce. "
-            "Multi-agent · brand-isolated · cost-guarded."
+            "Multi-agent · brand-isolated · cost-guarded · native publishing."
         ),
-        version="0.2.0",
+        version="0.3.0",
     )
 
     app.add_middleware(
@@ -47,7 +51,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # /storage/* static
+    # /storage/* static (only for local storage backend; s3/r2 serves from CDN)
     os.makedirs(settings.STORAGE_LOCAL_PATH, exist_ok=True)
     app.mount("/storage", StaticFiles(directory=settings.STORAGE_LOCAL_PATH), name="storage")
 
@@ -57,18 +61,22 @@ def create_app() -> FastAPI:
     app.include_router(orgs.router, prefix="/orgs", tags=["orgs"])
     app.include_router(brands.router, prefix="/brands", tags=["brands"])
     app.include_router(brand_brain.router, prefix="/brands", tags=["brand-brain"])
+    app.include_router(brain_refine.router, prefix="/brands", tags=["brain-refine"])
     app.include_router(products.router, prefix="/brands", tags=["products"])
     app.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
     app.include_router(sse.router, prefix="/sse", tags=["sse"])
     app.include_router(scoring.router, prefix="/brands", tags=["scoring"])
     app.include_router(calendar.router, prefix="/brands", tags=["calendar"])
     app.include_router(trends.router, prefix="/brands", tags=["trends"])
+    app.include_router(trend_ingest.router, prefix="/brands", tags=["trend-ingest"])
     app.include_router(reviews.router, prefix="/brands", tags=["reviews"])
     app.include_router(assets.router, prefix="/brands", tags=["assets"])
+    app.include_router(publish_targets.router, prefix="/brands", tags=["publish-targets"])
     app.include_router(content.router, prefix="/content", tags=["content"])
     app.include_router(publishing.router, prefix="/publishing", tags=["publishing"])
     app.include_router(repurpose.router, prefix="/repurpose", tags=["repurpose"])
     app.include_router(analytics.router, prefix="/brands", tags=["analytics"])
+    app.include_router(billing.router, prefix="/billing", tags=["billing"])
 
     return app
 

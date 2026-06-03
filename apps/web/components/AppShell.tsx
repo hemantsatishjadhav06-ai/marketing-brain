@@ -60,7 +60,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
             <div className="font-serif text-lg leading-none">Marketing Brain</div>
           </div>
-          <div className="text-xs text-mute mt-1 font-mono">v0.2 · phase 2</div>
+          <div className="text-xs text-mute mt-1 font-mono">v0.3 · phase 3</div>
         </div>
         <nav className="flex-1 px-2 py-3 overflow-y-auto">
           {NAV.map((n) => {
@@ -98,7 +98,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex items-center justify-between px-6 py-3">
             <div className="flex items-center gap-3">
               <BrandSelector />
-              <span className="text-mute text-xs font-mono">→ Phase 1 + 2 · Operating</span>
+              <span className="text-mute text-xs font-mono">→ Phase 3 · Native publishing</span>
             </div>
             <div className="flex items-center gap-3">
               <CostMeter />

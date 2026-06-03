@@ -28,9 +28,22 @@ class Settings(BaseSettings):
     FAL_KEY: str = ""
 
     # storage
-    STORAGE_BACKEND: str = "local"  # local | r2
+    STORAGE_BACKEND: str = "local"  # local | s3 | r2
     STORAGE_LOCAL_PATH: str = "/app/storage"
     PUBLIC_BASE_URL: str = "http://localhost:8001"
+
+    # s3/r2 storage
+    S3_BUCKET: str = ""
+    S3_REGION: str = "auto"
+    S3_ENDPOINT_URL: str = ""           # blank for AWS, full URL for R2/MinIO
+    S3_ACCESS_KEY: str = ""
+    S3_SECRET_KEY: str = ""
+    S3_PUBLIC_BASE_URL: str = ""        # CDN front for the bucket
+
+    # billing
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_PRICE_ID: str = ""           # default monthly price for new orgs
+    STRIPE_WEBHOOK_SECRET: str = ""
 
     # ops
     CORS_ORIGINS: str = "http://localhost:3006,http://localhost:3005,http://localhost:3000"
