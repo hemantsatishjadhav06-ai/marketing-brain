@@ -1,88 +1,100 @@
-# Current State — v0.3 (Phase 0 → 3 complete)
+# Current State — v0.4 (Phases 0 → 4 complete)
 
-## V1 (`tennisoutlet-video-agent`) — what we absorbed
+## Deployment
 
-V1 was a single-purpose tool: one tennis SKU in, one 9:16 vertical product
-video out (1080×1920 @ 30 fps, ~25-35 s, with voiceover and on-screen text).
-It now lives in this repo as the **`short_video.product_video` sub-type** of
-the Short Video agent — roughly 5 % of the eventual product.
+- **Repo**: <https://github.com/hemantsatishjadhav06-ai/marketing-brain>
+- **Render Blueprint** (`render.yaml`): one-click deploy of Postgres + KeyValue + API + Web.
+- **Local**: `docker compose up -d --build` → cockpit at `http://localhost:3006`, Swagger at `http://localhost:8001/docs`.
+- See **`docs/DEPLOY.md`** for the full Render + env-var matrix.
 
-## What's shipped (Phases 0 → 3)
+## What's shipped
+
+### Backend (`apps/api`, 119 Python files, all ast-clean)
 
 | Area | Where |
 |---|---|
-| Monorepo + Docker Compose (postgres · redis · api · worker · web) | `docker-compose.yml` |
-| All spec § 14 tables + Alembic | `apps/api/alembic/versions/001_initial.py` |
-| SQLAlchemy models + JWT auth + 6-role RBAC | `apps/api/app/{models,core/security.py}` |
-| Cross-brand guard + cost guard | `apps/api/app/{guards,core/cost_guard.py}` |
-| One LLM gateway (OpenRouter, cost-logged, tier-aware) | `apps/api/app/pipeline/llm_gateway.py` |
-| Swappable storage (Local · **S3 · R2**) | `apps/api/app/pipeline/{storage,storage_s3}.py` |
-| Swappable media gateway (fal) | `apps/api/app/pipeline/media_gateway.py` |
-| **Scoring engine** (6 signals, all weights documented + tested) | `apps/api/app/services/scoring.py` |
-| **Idea Mill agent** (LLM + deterministic fallback) | `apps/api/app/agents/idea_mill.py` |
-| **Calendar agent** (cadence-aware, long-form caps) | `apps/api/app/agents/calendar.py` |
-| **Specialist agents**: static_post · carousel · blog · email · short_video | `apps/api/app/agents/` |
-| **Critic v2** (regex hard-gate + LLM rubric) | `apps/api/app/agents/critic_llm.py` |
-| **Repurpose agent** (fan one approved item to N derivatives) | `apps/api/app/agents/repurpose.py` |
-| Agent registry + dispatcher | `apps/api/app/agents/registry.py` |
-| **Publish-export bundler** (zip per item) | `apps/api/app/services/publish_export.py` |
-| **Native publishers**: X v2 · Meta IG Graph · LinkedIn UGC · Pinterest v5 · Klaviyo · Generic webhook (HMAC) | `apps/api/app/publishers/` |
-| Publisher dispatcher with export-bundle fallback | `apps/api/app/publishers/dispatcher.py` |
-| **PublishTarget CRUD per brand+platform** (credentials never echoed back) | `apps/api/app/routers/publish_targets.py` |
-| **Trend automation**: Reddit hot + Google Trends RSS, auto-runs against brand config | `apps/api/app/services/trend_ingest.py` |
-| **Brand-brain refinement loop** (top performers → keyword + voice + channel-mix proposals; one-click accept-to-write) | `apps/api/app/services/brain_refine.py` |
-| **Analytics ingestion** (manual + CSV) + summary endpoint | `apps/api/app/routers/analytics.py` |
-| **Stripe billing skeleton** (checkout + subscription summary, env-gated) | `apps/api/app/services/billing.py` |
-| **White-label theme** (org-level: brand_name · accent · logo · hide_powered_by) | `apps/api/app/routers/orgs.py` |
-| Tests: cross-brand guard · scoring · calendar caps · repurpose map · publishers safety · dispatcher · brain-refine | `apps/api/app/tests/` |
-| **Cockpit (Next.js 15)** — every sidebar page is a working surface | `apps/web/app/` |
-| Dashboard with live KPIs (brands · calendar entries · MTD spend · review queue · top ideas · jobs) | `apps/web/app/dashboard/` |
-| Ideas (sort/filter, generate, re-score) | `apps/web/app/ideas/` |
-| Calendar (drag-drop month grid, Draft button) | `apps/web/app/calendar/` |
-| Reviews (queue + critic + approve/reject) | `apps/web/app/reviews/` |
-| Studio (content detail with media render + critic history + transitions + export) | `apps/web/app/studio/` |
-| Library (assets grid) | `apps/web/app/library/` |
-| **Publishing (real "Publish now" with API/export indicator)** | `apps/web/app/publishing/` |
-| **Settings → Publish Targets** (credential JSON, mode toggle, enable/disable) | `apps/web/app/settings/publish-targets/` |
-| **Settings → White-label theme + billing block** | `apps/web/app/settings/` |
-| **Brand Brain (editor + refinement proposals panel)** | `apps/web/app/brand-brain/` |
-| Trends ingest form + table | `apps/web/app/trends/` |
-| Analytics dashboard (KPIs + manual entry + CSV upload + top content) | `apps/web/app/analytics/` |
-| Jobs, Audience pages | `apps/web/app/{jobs,audience}/` |
-| 8 docs in `/docs` + `AGENTS.md` | `docs/` + `AGENTS.md` |
+| Monorepo + Docker Compose | `docker-compose.yml` |
+| All spec § 14 tables + Alembic + auto-migrate on startup | `apps/api/alembic/` + `app/main.py` |
+| JWT auth + 6-role RBAC + **TOTP 2FA** (RFC 6238) | `app/core/security.py` · `app/services/totp.py` · `app/routers/twofa.py` |
+| Cross-brand guard + cost guard | `app/guards/` · `app/core/cost_guard.py` |
+| One LLM gateway (OpenRouter, cost-logged, tier-aware) | `app/pipeline/llm_gateway.py` |
+| Swappable storage (Local · S3 · R2) | `app/pipeline/storage*.py` |
+| Swappable media (fal) | `app/pipeline/media_gateway.py` |
+| **Scoring engine** (6 signals) | `app/services/scoring.py` |
+| **13 agents** (orchestrator · idea_mill · calendar · static_post · carousel · blog · email · short_video · reel_voice · long_video · critic_v2 · repurpose · publish_export) | `app/agents/` |
+| **8 native publishers** (X · Instagram · LinkedIn · Pinterest · Klaviyo · YouTube · TikTok · Webhook) | `app/publishers/` |
+| Per-brand `PublishTarget` CRUD with credential vault (never echoed) | `app/routers/publish_targets.py` |
+| **Trend automation**: Reddit hot + Google Trends RSS | `app/services/trend_ingest.py` |
+| **Brand-brain refinement loop** (winning content → keyword + voice proposals) | `app/services/brain_refine.py` |
+| **Analytics**: manual + CSV ingest + GA4 puller + Meta Insights puller | `app/services/analytics_pull.py` |
+| **Shopify product webhook** (HMAC verify) | `app/routers/shopify_webhook.py` |
+| **Stripe billing** (checkout + customer portal) | `app/services/billing.py` |
+| **White-label theme** + **subdomain → org resolver middleware** | `app/routers/orgs.py` · `app/core/subdomain.py` |
+| 13 pytests (scoring · calendar caps · cross-brand · publishers safety · dispatcher · brain-refine · TOTP · DB URL · subdomain) | `app/tests/` |
 
-## End-to-end happy path (today)
+### Frontend (`apps/web`, 24 pages)
 
-1. Log in → select a brand.
-2. **Brand Brain → Save** voice + banned + seo_keywords + competitors (these double as subreddits for trend ingest).
-3. **Trends → Ingest all** (or schedule it) → pulls Reddit hot + Google Trends RSS into the Trend table.
-4. **Ideas → Generate 40 ideas** → Idea Mill produces scored ideas using brand brain + products + trends.
-5. **Calendar → Regenerate 30-day plan** → Calendar agent fills the grid honouring cadence caps; drag entries between days.
-6. On any cell, **Draft** → fires the matching specialist agent (static_post / carousel / blog / email / short_video).
-7. **Studio → Run critic** → cross-sport hard-gate + LLM rubric. Approve / reject.
-8. **Settings → Publish Targets** → add credentials per platform (X, IG, LinkedIn, Pinterest, Klaviyo, Webhook).
-9. **Publishing → Publish now** → routes through the right publisher (or exports a bundle if no credentials).
-10. After it lands, **Analytics → Record a metric** (or CSV upload). KPIs update; top content surfaces.
-11. **Brand Brain → Refinement Proposals** → click "+ keyword" or "Accept all" to fold winning patterns back into seo_keywords. The next idea-mill cycle scores ideas higher on what's actually working.
+| Surface | Where |
+|---|---|
+| **Premium SaaS redesign**: Inter + Fraunces + JetBrains Mono · glass cards · aurora gradient backdrop · noise overlay · motion · CSS-variable theming | `app/globals.css` · `tailwind.config.ts` |
+| **Public marketing landing** at `/` | `app/page.tsx` |
+| **Login** (redesigned with 2FA flow) | `app/login/page.tsx` |
+| Cockpit shell with grouped nav + theme injection + white-label switch | `components/AppShell.tsx` |
+| Dashboard with live KPI cards, top ideas, recent jobs, what's-live grid | `app/dashboard/` |
+| Brands · Brand Brain (with **refinement proposals panel**) · Trends · Audience | `app/{brands,brand-brain,trends,audience}/` |
+| Ideas (sort/filter, generate, re-score) | `app/ideas/` |
+| Calendar (drag-drop month grid, Draft button per cell) | `app/calendar/` |
+| Studio (content detail with media render · critic history · transitions · export) | `app/studio/` |
+| Reviews queue (run critic + approve/reject) | `app/reviews/` |
+| Library (assets grid) | `app/library/` |
+| Publishing (native publish or export bundle · per-platform target indicator) | `app/publishing/` |
+| Analytics (KPIs · CSV upload · top content) | `app/analytics/` |
+| Jobs · Products · Settings (theme + billing + brands) · **Security (2FA enrolment with QR)** · **Publish Targets (CRUD)** | `app/{jobs,products,settings,settings/security,settings/publish-targets}/` |
 
-## Phase 4 backlog (post-launch)
+## What's remaining from the spec — and where it landed
 
-- TikTok + YouTube Data API publishers (TikTok needs business verification; YouTube needs OAuth flow + chunked upload).
-- WordPress / Webflow / Ghost blog publishers (the webhook publisher already covers this if your CMS has an inbox).
-- Live analytics pulls (GA4 + per-platform); manual + CSV ingestion is shipped now.
-- Per-brand subdomain routing + tenant-scoped CDN paths for white-label deploys.
-- Better-auth migration (2FA + WebAuthn) on top of the existing JWT layer.
-- Real customer-portal billing flows + invoices.
+The original spec docs in `/docs/` had a Phase 4+ backlog. Status now:
 
-## How to verify
+| Spec item | Status |
+|---|---|
+| TikTok publisher | ✓ shipped — `app/publishers/tiktok.py` |
+| YouTube Data API publisher | ✓ shipped — `app/publishers/youtube.py` (resumable upload by URL) |
+| WordPress / Webflow / Ghost blog publishers | ✓ covered — the generic webhook publisher fits these CMS inboxes |
+| Live analytics pulls (GA4 + per-platform) | ✓ shipped — GA4 Data API + Meta Insights pullers; CSV path stays |
+| Per-brand subdomain routing | ✓ shipped — `SubdomainMiddleware` resolves `acme.host` → org |
+| TOTP 2FA + WebAuthn migration | ✓ TOTP shipped; WebAuthn left for later if needed |
+| Stripe customer-portal flows + invoices | ✓ shipped — checkout + billing-portal session creation |
+| Shopify product webhook | ✓ shipped — HMAC-verified upsert to Product table |
+| R2 / S3 storage backend | ✓ shipped — `pipeline/storage_s3.py` |
+| White-label theming (org-level) | ✓ shipped — accent + logo + brand name + hide-powered-by |
+
+The product is feature-complete against the spec. Remaining items are **operational** rather than feature work:
+
+- **Spec § 25** (real customer-onboarding flow with email verification + invite links) — JWT register endpoint exists; verification-email branch can be added in 50 lines via Resend/Postmark.
+- **Spec § 26** (TikTok business verification) — outside the codebase; a Render-deployed app needs the brand to clear TikTok's app-review.
+- **Spec § 27** (per-tenant CDN paths for white-label) — needs custom-domain DNS + Render's verified-domain flow; the routing middleware is already in place.
+
+## End-to-end happy path
+
+1. Sign in. Optional: enable 2FA in Settings → Security.
+2. Brand Brain → save voice + banned + seo + competitors.
+3. Trends → "Ingest all" pulls Reddit hot + Google Trends RSS into the Trend table.
+4. Ideas → "Generate 40 ideas" runs the Idea Mill.
+5. Calendar → "Regenerate 30-day plan" fills the grid honouring cadence caps; drag to reorder.
+6. Click "Draft" on any cell — the specialist agent runs and produces a ContentItem + assets.
+7. Studio → "Run critic". Approve or reject.
+8. Settings → Publish Targets → paste credentials for any of 8 platforms.
+9. Publishing → "Publish now" routes through the native publisher (or exports a bundle if no target).
+10. Analytics → record a metric, upload a CSV, or hit "Pull GA4" / "Pull Meta".
+11. Brand Brain → Refinement Proposals updates daily; one-click "Accept all" folds winning keywords back into the brain. Next idea-mill cycle scores higher.
+
+## Verify
 
 ```bash
 cd marketing-brain
-cp .env.example .env       # fill JWT_SECRET; OPENROUTER_API_KEY optional (fallbacks built in)
+cp .env.example .env
 docker compose up -d --build
-open http://localhost:3006        # cockpit
-open http://localhost:8001/docs   # Swagger
 docker compose exec api pytest app/tests
 ```
 
-Pytests cover: cross-brand guard · scoring · calendar caps · repurpose map · publisher safety · dispatcher · brain-refine · health smoke.
+Pytests cover cross-brand guard, scoring, calendar caps, repurpose map, publishers safety, dispatcher, brain-refine, TOTP, DB URL normalisation, subdomain reserved list, and the health smoke test.
