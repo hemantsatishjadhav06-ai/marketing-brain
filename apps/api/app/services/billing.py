@@ -61,6 +61,23 @@ def create_checkout(
     return CheckoutSession(url=session.url, id=session.id)
 
 
+def create_portal_session(org_id: uuid.UUID, *, return_url: str) -> dict:
+    """Stripe customer-portal session for self-serve plan changes + invoices."""
+    stripe = _stripe()
+    if not stripe:
+        return {"url": return_url + "?dev_billing=skip"}
+    # find the customer by metadata.org_id
+    try:
+        customers = stripe.Customer.list(limit=100).data
+        match = next((c for c in customers if (c.metadata or {}).get("org_id") == str(org_id)), None)
+        if not match:
+            return {"url": return_url + "?no_customer=1"}
+        sess = stripe.billing_portal.Session.create(customer=match.id, return_url=return_url)
+        return {"url": sess.url, "id": sess.id}
+    except Exception as e:
+        return {"error": str(e)}
+
+
 def get_subscription_summary(org_id: uuid.UUID) -> dict:
     """Returns a lightweight, billing-provider-agnostic shape so the cockpit
     can render a single block."""

@@ -15,22 +15,22 @@ import { CostMeter } from "./CostMeter";
 import useSWR from "swr";
 import type { Me } from "@/lib/types";
 
-const NAV = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/brands", label: "Brands", icon: Brain },
-  { href: "/products", label: "Products", icon: Package },
-  { href: "/brand-brain", label: "Brand Brain", icon: Brain },
-  { href: "/trends", label: "Trends", icon: TrendingUp },
-  { href: "/audience", label: "Audience", icon: Users },
-  { href: "/ideas", label: "Ideas", icon: Lightbulb },
-  { href: "/studio", label: "Studio", icon: Wand2 },
-  { href: "/calendar", label: "Calendar", icon: Calendar },
-  { href: "/jobs", label: "Jobs", icon: Cpu },
-  { href: "/reviews", label: "Reviews", icon: CheckSquare },
-  { href: "/library", label: "Library", icon: FolderOpen },
-  { href: "/publishing", label: "Publishing", icon: Send },
-  { href: "/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/settings", label: "Settings", icon: Settings },
+const NAV: Array<{ href: string; label: string; icon: any; group?: string }> = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, group: "Overview" },
+  { href: "/brands", label: "Brands", icon: Brain, group: "Foundation" },
+  { href: "/products", label: "Products", icon: Package, group: "Foundation" },
+  { href: "/brand-brain", label: "Brand Brain", icon: Brain, group: "Foundation" },
+  { href: "/trends", label: "Trends", icon: TrendingUp, group: "Foundation" },
+  { href: "/audience", label: "Audience", icon: Users, group: "Foundation" },
+  { href: "/ideas", label: "Ideas", icon: Lightbulb, group: "Create" },
+  { href: "/studio", label: "Studio", icon: Wand2, group: "Create" },
+  { href: "/calendar", label: "Calendar", icon: Calendar, group: "Create" },
+  { href: "/jobs", label: "Jobs", icon: Cpu, group: "Create" },
+  { href: "/reviews", label: "Reviews", icon: CheckSquare, group: "Ship" },
+  { href: "/library", label: "Library", icon: FolderOpen, group: "Ship" },
+  { href: "/publishing", label: "Publishing", icon: Send, group: "Ship" },
+  { href: "/analytics", label: "Analytics", icon: BarChart3, group: "Learn" },
+  { href: "/settings", label: "Settings", icon: Settings, group: "Org" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -45,43 +45,69 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const { data: me } = useSWR<Me>(ready ? "/auth/me" : null, apiFetcher);
 
+  // theme injection (org-level white-label)
+  const { data: theme } = useSWR<{ accent_color?: string; brand_name?: string; logo_url?: string; hide_powered_by?: boolean }>(
+    ready ? "/orgs/me/theme" : null, apiFetcher,
+  );
+  useEffect(() => {
+    if (theme?.accent_color) {
+      document.documentElement.style.setProperty("--accent", theme.accent_color);
+    }
+  }, [theme?.accent_color]);
+
   if (!ready) return null;
 
+  // group nav items
+  const grouped: Record<string, typeof NAV> = {};
+  NAV.forEach((n) => { (grouped[n.group || "—"] ||= []).push(n); });
+  const groupOrder = ["Overview", "Foundation", "Create", "Ship", "Learn", "Org"];
+
   return (
-    <div className="grid grid-cols-[240px_1fr] min-h-screen">
-      <aside className="border-r border-line bg-panel sticky top-0 h-screen flex flex-col">
-        <div className="px-5 py-5 border-b border-line">
-          <div className="flex items-center gap-2">
-            <div className="grid grid-cols-2 gap-0.5">
-              <span className="size-2 rounded-sm bg-tennis" />
-              <span className="size-2 rounded-sm bg-padel" />
-              <span className="size-2 rounded-sm bg-pickleball" />
-              <span className="size-2 rounded-sm bg-badminton" />
-            </div>
-            <div className="font-serif text-lg leading-none">Marketing Brain</div>
-          </div>
-          <div className="text-xs text-mute mt-1 font-mono">v0.3 · phase 3</div>
+    <div className="grid grid-cols-[260px_1fr] min-h-screen bg-bg">
+      <aside className="border-r hairline bg-panel sticky top-0 h-screen flex flex-col">
+        <div className="px-5 py-5 border-b hairline">
+          <Link href="/" className="flex items-center gap-2.5">
+            {theme?.logo_url ? (
+              <img src={theme.logo_url} alt="" className="size-6 rounded" />
+            ) : (
+              <div className="grid grid-cols-2 gap-0.5">
+                <span className="size-2 rounded-sm bg-tennis" />
+                <span className="size-2 rounded-sm bg-padel" />
+                <span className="size-2 rounded-sm bg-pickleball" />
+                <span className="size-2 rounded-sm bg-badminton" />
+              </div>
+            )}
+            <div className="display text-lg leading-none">{theme?.brand_name || "Marketing Brain"}</div>
+          </Link>
+          {!theme?.hide_powered_by && (
+            <div className="text-[10px] text-mute mt-1 font-mono">v0.4 · phase 4</div>
+          )}
         </div>
         <nav className="flex-1 px-2 py-3 overflow-y-auto">
-          {NAV.map((n) => {
-            const active = pathname?.startsWith(n.href);
-            const Icon = n.icon;
-            return (
-              <Link
-                key={n.href}
-                href={n.href}
-                className={clsx(
-                  "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm",
-                  active ? "bg-panel2 text-ink" : "text-mute hover:text-ink hover:bg-panel2"
-                )}
-              >
-                <Icon className="size-4" />
-                {n.label}
-              </Link>
-            );
-          })}
+          {groupOrder.map((g) => grouped[g] && (
+            <div key={g} className="mb-3">
+              <div className="text-[10px] uppercase tracking-widest text-mute px-3 mb-1 font-mono">{g}</div>
+              {grouped[g].map((n) => {
+                const active = pathname === n.href || pathname?.startsWith(n.href + "/");
+                const Icon = n.icon;
+                return (
+                  <Link
+                    key={n.href}
+                    href={n.href}
+                    className={clsx(
+                      "flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition",
+                      active ? "bg-panel2 text-ink accent-ring" : "text-mute hover:text-ink hover:bg-panel2",
+                    )}
+                  >
+                    <Icon className="size-4" strokeWidth={1.6} />
+                    {n.label}
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
-        <div className="px-3 py-3 border-t border-line text-xs">
+        <div className="px-3 py-3 border-t hairline text-xs">
           <div className="font-mono text-mute truncate">{me?.email || "—"}</div>
           <div className="text-mute mt-0.5">role · <span className="text-ink">{me?.role || "—"}</span></div>
           <button
@@ -94,11 +120,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="flex flex-col">
-        <header className="sticky top-0 z-30 border-b border-line bg-bg/80 backdrop-blur">
+        <header className="sticky top-0 z-30 border-b hairline bg-bg/75 backdrop-blur">
           <div className="flex items-center justify-between px-6 py-3">
             <div className="flex items-center gap-3">
               <BrandSelector />
-              <span className="text-mute text-xs font-mono">→ Phase 3 · Native publishing</span>
+              <span className="text-mute text-xs font-mono hidden md:inline">→ {theme?.brand_name || "Marketing Brain"} · v0.4</span>
             </div>
             <div className="flex items-center gap-3">
               <CostMeter />

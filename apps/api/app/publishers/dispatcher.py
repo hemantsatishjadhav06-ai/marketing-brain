@@ -17,8 +17,10 @@ from app.publishers.klaviyo import KlaviyoPublisher
 from app.publishers.linkedin import LinkedInPublisher
 from app.publishers.meta_ig import MetaInstagramPublisher
 from app.publishers.pinterest import PinterestPublisher
+from app.publishers.tiktok import TikTokPublisher
 from app.publishers.webhook import WebhookPublisher
 from app.publishers.x_v2 import XPublisher
+from app.publishers.youtube import YouTubePublisher
 from app.services.publish_export import export_to_storage
 
 
@@ -29,6 +31,8 @@ PLATFORM_PUBLISHERS = {
     "pinterest": PinterestPublisher,
     "email": KlaviyoPublisher,
     "webhook": WebhookPublisher,
+    "youtube": YouTubePublisher,
+    "tiktok": TikTokPublisher,
 }
 
 

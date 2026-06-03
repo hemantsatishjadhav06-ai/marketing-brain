@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.core.db import get_db
 from app.core.security import require_role
 from app.models.tenancy import User
-from app.services.billing import create_checkout, get_subscription_summary
+from app.services.billing import create_checkout, create_portal_session, get_subscription_summary
 
 router = APIRouter()
 
@@ -39,3 +39,13 @@ def checkout(
         cancel_url=body.cancel_url,
     )
     return {"id": sess.id, "url": sess.url}
+
+
+class PortalIn(BaseModel):
+    return_url: str
+
+
+@router.post("/portal")
+def portal(body: PortalIn, user: User = Depends(require_role("admin"))):
+    """Stripe customer portal — self-serve cancel / change plan / invoices."""
+    return create_portal_session(user.org_id, return_url=body.return_url)

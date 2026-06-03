@@ -1,4 +1,4 @@
-"""Auth: login, register (owner-only invites), me."""
+"""Auth: login (with optional 2FA gate), register (admin-invite), me."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -13,19 +13,29 @@ from app.core.security import (
     require_user,
     verify_password,
 )
-from app.models.tenancy import User
+from app.models.tenancy import Org, User
 from app.schemas.auth import LoginIn, MeOut, RegisterIn, TokenOut
 
 router = APIRouter()
 
 
-@router.post("/login", response_model=TokenOut)
+def _totp_enabled(org: Org, user_id) -> bool:
+    settings_blob = (org.settings or {}).get("totp") or {}
+    return bool(settings_blob.get(str(user_id), {}).get("enabled"))
+
+
+@router.post("/login")
 def login(payload: LoginIn, db: Session = Depends(get_db)):
+    """Returns a TokenOut when 2FA is off, or a `{requires_2fa, user_id}` envelope
+    when the user has 2FA enabled. The client then posts to /auth/2fa/verify-login."""
     user = db.execute(select(User).where(User.email == payload.email)).scalar_one_or_none()
     if not user or not user.active or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    org = db.get(Org, user.org_id)
+    if _totp_enabled(org, user.id):
+        return {"requires_2fa": True, "user_id": str(user.id)}
     token = create_access_token(user.id, user.org_id, user.role)
-    return TokenOut(access_token=token)
+    return {"access_token": token, "token_type": "bearer"}
 
 
 @router.post("/register", response_model=MeOut, status_code=status.HTTP_201_CREATED)
