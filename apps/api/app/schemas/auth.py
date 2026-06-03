@@ -9,7 +9,10 @@ from app.schemas.common import ORM
 
 
 class LoginIn(BaseModel):
-    email: EmailStr
+    # plain str on login: it's just a DB lookup, and we don't want
+    # email-validator's reserved-TLD list rejecting (e.g.) ".local" addresses
+    # that legitimate self-hosted deploys use.
+    email: str
     password: str
 
 
