@@ -73,11 +73,59 @@ export default function Page() {
     }
   }
 
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  function toggle(id: string) {
+    setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }
+  async function bulkPublish() {
+    if (selected.size === 0) return;
+    setBusy("bulk");
+    let ok = 0, fail = 0;
+    for (const id of selected) {
+      try {
+        const r = await api<{ ok: boolean }>(`/publishing/publish/${id}`, { method: "POST" });
+        if (r.ok) ok++; else fail++;
+      } catch { fail++; }
+    }
+    setSelected(new Set());
+    setBusy(null);
+    toast.success(`Published ${ok}${fail ? ` · ${fail} failed` : ""}`);
+    mutate();
+  }
+  async function bulkDownload() {
+    if (selected.size === 0) return;
+    setBusy("bulk-dl");
+    try {
+      const t = (await import("@/lib/api")).getToken();
+      const r = await fetch("/api/publishing/export/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(t ? { Authorization: `Bearer ${t}` } : {}) },
+        body: JSON.stringify({ content_ids: [...selected] }),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `marketing-brain-bulk-${selected.size}.zip`; a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Downloaded ${selected.size} bundles`);
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBusy(null); }
+  }
+
   return (
     <AppShell>
       <PageHeader
         title="Publishing"
         description="Approved content. Configure a publish target per platform in Settings → Publish Targets; without one, we fall back to the export bundle."
+        action={selected.size > 0 ? (
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-mono text-mute">{selected.size} selected</span>
+            <Button variant="outline" onClick={() => setSelected(new Set())}>Clear</Button>
+            <Button variant="outline" onClick={bulkDownload} disabled={busy === "bulk-dl"}>{busy === "bulk-dl" ? "…" : `Download ${selected.size}.zip`}</Button>
+            <Button onClick={bulkPublish} disabled={busy === "bulk"}>{busy === "bulk" ? "…" : `Publish ${selected.size}`}</Button>
+          </div>
+        ) : undefined}
       />
       {!brandId && <Card className="p-8 text-mute text-sm">Select a brand in the top bar.</Card>}
       {brandId && targets && targets.length > 0 && (
@@ -104,6 +152,13 @@ export default function Page() {
           const willPublish = t && t.mode === "api" && t.credentials.configured && t.active;
           return (
             <Card key={c.id} className="p-4 flex items-center gap-4">
+              <input
+                type="checkbox"
+                checked={selected.has(c.id)}
+                onChange={() => toggle(c.id)}
+                className="size-4 accent-tennis"
+                title="Select for bulk publish / download"
+              />
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <StatusPill status={c.status} />

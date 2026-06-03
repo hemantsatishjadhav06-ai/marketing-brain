@@ -82,11 +82,40 @@ export default function Page() {
     }
   }
 
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  function toggle(id: string) {
+    setSelected((s) => {
+      const n = new Set(s);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  }
+  async function bulkApprove() {
+    if (!brandId || selected.size === 0) return;
+    setBusy("bulk");
+    let ok = 0, fail = 0;
+    for (const id of selected) {
+      try { await api(`/brands/${brandId}/reviews/${id}/approve`, { method: "POST" }); ok++; }
+      catch { fail++; }
+    }
+    setSelected(new Set());
+    setBusy(null);
+    toast.success(`Approved ${ok}${fail ? ` (${fail} failed)` : ""}`);
+    mutate();
+  }
+
   return (
     <AppShell>
       <PageHeader
         title="Reviews"
         description="Drafts awaiting critic + human approval. The Critic runs cross-sport hard gate first, then the LLM rubric."
+        action={selected.size > 0 ? (
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-mono text-mute">{selected.size} selected</span>
+            <Button variant="outline" onClick={() => setSelected(new Set())}>Clear</Button>
+            <Button onClick={bulkApprove} disabled={busy === "bulk"}>{busy === "bulk" ? "…" : `Approve ${selected.size}`}</Button>
+          </div>
+        ) : undefined}
       />
       {!brandId && <Card className="p-8 text-mute text-sm">Select a brand in the top bar.</Card>}
       {brandId && data && data.length === 0 && (
@@ -99,6 +128,13 @@ export default function Page() {
         {(data || []).map((c) => (
           <Card key={c.id} className="p-4">
             <div className="flex items-start gap-4">
+              <input
+                type="checkbox"
+                checked={selected.has(c.id)}
+                onChange={() => toggle(c.id)}
+                className="size-4 mt-2 accent-tennis"
+                title="Select for bulk action"
+              />
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <StatusPill status={c.status} />

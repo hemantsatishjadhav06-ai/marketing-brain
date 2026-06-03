@@ -1,9 +1,11 @@
-"""Org info + cost meter."""
+"""Org info + cost meter + white-label theme."""
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import Optional
 
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.cost_guard import month_to_date_spend
@@ -13,6 +15,13 @@ from app.models.tenancy import Org, User
 from app.schemas.orgs import CostMeter, OrgOut, OrgUpdateIn
 
 router = APIRouter()
+
+
+class ThemeIn(BaseModel):
+    brand_name: Optional[str] = None
+    accent_color: Optional[str] = None
+    logo_url: Optional[str] = None
+    hide_powered_by: Optional[bool] = None
 
 
 @router.get("/me", response_model=OrgOut)
@@ -42,18 +51,8 @@ def get_theme(user: User = Depends(require_user), db: Session = Depends(get_db))
     })
 
 
-from pydantic import BaseModel as _BaseModel  # local import to avoid pulling top-level
-
-
-class _ThemeIn(_BaseModel):
-    brand_name: str | None = None
-    accent_color: str | None = None
-    logo_url: str | None = None
-    hide_powered_by: bool | None = None
-
-
 @router.put("/me/theme")
-def set_theme(body: _ThemeIn, user: User = Depends(require_user), db: Session = Depends(get_db)):
+def set_theme(body: ThemeIn, user: User = Depends(require_user), db: Session = Depends(get_db)):
     org = db.get(Org, user.org_id)
     settings_blob = dict(org.settings or {})
     theme = dict(settings_blob.get("theme") or {})

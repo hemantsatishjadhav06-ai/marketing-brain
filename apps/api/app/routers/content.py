@@ -135,6 +135,77 @@ def draft(
     return result
 
 
+class PayloadPatch(BaseModel):
+    """Subset of mutable copy fields the user can edit before publish."""
+    headline: str | None = None
+    title: str | None = None
+    subject_line: str | None = None
+    preheader: str | None = None
+    caption: str | None = None
+    cta: str | None = None
+    hashtags: list[str] | None = None
+
+
+@router.patch("/{content_id}/payload")
+def edit_payload(
+    content_id: uuid.UUID,
+    body: PayloadPatch,
+    user: User = Depends(require_role("marketer")),
+    db: Session = Depends(get_db),
+):
+    """Inline edit of AI-generated copy. Whitelist of keys to preserve agent invariants."""
+    item = db.get(ContentItem, content_id)
+    if not item:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
+    brand = db.get(Brand, item.brand_id)
+    if not brand or brand.org_id != user.org_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
+    payload = dict(item.payload or {})
+    diff = body.model_dump(exclude_unset=True)
+    for k, v in diff.items():
+        if v is not None:
+            payload[k] = v
+    item.payload = payload
+    variant = db.execute(
+        select(ContentVariant).where(ContentVariant.content_item_id == item.id).where(ContentVariant.label == "A")
+    ).scalar_one_or_none()
+    if variant:
+        merged = dict(variant.payload or {})
+        for k, v in diff.items():
+            if v is not None:
+                merged[k] = v
+        variant.payload = merged
+    db.commit()
+    return {"id": str(item.id), "edited_keys": list(diff.keys())}
+
+
+class VariantPatch(BaseModel):
+    payload: dict
+
+
+@router.patch("/{content_id}/variants/{variant_id}")
+def edit_variant(
+    content_id: uuid.UUID,
+    variant_id: uuid.UUID,
+    body: VariantPatch,
+    user: User = Depends(require_role("marketer")),
+    db: Session = Depends(get_db),
+):
+    """Replace a single A/B variant's payload (full object swap)."""
+    item = db.get(ContentItem, content_id)
+    if not item:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
+    brand = db.get(Brand, item.brand_id)
+    if not brand or brand.org_id != user.org_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
+    variant = db.get(ContentVariant, variant_id)
+    if not variant or variant.content_item_id != item.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Variant not found")
+    variant.payload = body.payload
+    db.commit()
+    return {"id": str(variant.id), "label": variant.label}
+
+
 @router.post("/{content_id}/transition")
 def transition(
     content_id: uuid.UUID,

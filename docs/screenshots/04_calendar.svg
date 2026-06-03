@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="Inter, system-ui, sans-serif">
+  <rect width="1280" height="720" fill="#07070A"/>
+  <rect width="260" height="720" fill="#0F0F14"/>
+  <rect x="259" width="1" height="720" fill="#23232E"/>
+  <text x="290" y="50" fill="#F5F5F7" font-family="Fraunces, serif" font-size="32">Calendar</text>
+  <text x="290" y="74" fill="#C9C9D2" font-size="13">30-day plan from the Calendar agent. Drag entries between days. Click "Draft" to fire the agent.</text>
+  <g transform="translate(1080,40)">
+    <rect width="200" height="36" rx="10" fill="#CCFF00"/>
+    <text x="100" y="22" text-anchor="middle" fill="#0A0A0A" font-size="13" font-weight="500">Regenerate 30-day plan</text>
+  </g>
+  <!-- grid 5 cols x 3 rows of days -->
+  <g transform="translate(284,110)" font-family="JetBrains Mono, monospace" font-size="9">
+    <!-- helper macro: each cell 188w 160h -->
+    <g>
+      <!-- day 1 -->
+      <g><rect width="188" height="160" rx="10" fill="#0F0F14" stroke="#23232E"/>
+        <text x="10" y="18" fill="#8A8A95">Mon 3/6</text>
+        <g transform="translate(8,28)">
+          <rect width="172" height="56" rx="8" fill="#15151D" stroke="#23232E"/>
+          <rect x="6" y="6" width="56" height="14" rx="3" fill="#22D3EE" fill-opacity="0.15"/>
+          <text x="34" y="16" text-anchor="middle" fill="#22D3EE" font-size="9">instagram</text>
+          <text x="158" y="16" text-anchor="end" fill="#CCFF00">92</text>
+          <text x="6" y="34" fill="#F5F5F7" font-family="Inter" font-size="10">How to choose grip size</text>
+          <rect x="6" y="44" width="42" height="9" rx="2" fill="#15151D" stroke="#23232E"/>
+          <text x="27" y="51" text-anchor="middle" fill="#8A8A95" font-size="7">planned</text>
+          <text x="155" y="51" text-anchor="end" fill="#CCFF00">Draft</text>
+        </g>
+        <g transform="translate(8,92)">
+          <rect width="172" height="56" rx="8" fill="#15151D" stroke="#23232E"/>
+          <rect x="6" y="6" width="40" height="14" rx="3" fill="#A78BFA" fill-opacity="0.15"/>
+          <text x="26" y="16" text-anchor="middle" fill="#A78BFA" font-size="9">x</text>
+          <text x="158" y="16" text-anchor="end" fill="#CCFF00">83</text>
+          <text x="6" y="34" fill="#F5F5F7" font-family="Inter" font-size="10">Thread: 5 footwork drills</text>
+        </g>
+      </g>
+      <g transform="translate(196,0)">
+        <rect width="188" height="160" rx="10" fill="#0F0F14" stroke="#23232E"/>
+        <text x="10" y="18" fill="#8A8A95">Tue 4/6</text>
+        <g transform="translate(8,28)">
+          <rect width="172" height="56" rx="8" fill="#15151D" stroke="#23232E"/>
+          <rect x="6" y="6" width="56" height="14" rx="3" fill="#EF4444" fill-opacity="0.15"/>
+          <text x="34" y="16" text-anchor="middle" fill="#EF4444" font-size="9">youtube</text>
+          <text x="158" y="16" text-anchor="end" fill="#CCFF00">88</text>
+          <text x="6" y="34" fill="#F5F5F7" font-family="Inter" font-size="10">5 mistakes with tension</text>
+        </g>
+      </g>
+      <g transform="translate(392,0)">
+        <rect width="188" height="160" rx="10" fill="#0F0F14" stroke="#23232E"/>
+        <text x="10" y="18" fill="#8A8A95">Wed 5/6</text>
+        <g transform="translate(8,28)">
+          <rect width="172" height="56" rx="8" fill="#15151D" stroke="#23232E"/>
+          <rect x="6" y="6" width="40" height="14" rx="3" fill="#F59E0B" fill-opacity="0.15"/>
+          <text x="26" y="16" text-anchor="middle" fill="#F59E0B" font-size="9">blog</text>
+          <text x="158" y="16" text-anchor="end" fill="#CCFF00">86</text>
+          <text x="6" y="34" fill="#F5F5F7" font-family="Inter" font-size="10">Racket weight myths</text>
+        </g>
+      </g>
+      <g transform="translate(588,0)">
+        <rect width="188" height="160" rx="10" fill="#0F0F14" stroke="#23232E"/>
+        <text x="10" y="18" fill="#8A8A95">Thu 6/6</text>
+        <g transform="translate(8,28)">
+          <rect width="172" height="56" rx="8" fill="#15151D" stroke="#23232E"/>
+          <rect x="6" y="6" width="56" height="14" rx="3" fill="#22D3EE" fill-opacity="0.15"/>
+          <text x="34" y="16" text-anchor="middle" fill="#22D3EE" font-size="9">instagram</text>
+          <text x="158" y="16" text-anchor="end" fill="#CCFF00">81</text>
+          <text x="6" y="34" fill="#F5F5F7" font-family="Inter" font-size="10">Reel: 30s grip change</text>
+        </g>
+      </g>
+      <g transform="translate(784,0)">
+        <rect width="188" height="160" rx="10" fill="#0F0F14" stroke="#23232E"/>
+        <text x="10" y="18" fill="#8A8A95">Fri 7/6</text>
+        <g transform="translate(8,28)">
+          <rect width="172" height="56" rx="8" fill="#15151D" stroke="#23232E"/>
+          <rect x="6" y="6" width="40" height="14" rx="3" fill="#22D3EE" fill-opacity="0.15"/>
+          <text x="26" y="16" text-anchor="middle" fill="#22D3EE" font-size="9">email</text>
+          <text x="158" y="16" text-anchor="end" fill="#CCFF00">79</text>
+          <text x="6" y="34" fill="#F5F5F7" font-family="Inter" font-size="10">Weekly digest A/B</text>
+        </g>
+      </g>
+    </g>
+    <!-- row 2 -->
+    <g transform="translate(0,176)">
+      <g><rect width="188" height="160" rx="10" fill="#0F0F14" stroke="#23232E"/><text x="10" y="18" fill="#8A8A95">Sat 8/6</text></g>
+      <g transform="translate(196,0)"><rect width="188" height="160" rx="10" fill="#0F0F14" stroke="#23232E"/><text x="10" y="18" fill="#8A8A95">Sun 9/6</text></g>
+      <g transform="translate(392,0)"><rect width="188" height="160" rx="10" fill="#0F0F14" stroke="#CCFF00" stroke-opacity="0.5"/><text x="10" y="18" fill="#8A8A95">Mon 10/6</text><text x="94" y="80" text-anchor="middle" fill="#CCFF00" font-size="11" font-family="Inter">DROP HERE</text></g>
+      <g transform="translate(588,0)"><rect width="188" height="160" rx="10" fill="#0F0F14" stroke="#23232E"/><text x="10" y="18" fill="#8A8A95">Tue 11/6</text></g>
+      <g transform="translate(784,0)"><rect width="188" height="160" rx="10" fill="#0F0F14" stroke="#23232E"/><text x="10" y="18" fill="#8A8A95">Wed 12/6</text></g>
+    </g>
+  </g>
+</svg>

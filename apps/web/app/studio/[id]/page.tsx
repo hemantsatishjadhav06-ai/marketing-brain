@@ -1,11 +1,27 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import useSWR from "swr";
 import { toast } from "sonner";
+import { Download, Pencil, Check, X } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import { Button, Card, PageHeader, StatusPill } from "@/components/ui";
-import { api, apiFetcher } from "@/lib/api";
+import { Button, Card, Input, PageHeader, StatusPill } from "@/components/ui";
+import { api, apiFetcher, getToken } from "@/lib/api";
+
+async function downloadBlob(url: string, fallbackName: string) {
+  const t = getToken();
+  const r = await fetch(url, { headers: t ? { Authorization: `Bearer ${t}` } : {} });
+  if (!r.ok) { toast.error(`Download failed (${r.status})`); return; }
+  const blob = await r.blob();
+  const cd = r.headers.get("content-disposition") || "";
+  const m = cd.match(/filename="([^"]+)"/);
+  const filename = m ? m[1] : fallbackName;
+  const u = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = u; a.download = filename; a.click();
+  URL.revokeObjectURL(u);
+  toast.success("Downloaded");
+}
 
 type Variant = { id: string; label: string; payload: any };
 type Review = {
@@ -32,27 +48,58 @@ type Item = {
   created_at: string;
 };
 
-function Caption({ payload }: { payload: any }) {
+function EditableField({
+  k, value, onSave,
+}: { k: string; value: string; onSave: (v: string) => Promise<void> }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => setDraft(value), [value]);
+  return (
+    <div className="group">
+      <div className="text-[10px] font-mono text-mute uppercase flex items-center justify-between">
+        <span>{k.replace("_", " ")}</span>
+        {!editing && (
+          <button onClick={() => setEditing(true)} className="opacity-0 group-hover:opacity-100 text-mute hover:text-ink">
+            <Pencil className="size-3" />
+          </button>
+        )}
+      </div>
+      {!editing ? (
+        <div className="text-sm whitespace-pre-wrap">{value || <span className="text-mute italic">empty</span>}</div>
+      ) : (
+        <div className="mt-1 flex gap-2">
+          <textarea
+            value={draft} onChange={(e) => setDraft(e.target.value)} autoFocus rows={Math.max(2, Math.ceil(draft.length / 70))}
+            className="flex-1 rounded-xl border hairline bg-panel2 px-3 py-2 text-sm focus-ring"
+          />
+          <div className="flex flex-col gap-1">
+            <button disabled={busy} onClick={async () => { setBusy(true); try { await onSave(draft); setEditing(false); } finally { setBusy(false); } }}
+              className="size-7 grid place-items-center rounded accent-bg hover:opacity-90"><Check className="size-3" /></button>
+            <button onClick={() => { setDraft(value); setEditing(false); }} className="size-7 grid place-items-center rounded bg-panel2 text-mute hover:text-ink"><X className="size-3" /></button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Caption({ payload, onPatch }: { payload: any; onPatch: (patch: Record<string, any>) => Promise<void> }) {
   const fields: [string, any][] = [];
   for (const k of ["headline", "title", "subject_line", "preheader", "caption", "cta"]) {
-    if (payload?.[k]) fields.push([k, payload[k]]);
+    if (payload?.[k] !== undefined) fields.push([k, payload[k] ?? ""]);
   }
-  if (!fields.length) return null;
+  if (!fields.length && !payload?.hashtags) return null;
   return (
     <Card className="p-4">
-      <div className="text-xs font-mono text-mute mb-3">CAPTION / COPY</div>
-      <div className="space-y-2">
+      <div className="text-xs font-mono text-mute mb-3">CAPTION / COPY — hover to edit</div>
+      <div className="space-y-3">
         {fields.map(([k, v]) => (
-          <div key={k}>
-            <div className="text-[10px] font-mono text-mute uppercase">{k.replace("_", " ")}</div>
-            <div className="text-sm whitespace-pre-wrap">{String(v)}</div>
-          </div>
+          <EditableField key={k} k={k} value={String(v || "")} onSave={(nv) => onPatch({ [k]: nv })} />
         ))}
         {payload.hashtags?.length > 0 && (
-          <div>
-            <div className="text-[10px] font-mono text-mute uppercase">hashtags</div>
-            <div className="text-sm text-tennis">{payload.hashtags.join(" ")}</div>
-          </div>
+          <EditableField k="hashtags" value={(payload.hashtags || []).join(" ")}
+            onSave={(nv) => onPatch({ hashtags: nv.split(/\s+/).filter(Boolean) })} />
         )}
       </div>
     </Card>
@@ -265,7 +312,34 @@ export default function Page() {
     } catch (e: any) { toast.error(e.message); }
   }
 
-  if (!data) return <AppShell><Card className="p-8">Loading…</Card></AppShell>;
+  async function patchPayload(patch: Record<string, any>) {
+    if (!data) return;
+    try {
+      await api(`/content/${data.id}/payload`, { method: "PATCH", body: JSON.stringify(patch) });
+      toast.success("Saved");
+      mutate();
+    } catch (e: any) { toast.error(e.message); }
+  }
+
+  async function downloadVariant(variantId: string) {
+    if (!data) return;
+    await downloadBlob(`/api/content/${data.id}/download/variant/${variantId}`, `variant-${variantId}.zip`);
+  }
+
+  async function downloadFullBundle() {
+    if (!data) return;
+    await downloadBlob(`/api/publishing/export/${data.id}/download`, `${data.platform}_${data.content_type}_${data.id}.zip`);
+  }
+
+  if (!data) return (
+    <AppShell>
+      <Card className="p-8 space-y-3">
+        <div className="h-7 w-2/3 rounded skeleton" />
+        <div className="h-4 w-1/3 rounded skeleton" />
+        <div className="h-64 w-full rounded skeleton mt-4" />
+      </Card>
+    </AppShell>
+  );
 
   return (
     <AppShell>
@@ -282,14 +356,15 @@ export default function Page() {
             <Button variant="outline" onClick={runCritic}>Run critic</Button>
             {data.status === "drafted" && <Button onClick={() => transition("under_review")}>Send to review</Button>}
             {data.status === "under_review" && <Button onClick={() => transition("approved")}>Approve</Button>}
-            <Button variant="ghost" onClick={exportBundle}>Export bundle</Button>
+            <Button variant="ghost" onClick={downloadFullBundle}>Download bundle</Button>
+            <Button variant="ghost" onClick={exportBundle}>Export to URL</Button>
           </div>
         }
       />
       <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4">
         <div className="space-y-4">
           <Media payload={data.payload} />
-          <Caption payload={data.payload} />
+          <Caption payload={data.payload} onPatch={patchPayload} />
         </div>
         <div className="space-y-4">
           <Card className="p-4">
@@ -338,6 +413,10 @@ export default function Page() {
                   <div key={v.id} className="border-t hairline pt-3 first:border-0 first:pt-0">
                     <div className="flex items-center gap-2 text-[10px] font-mono">
                       <span className="accent-bg rounded px-1.5 py-0.5">VARIANT {v.label}</span>
+                      <button onClick={() => downloadVariant(v.id)}
+                        className="ml-auto inline-flex items-center gap-1 text-mute hover:text-ink">
+                        <Download className="size-3" /> .zip
+                      </button>
                     </div>
                     <div className="text-sm mt-2 line-clamp-3">{headline}</div>
                     {subline && <div className="text-xs text-mute mt-1 line-clamp-2">{subline}</div>}

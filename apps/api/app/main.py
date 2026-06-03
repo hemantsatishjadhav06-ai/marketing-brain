@@ -21,6 +21,8 @@ from app.routers import (
     brand_brain,
     calendar,
     content,
+    content_search,
+    downloads,
     health,
     jobs,
     orgs,
@@ -160,6 +162,8 @@ def create_app() -> FastAPI:
     app.include_router(analytics_pull.router, prefix="/brands", tags=["analytics-pull"])
     app.include_router(billing.router, prefix="/billing", tags=["billing"])
     app.include_router(shopify_webhook.router, prefix="/webhooks/shopify", tags=["webhooks"])
+    app.include_router(downloads.router, tags=["downloads"])
+    app.include_router(content_search.router, prefix="/brands/{brand_id}/content", tags=["search"])
 
     return app
 

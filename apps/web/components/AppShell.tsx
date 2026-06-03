@@ -12,6 +12,7 @@ import {
 import { apiFetcher, clearToken, getToken } from "@/lib/api";
 import { BrandSelector } from "./BrandSelector";
 import { CostMeter } from "./CostMeter";
+import { SearchPalette } from "./SearchPalette";
 import useSWR from "swr";
 import type { Me } from "@/lib/types";
 
@@ -127,6 +128,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <span className="text-mute text-xs font-mono hidden md:inline">→ {theme?.brand_name || "Marketing Brain"} · v0.4</span>
             </div>
             <div className="flex items-center gap-3">
+              <SearchPalette />
               <CostMeter />
             </div>
           </div>

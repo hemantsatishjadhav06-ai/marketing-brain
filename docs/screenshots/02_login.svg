@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="Inter, system-ui, sans-serif">
+  <defs>
+    <radialGradient id="auroraL" cx="50%" cy="30%" r="55%">
+      <stop offset="0%" stop-color="#CCFF00" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="#07070A" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1280" height="720" fill="#07070A"/>
+  <rect width="1280" height="720" fill="url(#auroraL)"/>
+  <!-- left column -->
+  <g transform="translate(120,180)">
+    <text x="0" y="0" font-family="Fraunces, serif" font-size="56" fill="#F5F5F7" letter-spacing="-2">One brain.</text>
+    <text x="0" y="62" font-family="Fraunces, serif" font-size="56" fill="#CCFF00" letter-spacing="-2">Five sports.</text>
+    <text x="280" y="62" font-family="Fraunces, serif" font-size="56" fill="#F5F5F7" letter-spacing="-2">Zero crossover.</text>
+    <text x="0" y="125" fill="#C9C9D2" font-size="16">Tennis · padel · pickleball · badminton · squash — each its own</text>
+    <text x="0" y="145" fill="#C9C9D2" font-size="16">isolated vertical with its own brand voice, calendar, publish targets.</text>
+  </g>
+  <!-- right column login card -->
+  <g transform="translate(760,160)">
+    <rect width="400" height="380" rx="20" fill="#0F0F14" stroke="#23232E"/>
+    <text x="32" y="50" font-family="Fraunces, serif" font-size="30" fill="#F5F5F7">Welcome back</text>
+    <text x="32" y="78" fill="#8A8A95" font-size="14">Sign in to your cockpit.</text>
+    <!-- email -->
+    <text x="32" y="120" font-family="JetBrains Mono, monospace" font-size="10" fill="#8A8A95">EMAIL</text>
+    <rect x="32" y="130" width="336" height="42" rx="12" fill="#15151D" stroke="#23232E"/>
+    <text x="46" y="156" fill="#F5F5F7" font-size="14">owner@marketing-brain.local</text>
+    <!-- password -->
+    <text x="32" y="195" font-family="JetBrains Mono, monospace" font-size="10" fill="#8A8A95">PASSWORD</text>
+    <rect x="32" y="205" width="336" height="42" rx="12" fill="#15151D" stroke="#23232E"/>
+    <text x="46" y="231" fill="#F5F5F7" font-size="14">••••••••••••••••</text>
+    <!-- submit -->
+    <rect x="32" y="270" width="336" height="48" rx="14" fill="#CCFF00"/>
+    <text x="200" y="300" text-anchor="middle" fill="#0A0A0A" font-size="15" font-weight="500">Sign in →</text>
+  </g>
+</svg>

@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="Inter, system-ui, sans-serif">
+  <rect width="1280" height="720" fill="#07070A"/>
+  <rect width="260" height="720" fill="#0F0F14"/>
+  <rect x="259" width="1" height="720" fill="#23232E"/>
+  <text x="290" y="50" fill="#F5F5F7" font-family="Fraunces, serif" font-size="28">How to choose grip size — beginner guide</text>
+  <g transform="translate(290,66)" font-size="11">
+    <rect width="56" height="18" rx="9" fill="#44E08F" fill-opacity="0.15"/>
+    <text x="28" y="13" text-anchor="middle" fill="#44E08F" font-family="JetBrains Mono, monospace">approved</text>
+    <text x="68" y="13" fill="#8A8A95" font-family="JetBrains Mono, monospace">instagram · static_post · static_post</text>
+  </g>
+  <!-- action buttons -->
+  <g transform="translate(810,38)" font-size="12">
+    <rect width="92" height="36" rx="10" fill="#15151D" stroke="#23232E"/><text x="46" y="22" text-anchor="middle" fill="#F5F5F7">Run critic</text>
+    <g transform="translate(100,0)"><rect width="128" height="36" rx="10" fill="#CCFF00"/><text x="64" y="22" text-anchor="middle" fill="#0A0A0A" font-weight="500">Send to review</text></g>
+    <g transform="translate(236,0)"><rect width="148" height="36" rx="10" fill="#15151D" stroke="#23232E"/><text x="74" y="22" text-anchor="middle" fill="#F5F5F7">⬇ Download bundle</text></g>
+  </g>
+  <!-- main: media + caption -->
+  <g transform="translate(290,108)">
+    <rect width="600" height="280" rx="14" fill="#0F0F14" stroke="#23232E"/>
+    <!-- mock image preview -->
+    <rect x="10" y="10" width="580" height="260" rx="10" fill="#15151D"/>
+    <text x="300" y="100" text-anchor="middle" fill="#CCFF00" font-family="Fraunces, serif" font-size="28">How to choose grip size</text>
+    <text x="300" y="130" text-anchor="middle" fill="#8A8A95" font-size="12">— beginner guide</text>
+    <rect x="10" y="252" width="580" height="18" fill="#CCFF00"/>
+  </g>
+  <!-- caption editable card -->
+  <g transform="translate(290,398)">
+    <rect width="600" height="220" rx="14" fill="#0F0F14" stroke="#23232E"/>
+    <text x="16" y="24" fill="#8A8A95" font-family="JetBrains Mono, monospace" font-size="10">CAPTION / COPY — hover to edit</text>
+    <g transform="translate(16,40)" font-size="12">
+      <text fill="#8A8A95" font-family="JetBrains Mono, monospace" font-size="9">HEADLINE  ✎</text>
+      <text y="18" fill="#F5F5F7">Choose your grip size in 60 seconds.</text>
+      <text y="46" fill="#8A8A95" font-family="JetBrains Mono, monospace" font-size="9">CAPTION</text>
+      <text y="64" fill="#F5F5F7">Most players grip too thick. Here's the test that decides — without a coach.</text>
+      <text y="92" fill="#8A8A95" font-family="JetBrains Mono, monospace" font-size="9">CTA</text>
+      <text y="110" fill="#F5F5F7">Save this. Try it tomorrow.</text>
+      <text y="138" fill="#8A8A95" font-family="JetBrains Mono, monospace" font-size="9">HASHTAGS</text>
+      <text y="156" fill="#CCFF00">#tennis #grip #beginner #training #tennisoutlet</text>
+    </g>
+  </g>
+  <!-- right rail: critic + variants -->
+  <g transform="translate(910,108)">
+    <rect width="350" height="280" rx="14" fill="#0F0F14" stroke="#23232E"/>
+    <text x="16" y="24" fill="#8A8A95" font-family="JetBrains Mono, monospace" font-size="10">CRITIC HISTORY</text>
+    <g transform="translate(16,40)">
+      <text fill="#44E08F" font-family="JetBrains Mono, monospace" font-size="12">88.4 ✓</text>
+      <text x="318" text-anchor="end" fill="#8A8A95" font-size="10" font-family="JetBrains Mono, monospace">2 min ago</text>
+      <g transform="translate(0,18)" font-size="11" font-family="JetBrains Mono, monospace">
+        <text fill="#8A8A95" y="14">brand_fit</text><text x="316" text-anchor="end" y="14" fill="#F5F5F7">92</text>
+        <text fill="#8A8A95" y="32">product_accuracy</text><text x="316" text-anchor="end" y="32" fill="#F5F5F7">90</text>
+        <text fill="#8A8A95" y="50">platform_fit</text><text x="316" text-anchor="end" y="50" fill="#F5F5F7">85</text>
+        <text fill="#8A8A95" y="68">audience_relevance</text><text x="316" text-anchor="end" y="68" fill="#F5F5F7">88</text>
+        <text fill="#8A8A95" y="86">visual_clarity</text><text x="316" text-anchor="end" y="86" fill="#F5F5F7">86</text>
+        <text fill="#8A8A95" y="104">cta_strength</text><text x="316" text-anchor="end" y="104" fill="#F5F5F7">87</text>
+      </g>
+    </g>
+  </g>
+  <g transform="translate(910,398)">
+    <rect width="350" height="220" rx="14" fill="#0F0F14" stroke="#23232E"/>
+    <text x="16" y="24" fill="#8A8A95" font-family="JetBrains Mono, monospace" font-size="10">VARIANTS — 2</text>
+    <g transform="translate(16,38)">
+      <rect width="48" height="16" rx="3" fill="#CCFF00"/>
+      <text x="24" y="12" text-anchor="middle" fill="#0A0A0A" font-family="JetBrains Mono, monospace" font-size="9">VARIANT A</text>
+      <text x="318" y="12" text-anchor="end" fill="#8A8A95" font-family="JetBrains Mono, monospace" font-size="9">⬇ .zip</text>
+      <text y="32" fill="#F5F5F7" font-size="11">Choose your grip size in 60 seconds.</text>
+      <text y="50" fill="#8A8A95" font-size="10">Save this. Try it tomorrow.</text>
+    </g>
+    <g transform="translate(16,108)">
+      <rect width="48" height="16" rx="3" fill="#CCFF00"/>
+      <text x="24" y="12" text-anchor="middle" fill="#0A0A0A" font-family="JetBrains Mono, monospace" font-size="9">VARIANT B</text>
+      <text x="318" y="12" text-anchor="end" fill="#8A8A95" font-family="JetBrains Mono, monospace" font-size="9">⬇ .zip</text>
+      <text y="32" fill="#F5F5F7" font-size="11">Are you gripping too thick?</text>
+      <text y="50" fill="#8A8A95" font-size="10">60-second test inside →</text>
+    </g>
+  </g>
+</svg>
