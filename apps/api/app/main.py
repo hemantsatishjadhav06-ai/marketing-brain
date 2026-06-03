@@ -50,13 +50,23 @@ def _auto_migrate() -> None:
         from alembic import command
         from alembic.config import Config
 
+        from app.core.db import DATABASE_URL as NORMALISED_URL
+
         cfg = Config()
-        cfg.set_main_option("script_location", os.path.join(os.path.dirname(__file__), "..", "alembic"))
-        cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+        cfg.set_main_option(
+            "script_location",
+            os.path.join(os.path.dirname(__file__), "..", "alembic"),
+        )
+        # Alembic must use the SAME psycopg-normalised URL the engine uses,
+        # otherwise it tries to import psycopg2 (not installed).
+        cfg.set_main_option("sqlalchemy.url", NORMALISED_URL)
         command.upgrade(cfg, "head")
         log.info("alembic upgrade head OK")
     except Exception as e:  # noqa: BLE001 — never block boot
         log.warning("alembic auto-migrate skipped: %s", e)
+        # surface the trace to Render's log stream so we can debug
+        import traceback
+        log.warning(traceback.format_exc()[:2000])
 
 
 def _seed_owner() -> None:
