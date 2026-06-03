@@ -42,6 +42,58 @@ def _download(url: str, dest: Path) -> Path:
     return dest
 
 
+class ShortVideoAgent:
+    """Class-based wrapper used by the agent registry / CalendarEntry dispatcher."""
+
+    name = "short_video"
+
+    def run(self, db: Session, brand_id: uuid.UUID, entry_id: uuid.UUID) -> dict:
+        from app.models.content import CalendarEntry, ContentItem, ContentVariant
+        from app.models.brand import Brand
+
+        entry = db.get(CalendarEntry, entry_id)
+        if not entry or entry.brand_id != brand_id:
+            raise ValueError("calendar entry not found")
+        if not entry.product_ids:
+            raise ValueError("short_video agent requires a product on the entry")
+        brand = db.get(Brand, brand_id)
+        # spin a stub Job to reuse the legacy pipeline
+        job = Job(
+            org_id=brand.org_id,
+            brand_id=brand_id,
+            agent="short_video",
+            payload={"product_id": entry.product_ids[0]},
+            status="running",
+            tokens_in=0,
+            tokens_out=0,
+            cost_usd=0,
+        )
+        db.add(job)
+        db.flush()
+        result = run_product_video(db, job)
+        item = ContentItem(
+            brand_id=brand_id,
+            platform=entry.platform,
+            content_type=entry.content_type,
+            angle=entry.angle,
+            product_ids=entry.product_ids,
+            payload=result,
+            status="drafted",
+            agent_name=self.name,
+            created_by="ai",
+        )
+        db.add(item)
+        db.flush()
+        db.add(ContentVariant(content_item_id=item.id, label="A", payload=result))
+        entry.content_item_id = item.id
+        entry.status = "drafted"
+        job.status = "succeeded"
+        job.result = result
+        db.commit()
+        result["content_item_id"] = str(item.id)
+        return result
+
+
 def run_product_video(db: Session, job: Job) -> dict:
     """`payload`: { product_id: uuid }. Returns { video_url, script, scenes_meta, critic }."""
     product_id = uuid.UUID(job.payload["product_id"])

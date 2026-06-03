@@ -1,13 +1,15 @@
-"""Calendar — list + generate stubs."""
+"""Calendar — list, generate, move, lock (Phase 1)."""
 from __future__ import annotations
 
 import uuid
-from typing import List
+from datetime import date as date_t
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.agents.calendar import CalendarAgent
 from app.core.db import get_db
 from app.core.security import require_role, require_user
 from app.models.brand import Brand
@@ -17,13 +19,25 @@ from app.models.tenancy import User
 router = APIRouter()
 
 
-@router.get("/{brand_id}/calendar")
-def list_entries(brand_id: uuid.UUID, user: User = Depends(require_user), db: Session = Depends(get_db)):
+def _brand_or_404(db: Session, brand_id: uuid.UUID, user: User) -> Brand:
     brand = db.get(Brand, brand_id)
     if not brand or brand.org_id != user.org_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Brand not found")
+    return brand
+
+
+@router.get("/{brand_id}/calendar")
+def list_entries(
+    brand_id: uuid.UUID,
+    days: int = Query(30, ge=1, le=120),
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    _brand_or_404(db, brand_id, user)
     rows = db.execute(
-        select(CalendarEntry).where(CalendarEntry.brand_id == brand_id).order_by(CalendarEntry.date)
+        select(CalendarEntry)
+        .where(CalendarEntry.brand_id == brand_id)
+        .order_by(CalendarEntry.date, CalendarEntry.position)
     ).scalars().all()
     return [
         {
@@ -31,26 +45,88 @@ def list_entries(brand_id: uuid.UUID, user: User = Depends(require_user), db: Se
             "date": e.date.isoformat(),
             "platform": e.platform,
             "content_type": e.content_type,
+            "product_ids": e.product_ids,
             "angle": e.angle,
             "score": float(e.score),
             "reason": e.reason,
             "status": e.status,
             "agent_name": e.agent_name,
+            "content_item_id": str(e.content_item_id) if e.content_item_id else None,
+            "position": e.position,
         }
         for e in rows
     ]
 
 
+class GenerateBody(BaseModel):
+    days: int = Field(30, ge=1, le=60)
+    replace_existing: bool = True
+
+
 @router.post("/{brand_id}/calendar/generate", status_code=status.HTTP_202_ACCEPTED)
 def generate_calendar(
     brand_id: uuid.UUID,
+    body: GenerateBody = GenerateBody(),
     user: User = Depends(require_role("growth_head")),
     db: Session = Depends(get_db),
 ):
-    """Phase 1 wiring: queues a 'calendar.generate' job → CalendarAgent.run(brand_id).
-    Phase 0: stub.
-    """
-    brand = db.get(Brand, brand_id)
-    if not brand or brand.org_id != user.org_id:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Brand not found")
-    return {"status": "not_implemented_in_phase_0", "brand_id": str(brand_id)}
+    _brand_or_404(db, brand_id, user)
+    return CalendarAgent().generate(
+        db, brand_id, days=body.days, replace_existing=body.replace_existing
+    )
+
+
+class MoveBody(BaseModel):
+    date: date_t
+    position: int = 0
+
+
+@router.patch("/{brand_id}/calendar/{entry_id}/move")
+def move_entry(
+    brand_id: uuid.UUID,
+    entry_id: uuid.UUID,
+    body: MoveBody,
+    user: User = Depends(require_role("marketer")),
+    db: Session = Depends(get_db),
+):
+    _brand_or_404(db, brand_id, user)
+    entry = db.get(CalendarEntry, entry_id)
+    if not entry or entry.brand_id != brand_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Entry not found")
+    entry.date = body.date
+    entry.position = body.position
+    db.commit()
+    return {"id": str(entry.id), "date": entry.date.isoformat(), "position": entry.position}
+
+
+@router.patch("/{brand_id}/calendar/{entry_id}/status")
+def set_entry_status(
+    brand_id: uuid.UUID,
+    entry_id: uuid.UUID,
+    to: str = Query(..., pattern="^(planned|locked|drafting|drafted|approved|scheduled|published|skipped)$"),
+    user: User = Depends(require_role("marketer")),
+    db: Session = Depends(get_db),
+):
+    _brand_or_404(db, brand_id, user)
+    entry = db.get(CalendarEntry, entry_id)
+    if not entry or entry.brand_id != brand_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Entry not found")
+    entry.status = to
+    db.commit()
+    return {"id": str(entry.id), "status": entry.status}
+
+
+@router.delete("/{brand_id}/calendar/{entry_id}")
+def delete_entry(
+    brand_id: uuid.UUID,
+    entry_id: uuid.UUID,
+    user: User = Depends(require_role("marketer")),
+    db: Session = Depends(get_db),
+):
+    _brand_or_404(db, brand_id, user)
+    entry = db.get(CalendarEntry, entry_id)
+    if not entry or entry.brand_id != brand_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Entry not found")
+    db.delete(entry)
+    db.commit()
+    return {"deleted": str(entry_id)}

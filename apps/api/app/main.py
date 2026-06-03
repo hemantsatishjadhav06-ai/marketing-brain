@@ -9,6 +9,8 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.routers import (
+    analytics,
+    assets,
     auth,
     brands,
     brand_brain,
@@ -18,8 +20,12 @@ from app.routers import (
     jobs,
     orgs,
     products,
+    publishing,
+    repurpose,
+    reviews,
     scoring,
     sse,
+    trends,
 )
 
 
@@ -30,7 +36,7 @@ def create_app() -> FastAPI:
             "AI Marketing Content Brain for racket-sport e-commerce. "
             "Multi-agent · brand-isolated · cost-guarded."
         ),
-        version="0.1.0",
+        version="0.2.0",
     )
 
     app.add_middleware(
@@ -56,7 +62,13 @@ def create_app() -> FastAPI:
     app.include_router(sse.router, prefix="/sse", tags=["sse"])
     app.include_router(scoring.router, prefix="/brands", tags=["scoring"])
     app.include_router(calendar.router, prefix="/brands", tags=["calendar"])
+    app.include_router(trends.router, prefix="/brands", tags=["trends"])
+    app.include_router(reviews.router, prefix="/brands", tags=["reviews"])
+    app.include_router(assets.router, prefix="/brands", tags=["assets"])
     app.include_router(content.router, prefix="/content", tags=["content"])
+    app.include_router(publishing.router, prefix="/publishing", tags=["publishing"])
+    app.include_router(repurpose.router, prefix="/repurpose", tags=["repurpose"])
+    app.include_router(analytics.router, prefix="/brands", tags=["analytics"])
 
     return app
 
