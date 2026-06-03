@@ -1,0 +1,105 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: brain
+      POSTGRES_PASSWORD: brain
+      POSTGRES_DB: marketing_brain
+    ports:
+      - "5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U brain -d marketing_brain"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6381:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: ./apps/api
+    command: >
+      sh -c "
+      python -m app.cli wait-db &&
+      alembic upgrade head &&
+      python -m app.cli seed-defaults &&
+      uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      "
+    environment:
+      DATABASE_URL: postgresql+psycopg://brain:brain@postgres:5432/marketing_brain
+      REDIS_URL: redis://redis:6379/0
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      FAL_KEY: ${FAL_KEY:-}
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me-32chars-min-xxxxxxxxxxx}
+      CORS_ORIGINS: http://localhost:3006,http://localhost:3005,http://localhost:3000
+      STORAGE_BACKEND: local
+      STORAGE_LOCAL_PATH: /app/storage
+      PUBLIC_BASE_URL: http://localhost:8001
+      DEFAULT_OWNER_EMAIL: ${DEFAULT_OWNER_EMAIL:-owner@marketing-brain.local}
+      DEFAULT_OWNER_PASSWORD: ${DEFAULT_OWNER_PASSWORD:-changeme}
+      DEFAULT_ORG_NAME: ${DEFAULT_ORG_NAME:-Racket Sports Group}
+      DEFAULT_MONTHLY_COST_CAP_USD: ${DEFAULT_MONTHLY_COST_CAP_USD:-200}
+      OPENROUTER_MODEL_REASONING: anthropic/claude-sonnet-4.5
+      OPENROUTER_MODEL_DRAFTING: anthropic/claude-haiku-4.5
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./apps/api/app:/app/app
+      - ./apps/api/alembic:/app/alembic
+      - api_storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build: ./apps/api
+    command: >
+      sh -c "
+      python -m app.cli wait-db &&
+      python -m app.workers.worker
+      "
+    environment:
+      DATABASE_URL: postgresql+psycopg://brain:brain@postgres:5432/marketing_brain
+      REDIS_URL: redis://redis:6379/0
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      FAL_KEY: ${FAL_KEY:-}
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me-32chars-min-xxxxxxxxxxx}
+      STORAGE_BACKEND: local
+      STORAGE_LOCAL_PATH: /app/storage
+      PUBLIC_BASE_URL: http://localhost:8001
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
+      OPENROUTER_MODEL_REASONING: anthropic/claude-sonnet-4.5
+      OPENROUTER_MODEL_DRAFTING: anthropic/claude-haiku-4.5
+    volumes:
+      - ./apps/api/app:/app/app
+      - api_storage:/app/storage
+    depends_on:
+      api:
+        condition: service_started
+
+  web:
+    build:
+      context: ./apps/web
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8001
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8001
+    ports:
+      - "3006:3000"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  api_storage:

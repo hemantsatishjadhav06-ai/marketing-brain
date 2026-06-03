@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* design tokens */
+:root {
+  --bg: #08080A;
+  --panel: #0F0F12;
+  --panel-2: #14141A;
+  --line: #1F1F26;
+  --ink: #F5F5F7;
+  --mute: #8A8A93;
+}
+
+html, body { background: var(--bg); color: var(--ink); }
+body { font-family: Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+
+/* fonts via Google Fonts */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap");
+
+/* scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2A2A33; border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: #3A3A45; }
+
+/* focus rings (lime — tennis default; per-brand override done via CSS var) */
+.focus-ring:focus-visible { outline: 2px solid #CCFF00; outline-offset: 2px; }
