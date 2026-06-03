@@ -32,6 +32,7 @@ from app.routers import (
     repurpose,
     reviews,
     scoring,
+    scoring_v2,
     shopify_webhook,
     sse,
     trend_ingest,
@@ -149,6 +150,7 @@ def create_app() -> FastAPI:
     app.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
     app.include_router(sse.router, prefix="/sse", tags=["sse"])
     app.include_router(scoring.router, prefix="/brands", tags=["scoring"])
+    app.include_router(scoring_v2.router, prefix="/brands", tags=["scoring-v2"])
     app.include_router(calendar.router, prefix="/brands", tags=["calendar"])
     app.include_router(trends.router, prefix="/brands", tags=["trends"])
     app.include_router(trend_ingest.router, prefix="/brands", tags=["trend-ingest"])

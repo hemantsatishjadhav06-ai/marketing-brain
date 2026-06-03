@@ -32,14 +32,17 @@ class Publisher(Protocol):
 
 
 def credentials(target: PublishTarget) -> dict:
-    """credentials_ref is a JSON-encoded blob (we keep it simple for Phase 3;
-    Phase 4 will move secrets to a real KV store with envelope encryption)."""
+    """credentials_ref is a Fernet-encrypted JSON blob (spec § 24).
+    Falls back to legacy plaintext JSON if the value was stored before
+    encryption landed — those get re-encrypted on next write."""
     import json
+    from app.core.crypto import decrypt
 
     raw = (target.credentials_ref or "").strip()
     if not raw:
         return {}
     try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
+        decoded = decrypt(raw)
+        return json.loads(decoded)
+    except (json.JSONDecodeError, ValueError):
         return {}

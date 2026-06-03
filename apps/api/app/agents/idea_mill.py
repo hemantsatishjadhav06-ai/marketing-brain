@@ -46,6 +46,11 @@ CHANNEL_TYPES = [
     ("meta_ads", "ad"),              # paid Meta ads
     ("google_ads", "ad"),            # paid Google Search ads
     ("reddit", "post"),
+    ("quora", "answer"),             # community / Q&A long-form
+    ("reddit", "answer"),            # subreddit answers
+    ("pinterest", "pin"),            # vertical 1000×1500 pin
+    ("blog", "seo_geo"),             # SEO + GEO head block for any web page
+    ("whatsapp", "broadcast"),       # WA Business template
 ]
 
 ANGLES_TEMPLATE = [

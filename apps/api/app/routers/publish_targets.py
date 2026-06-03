@@ -31,16 +31,17 @@ def _brand_or_404(db: Session, brand_id: uuid.UUID, user: User) -> Brand:
 
 
 def _safe_credentials(target: PublishTarget) -> dict:
-    """Don't echo secrets to the client. Just say whether credentials are set
-    and which keys they contain."""
+    """Don't echo secrets to the client. Just say whether credentials are set,
+    which keys they contain, and whether they're encrypted at rest."""
+    from app.core.crypto import decrypt, is_encrypted
     raw = (target.credentials_ref or "").strip()
     if not raw:
-        return {"configured": False, "keys": []}
+        return {"configured": False, "keys": [], "encrypted": False}
     try:
-        d = json.loads(raw)
-        return {"configured": True, "keys": sorted(d.keys())}
-    except json.JSONDecodeError:
-        return {"configured": True, "keys": []}
+        d = json.loads(decrypt(raw))
+        return {"configured": True, "keys": sorted(d.keys()), "encrypted": is_encrypted(raw)}
+    except (json.JSONDecodeError, ValueError):
+        return {"configured": True, "keys": [], "encrypted": is_encrypted(raw)}
 
 
 class TargetIn(BaseModel):
@@ -85,11 +86,13 @@ def create_target(
     db: Session = Depends(get_db),
 ):
     _brand_or_404(db, brand_id, user)
+    from app.core.crypto import encrypt
+    blob = json.dumps(body.credentials) if body.credentials else ""
     t = PublishTarget(
         brand_id=brand_id,
         platform=body.platform,
         mode=body.mode,
-        credentials_ref=json.dumps(body.credentials) if body.credentials else "",
+        credentials_ref=encrypt(blob) if blob else "",
         active=body.active,
     )
     db.add(t)
@@ -114,7 +117,9 @@ def update_target(
     if body.active is not None:
         t.active = body.active
     if body.credentials is not None:
-        t.credentials_ref = json.dumps(body.credentials)
+        from app.core.crypto import encrypt
+        blob = json.dumps(body.credentials)
+        t.credentials_ref = encrypt(blob)
     db.commit()
     return {"id": str(t.id), "mode": t.mode, "active": t.active}
 

@@ -48,9 +48,13 @@ def _agent_for(content_type: str) -> str:
         "youtube_long": "long_video",
         "blog": "blog",
         "email": "email",
-        "post": "static_post",        # simple feed post → static_post draft (caption only)
-        "thread": "thread_post",      # explicit thread content type → multi-post sequence
+        "post": "x_post",             # single X / LI post (spec § 6.8)
+        "thread": "thread_post",      # multi-post sequence
         "ad": "ads",                  # paid ad slots
+        "answer": "community",        # § 6.7 Quora / Reddit answer
+        "pin": "pinterest",           # § 6.9 pin
+        "seo_geo": "seo_geo",         # § 6.10 SEO + GEO head block
+        "broadcast": "whatsapp",      # § 6.11 WhatsApp Business template
     }.get(content_type, "static_post")
 
 
