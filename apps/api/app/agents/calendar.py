@@ -32,6 +32,8 @@ CHANNEL_DAILY_CAP = {
     "blog": 1,
     "email": 1,
     "reddit": 1,
+    "meta_ads": 2,
+    "google_ads": 2,
 }
 LONG_FORM_TYPES = {"blog", "youtube_long"}
 MAX_LONG_FORM_PER_DAY = 1
@@ -46,7 +48,9 @@ def _agent_for(content_type: str) -> str:
         "youtube_long": "long_video",
         "blog": "blog",
         "email": "email",
-        "post": "thread_post",
+        "post": "static_post",        # simple feed post → static_post draft (caption only)
+        "thread": "thread_post",      # explicit thread content type → multi-post sequence
+        "ad": "ads",                  # paid ad slots
     }.get(content_type, "static_post")
 
 

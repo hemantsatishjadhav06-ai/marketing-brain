@@ -21,7 +21,7 @@
 | Swappable storage (Local · S3 · R2) | `app/pipeline/storage*.py` |
 | Swappable media (fal) | `app/pipeline/media_gateway.py` |
 | **Scoring engine** (6 signals) | `app/services/scoring.py` |
-| **13 agents** (orchestrator · idea_mill · calendar · static_post · carousel · blog · email · short_video · reel_voice · long_video · critic_v2 · repurpose · publish_export) | `app/agents/` |
+| **15 real agents** — orchestrator · idea_mill · calendar · static_post (A/B) · carousel · blog (A/B) · email (A/B) · short_video · long_video (chaptered) · reel_voice (TTS hook) · thread_post (X / LinkedIn multi-post) · ads (Meta + Google, A/B/C) · critic_v2 · repurpose · publish_export | `app/agents/` |
 | **8 native publishers** (X · Instagram · LinkedIn · Pinterest · Klaviyo · YouTube · TikTok · Webhook) | `app/publishers/` |
 | Per-brand `PublishTarget` CRUD with credential vault (never echoed) | `app/routers/publish_targets.py` |
 | **Trend automation**: Reddit hot + Google Trends RSS | `app/services/trend_ingest.py` |
@@ -30,7 +30,7 @@
 | **Shopify product webhook** (HMAC verify) | `app/routers/shopify_webhook.py` |
 | **Stripe billing** (checkout + customer portal) | `app/services/billing.py` |
 | **White-label theme** + **subdomain → org resolver middleware** | `app/routers/orgs.py` · `app/core/subdomain.py` |
-| 13 pytests (scoring · calendar caps · cross-brand · publishers safety · dispatcher · brain-refine · TOTP · DB URL · subdomain) | `app/tests/` |
+| 18 pytests (scoring · calendar caps · cross-brand · publishers safety · dispatcher · brain-refine · TOTP · DB URL · subdomain · agents registry · A/B variants · thread limits · long video chapters · ads variants) | `app/tests/` |
 
 ### Frontend (`apps/web`, 24 pages)
 

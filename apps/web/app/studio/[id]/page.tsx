@@ -60,6 +60,123 @@ function Caption({ payload }: { payload: any }) {
 }
 
 function Media({ payload }: { payload: any }) {
+  // THREAD POST (X / LinkedIn)
+  if (Array.isArray(payload?.posts) && payload.posts.length > 0) {
+    return (
+      <Card className="p-5">
+        <div className="text-xs font-mono text-mute mb-3">
+          THREAD · {payload.platform_hint?.toUpperCase() || "X"} · {payload.posts.length} posts
+        </div>
+        <ol className="space-y-3">
+          {payload.posts.map((p: any, i: number) => (
+            <li key={i} className="flex gap-3">
+              <span className="font-mono text-xs text-mute mt-1 w-10 text-right shrink-0">{i + 1}/{payload.posts.length}</span>
+              <div className="flex-1 glass rounded-lg p-3 text-sm whitespace-pre-wrap leading-relaxed">
+                {p.text}
+                {(p.is_hook || p.is_cta) && (
+                  <div className="mt-1.5 text-[10px] font-mono accent-text">
+                    {p.is_hook ? "● HOOK" : ""}{p.is_hook && p.is_cta ? " · " : ""}{p.is_cta ? "● CTA" : ""}
+                  </div>
+                )}
+              </div>
+            </li>
+          ))}
+        </ol>
+        {payload.hashtags?.length > 0 && (
+          <div className="mt-4 text-sm accent-text">{payload.hashtags.join(" ")}</div>
+        )}
+      </Card>
+    );
+  }
+
+  // ADS (A/B/C variants)
+  if (Array.isArray(payload?.variants) && payload.variants.length > 0 && (payload?.ad_format === "meta" || payload?.ad_format === "google_search")) {
+    return (
+      <Card className="p-5">
+        <div className="text-xs font-mono text-mute mb-3">
+          ADS · {payload.ad_format.toUpperCase()} · {payload.variants.length} variants
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {payload.variants.map((v: any) => (
+            <div key={v.label} className="glass rounded-lg p-4">
+              <div className="text-[10px] font-mono accent-text mb-2">VARIANT {v.label}</div>
+              <div className="display text-lg leading-tight">{v.headline}</div>
+              {v.primary_text && <p className="text-sm text-ink2 mt-2">{v.primary_text}</p>}
+              {v.description && <p className="text-xs text-mute mt-2">{v.description}</p>}
+              <div className="mt-3 inline-block accent-bg rounded-lg px-3 py-1 text-xs font-medium">{v.cta}</div>
+            </div>
+          ))}
+        </div>
+        {payload.target_audience && (
+          <div className="mt-4 text-xs text-mute">
+            <span className="font-mono uppercase tracking-widest">audience</span> · {payload.target_audience}
+          </div>
+        )}
+      </Card>
+    );
+  }
+
+  // LONG VIDEO with chapters
+  if (payload?.video_url && Array.isArray(payload?.chapters) && payload.chapters.length > 0) {
+    return (
+      <div className="space-y-3">
+        <Card className="p-2">
+          <video controls src={payload.video_url} className="w-full rounded-xl" />
+        </Card>
+        <Card className="p-4">
+          <div className="text-xs font-mono text-mute mb-3">CHAPTERS</div>
+          <ol className="space-y-2">
+            {payload.chapters.map((ch: any, i: number) => {
+              const t = Math.floor(ch.start_s || 0);
+              const mm = Math.floor(t / 60), ss = t % 60;
+              return (
+                <li key={i} className="flex items-start gap-3 text-sm">
+                  <span className="font-mono accent-text w-12 shrink-0">{mm}:{ss.toString().padStart(2, "0")}</span>
+                  <div>
+                    <div className="font-medium">{ch.title}</div>
+                    <div className="text-mute text-xs">{ch.body}</div>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+          {payload.chapters_youtube && (
+            <div className="mt-4">
+              <div className="text-[10px] font-mono text-mute uppercase mb-1">paste into YouTube description</div>
+              <pre className="text-xs bg-panel2 rounded-lg p-3 whitespace-pre-wrap font-mono">{payload.chapters_youtube}</pre>
+            </div>
+          )}
+        </Card>
+      </div>
+    );
+  }
+
+  // REEL with beats
+  if (payload?.video_url && Array.isArray(payload?.beats) && payload.beats.length > 0) {
+    return (
+      <div className="space-y-3">
+        <Card className="p-2">
+          <video controls src={payload.video_url} className="w-full rounded-xl" />
+        </Card>
+        <Card className="p-4">
+          <div className="text-xs font-mono text-mute mb-3">REEL BEATS</div>
+          <div className="display text-2xl mb-3 accent-text">"{payload.hook}"</div>
+          <ol className="space-y-2 text-sm">
+            {payload.beats.map((b: any, i: number) => (
+              <li key={i} className="flex gap-3">
+                <span className="font-mono text-mute w-6 text-right">{i + 1}.</span>
+                <div>
+                  <div>{b.text}</div>
+                  <div className="text-[10px] font-mono accent-text">{b.on_screen}</div>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </Card>
+      </div>
+    );
+  }
+
   if (payload?.image_url) {
     return (
       <Card className="p-2">
@@ -210,8 +327,24 @@ export default function Page() {
             </div>
           </Card>
           <Card className="p-4">
-            <div className="text-xs font-mono text-mute mb-3">VARIANTS</div>
-            {data.variants.map((v) => <div key={v.id} className="text-xs font-mono text-mute">· {v.label}</div>)}
+            <div className="text-xs font-mono text-mute mb-3">VARIANTS — {data.variants.length}</div>
+            {data.variants.length === 0 && <div className="text-mute text-sm">No variants.</div>}
+            <div className="space-y-3">
+              {data.variants.map((v) => {
+                const p = v.payload || {};
+                const headline = p.headline || p.title || p.subject_line || p.hook || (Array.isArray(p.posts) && p.posts[0]?.text) || "—";
+                const subline = p.cta || p.preheader || p.meta_description || "";
+                return (
+                  <div key={v.id} className="border-t hairline pt-3 first:border-0 first:pt-0">
+                    <div className="flex items-center gap-2 text-[10px] font-mono">
+                      <span className="accent-bg rounded px-1.5 py-0.5">VARIANT {v.label}</span>
+                    </div>
+                    <div className="text-sm mt-2 line-clamp-3">{headline}</div>
+                    {subline && <div className="text-xs text-mute mt-1 line-clamp-2">{subline}</div>}
+                  </div>
+                );
+              })}
+            </div>
           </Card>
         </div>
       </div>

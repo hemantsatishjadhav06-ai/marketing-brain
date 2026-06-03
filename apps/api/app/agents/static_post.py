@@ -139,8 +139,16 @@ class StaticPostAgent:
         db.add(item)
         db.flush()
 
-        variant = ContentVariant(content_item_id=item.id, label="A", payload=item.payload)
-        db.add(variant)
+        db.add(ContentVariant(content_item_id=item.id, label="A", payload=item.payload))
+        # generate B variant for A/B test (different hook / CTA, same image)
+        from app.agents._ab import make_b_variant_for_caption
+        b_payload = make_b_variant_for_caption(
+            brand_sport=brand.sport,
+            brand_voice=(brain.voice if brain else ""),
+            angle=entry.angle,
+            a_payload=item.payload,
+        )
+        db.add(ContentVariant(content_item_id=item.id, label="B", payload=b_payload))
 
         asset = Asset(
             brand_id=brand_id,

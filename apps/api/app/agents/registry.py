@@ -1,6 +1,7 @@
 """Agent registry — maps agent_name → callable.
 
 Used by the content router to draft a CalendarEntry on demand.
+Every agent here is a real implementation (no aliases anymore).
 """
 from __future__ import annotations
 
@@ -8,11 +9,15 @@ import uuid
 
 from sqlalchemy.orm import Session
 
+from app.agents.ads import AdsAgent
 from app.agents.blog import BlogAgent
 from app.agents.carousel import CarouselAgent
 from app.agents.email import EmailAgent
+from app.agents.long_video import LongVideoAgent
+from app.agents.reel_voice import ReelVoiceAgent
 from app.agents.short_video.agent import ShortVideoAgent
 from app.agents.static_post import StaticPostAgent
+from app.agents.thread_post import ThreadPostAgent
 
 
 AGENTS = {
@@ -21,10 +26,10 @@ AGENTS = {
     "blog": BlogAgent,
     "email": EmailAgent,
     "short_video": ShortVideoAgent,
-    # Aliases mapped to nearest concrete agent until specialised ones land:
-    "reel_voice": StaticPostAgent,
-    "thread_post": StaticPostAgent,
-    "long_video": ShortVideoAgent,
+    "long_video": LongVideoAgent,
+    "reel_voice": ReelVoiceAgent,
+    "thread_post": ThreadPostAgent,
+    "ads": AdsAgent,
 }
 
 

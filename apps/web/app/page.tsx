@@ -173,10 +173,10 @@ export default function Landing() {
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
               {[
                 "Orchestrator", "Idea Mill", "Calendar",
-                "Static Post", "Carousel", "Blog",
-                "Email", "Short Video", "Reel + Voice",
-                "Long Video", "Critic v2", "Repurpose",
-                "Publish Export",
+                "Static Post (A/B)", "Carousel", "Blog (A/B)",
+                "Email (A/B)", "Short Video", "Reel + Voice",
+                "Long Video + chapters", "Thread (X / LinkedIn)", "Ads (Meta + Google)",
+                "Critic v2", "Repurpose", "Publish Export",
               ].map((a) => (
                 <div key={a} className="glass rounded p-3 text-sm">
                   <div className="text-[10px] font-mono text-mute">agent</div>

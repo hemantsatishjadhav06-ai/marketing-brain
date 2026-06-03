@@ -108,7 +108,9 @@ export default function DashboardPage() {
             <ul className="text-mute space-y-1 text-xs">
               <li>✓ Scoring engine + ScoringRun history</li>
               <li>✓ Idea Mill agent + 30-day Calendar agent</li>
-              <li>✓ Static Post · Carousel · Blog · Email · Short Video agents</li>
+              <li>✓ Static Post · Carousel · Blog · Email · Short + Long Video · Reel + Voice</li>
+              <li>✓ Thread (X / LinkedIn) · Ads (Meta + Google) with A/B/C variants</li>
+              <li>✓ A/B variants auto-generated on Static Post · Blog · Email</li>
               <li>✓ Critic v2 (regex hard-gate + LLM rubric)</li>
               <li>✓ Reviews · Studio · Library · Publishing (export bundle)</li>
               <li>✓ Repurpose agent · Analytics ingest + dashboard</li>

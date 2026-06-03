@@ -38,9 +38,13 @@ CHANNEL_TYPES = [
     ("blog", "blog"),
     ("email", "email"),
     ("x", "post"),
+    ("x", "thread"),                 # multi-post thread
     ("linkedin", "post"),
+    ("linkedin", "thread"),          # LI long-form follow-ups
     ("tiktok", "reel"),
     ("pinterest", "static_post"),
+    ("meta_ads", "ad"),              # paid Meta ads
+    ("google_ads", "ad"),            # paid Google Search ads
     ("reddit", "post"),
 ]
 
