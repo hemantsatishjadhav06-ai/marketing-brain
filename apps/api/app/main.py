@@ -24,6 +24,7 @@ from app.routers import (
     content_search,
     downloads,
     health,
+    integrations,
     jobs,
     orgs,
     products,
@@ -102,12 +103,32 @@ def _seed_owner() -> None:
                 active=True,
             )
             db.add(owner)
-            brand = Brand(org_id=org.id, sport="tennis", name="Tennis Outlet", website_url="", accent_color="#CCFF00")
-            db.add(brand)
-            db.flush()
-            db.add(BrandBrain(brand_id=brand.id, voice="Clear, useful, non-hypey.", seo_keywords=["string", "tension", "grip", "racket", "drill"]))
+            # Three default racket-sport brands so the cockpit feels real out of the box.
+            seed_brands = [
+                ("tennis",     "Tennis Outlet",     "https://tennisoutlet.in",     "#CCFF00", ["string", "tension", "grip", "racket", "drill"], os.environ.get("MAGENTO_BASE_URL_TENNIS",     "https://tennisoutlet.in")),
+                ("padel",      "Padel Outlet",      "https://padeloutlet.in",      "#22D3EE", ["padel", "grip", "court", "drill", "tournament"], os.environ.get("MAGENTO_BASE_URL_PADEL",      "https://padeloutlet.in")),
+                ("pickleball", "Pickleball Outlet", "https://pickleballoutlet.in", "#F59E0B", ["paddle", "court", "pickleball", "drill", "rules"], os.environ.get("MAGENTO_BASE_URL_PICKLEBALL", "https://pickleballoutlet.in")),
+            ]
+            shared_magento_token = os.environ.get("MAGENTO_TOKEN", "").strip()
+            from app.services.magento_sync import save_config
+
+            for sport, name, website, accent, kws, magento_url in seed_brands:
+                brand = Brand(org_id=org.id, sport=sport, name=name, website_url=website, accent_color=accent)
+                db.add(brand); db.flush()
+                db.add(BrandBrain(
+                    brand_id=brand.id,
+                    voice=f"Clear, useful, no hype. Voice of {sport} players who play three times a week.",
+                    seo_keywords=kws,
+                ))
+                db.flush()
+                if shared_magento_token and magento_url:
+                    try:
+                        save_config(db, brand.id, base_url=magento_url, token=shared_magento_token)
+                        log.info("magento config seeded for %s", sport)
+                    except Exception as e:  # noqa: BLE001
+                        log.warning("magento seed failed for %s: %s", sport, e)
             db.commit()
-            log.info("seeded default org/owner/brand")
+            log.info("seeded default org/owner + 3 brands (tennis/padel/pickleball)")
         finally:
             db.close()
     except Exception as e:  # noqa: BLE001
@@ -167,6 +188,7 @@ def create_app() -> FastAPI:
     app.include_router(analytics.router, prefix="/brands", tags=["analytics"])
     app.include_router(analytics_pull.router, prefix="/brands", tags=["analytics-pull"])
     app.include_router(billing.router, prefix="/billing", tags=["billing"])
+    app.include_router(integrations.router, prefix="/brands", tags=["integrations"])
     app.include_router(shopify_webhook.router, prefix="/webhooks/shopify", tags=["webhooks"])
     app.include_router(downloads.router, tags=["downloads"])
     app.include_router(content_search.router, prefix="/brands/{brand_id}/content", tags=["search"])

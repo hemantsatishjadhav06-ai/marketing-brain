@@ -47,10 +47,6 @@ export default function CreateHubPage() {
 
   const { data: agentsResp, isLoading: aLoading } = useSWR<AgentMeta[] | { detail?: string }>("/content/agents", apiFetcher);
   const agents: AgentMeta[] = Array.isArray(agentsResp) ? agentsResp : [];
-  const { data: productsResp } = useSWR<Product[] | { detail?: string }>(
-    brandId ? `/brands/${brandId}/products` : null, apiFetcher,
-  );
-  const products: Product[] = Array.isArray(productsResp) ? productsResp : [];
   const [active, setActive] = useState<string | null>(null);
 
   // pre-select first agent on load
@@ -118,7 +114,7 @@ export default function CreateHubPage() {
               <Skeleton className="h-12 w-full rounded" />
             </Card>
           ) : meta ? (
-            <CreateForm meta={meta} brandId={brandId!} products={products} onCreated={(id) => router.push(`/studio/${id}`)} />
+            <CreateForm meta={meta} brandId={brandId!} onCreated={(id) => router.push(`/studio/${id}`)} />
           ) : agents.length === 0 ? (
             <Card className="p-8 text-mute text-sm">
               Couldn't load agents. Check the API is reachable at <span className="font-mono text-ink">/content/agents</span>.
@@ -174,13 +170,16 @@ export default function CreateHubPage() {
 }
 
 
+type Category = { external_id: string; name: string; level: number; product_count: number };
+
 function CreateForm({
-  meta, brandId, products, onCreated,
+  meta, brandId, onCreated,
 }: {
-  meta: AgentMeta; brandId: string; products: Product[];
+  meta: AgentMeta; brandId: string;
   onCreated: (contentItemId: string) => void;
 }) {
   const [values, setValues] = useState<Record<string, string>>({});
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   // reset when agent changes
@@ -188,9 +187,26 @@ function CreateForm({
     const initial: Record<string, string> = {};
     for (const f of meta.fields) initial[f.key] = f.default || "";
     setValues(initial);
+    setSelectedProductIds([]);
   }, [meta.name]);
 
   const set = (k: string, v: string) => setValues((s) => ({ ...s, [k]: v }));
+
+  // categories (from Magento sync cache)
+  const { data: categoriesResp } = useSWR<Category[] | { detail?: string }>(
+    `/brands/${brandId}/integrations/magento/categories`, apiFetcher,
+  );
+  const categories: Category[] = Array.isArray(categoriesResp)
+    ? categoriesResp.filter((c) => c.product_count > 0).sort((a, b) => a.name.localeCompare(b.name))
+    : [];
+
+  // products — filtered by selected category if any
+  const categoryName = categories.find((c) => c.external_id === values.category_id)?.name;
+  const productsKey = `/brands/${brandId}/products${categoryName ? `?category=${encodeURIComponent(categoryName)}` : ""}`;
+  const { data: productsResp } = useSWR<Product[] | { detail?: string }>(productsKey, apiFetcher);
+  const products: (Product & { image_urls?: string[] })[] = Array.isArray(productsResp) ? (productsResp as any) : [];
+
+  const allowMulti = meta.fields.some((f) => f.key === "product_ids");
 
   async function submit() {
     if (!values.angle || values.angle.trim().length < 2) {
@@ -205,7 +221,6 @@ function CreateForm({
         angle: values.angle,
         platform: values.platform || meta.default_platform,
         content_type: values.content_type || meta.default_content_type,
-        product_id: values.product_id || undefined,
         overrides: {
           tone: values.override_tone || undefined,
           length: values.override_length || undefined,
@@ -213,7 +228,11 @@ function CreateForm({
           custom_instructions: values.override_custom_instructions || undefined,
         },
       };
-      // drop empty overrides
+      if (allowMulti && selectedProductIds.length > 0) {
+        body.product_ids = selectedProductIds.slice(0, 5);
+      } else if (values.product_id) {
+        body.product_id = values.product_id;
+      }
       if (Object.values(body.overrides).every((v: any) => !v)) delete body.overrides;
       const r = await api<{ content_item_id: string }>("/content/create", {
         method: "POST",
@@ -228,8 +247,16 @@ function CreateForm({
     }
   }
 
+  function toggleProduct(id: string) {
+    setSelectedProductIds((s) => {
+      if (s.includes(id)) return s.filter((x) => x !== id);
+      if (s.length >= 5) { toast.info("Max 5 products"); return s; }
+      return [...s, id];
+    });
+  }
+
   // group fields: primary (required + non-override) vs overrides (advanced)
-  const primaryFields = meta.fields.filter((f) => !f.key.startsWith("override_"));
+  const primaryFields = meta.fields.filter((f) => !f.key.startsWith("override_") && f.key !== "product_id" && f.key !== "product_ids" && f.key !== "category_id");
   const overrideFields = meta.fields.filter((f) => f.key.startsWith("override_"));
 
   return (
@@ -246,6 +273,74 @@ function CreateForm({
         {primaryFields.map((f) => (
           <FieldRow key={f.key} field={f} value={values[f.key] || ""} onChange={(v) => set(f.key, v)} products={products} />
         ))}
+
+        {/* CATEGORY → PRODUCT cascade (Magento sync) */}
+        <div>
+          <label className="text-[10px] uppercase tracking-widest text-mute font-mono">
+            Category (Magento) — filters products below
+          </label>
+          <select
+            value={values.category_id || ""} onChange={(e) => set("category_id", e.target.value)}
+            className="mt-1 w-full rounded-xl border hairline bg-panel2 px-3.5 py-2 text-sm focus-ring"
+          >
+            <option value="">— All categories ({products.length} products available)</option>
+            {categories.map((c) => (
+              <option key={c.external_id} value={c.external_id}>{c.name} ({c.product_count})</option>
+            ))}
+          </select>
+          {categories.length === 0 && (
+            <div className="text-[11px] text-mute mt-1">
+              No Magento categories yet. <Link href="/settings/integrations" className="accent-text hover:underline">Connect Magento</Link> + Sync to populate this dropdown.
+            </div>
+          )}
+        </div>
+
+        {/* PRODUCT picker — single or multi depending on agent */}
+        {!allowMulti && (
+          <div>
+            <label className="text-[10px] uppercase tracking-widest text-mute font-mono">
+              Featured product (optional)
+            </label>
+            <select
+              value={values.product_id || ""} onChange={(e) => set("product_id", e.target.value)}
+              className="mt-1 w-full rounded-xl border hairline bg-panel2 px-3.5 py-2 text-sm focus-ring"
+            >
+              <option value="">— No product</option>
+              {products.map((p) => <option key={p.id} value={p.id}>{p.sku} · {p.title}</option>)}
+            </select>
+            {values.product_id && (
+              <ProductPreview product={products.find((p) => p.id === values.product_id)} />
+            )}
+          </div>
+        )}
+        {allowMulti && (
+          <div>
+            <label className="text-[10px] uppercase tracking-widest text-mute font-mono">
+              Featured products — pick 1–5 ({selectedProductIds.length} selected)
+            </label>
+            <div className="mt-2 max-h-72 overflow-y-auto grid grid-cols-2 md:grid-cols-3 gap-2 rounded-xl border hairline bg-panel2 p-2">
+              {products.length === 0 && <div className="col-span-full text-mute text-xs p-3">No products yet — sync Magento.</div>}
+              {products.map((p) => {
+                const checked = selectedProductIds.includes(p.id);
+                const img = (p.image_urls || [])[0];
+                return (
+                  <button
+                    key={p.id} type="button" onClick={() => toggleProduct(p.id)}
+                    className={`flex gap-2 text-left rounded-lg p-1.5 border transition ${
+                      checked ? "border-accent bg-panel3 accent-ring" : "hairline hover:bg-panel3"
+                    }`}
+                  >
+                    {img ? <img src={img} alt="" className="size-12 rounded object-cover bg-bg2" /> : <div className="size-12 rounded bg-bg2" />}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-medium line-clamp-2">{p.title}</div>
+                      <div className="text-[10px] font-mono text-mute mt-0.5">{p.sku} · ${p.price}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {overrideFields.length > 0 && (
@@ -270,6 +365,22 @@ function CreateForm({
         </span>
       </div>
     </Card>
+  );
+}
+
+
+function ProductPreview({ product }: { product: any | undefined }) {
+  if (!product) return null;
+  const img = (product.image_urls || [])[0];
+  return (
+    <div className="mt-3 flex gap-3 items-center rounded-xl border hairline bg-panel2 p-2">
+      {img ? <img src={img} alt="" className="size-16 rounded object-cover bg-bg2" />
+           : <div className="size-16 rounded bg-bg2 grid place-items-center text-mute text-xs">no image</div>}
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium line-clamp-2">{product.title}</div>
+        <div className="text-xs font-mono text-mute mt-0.5">{product.sku} · ${product.price}{product.category ? ` · ${product.category}` : ""}</div>
+      </div>
+    </div>
   );
 }
 

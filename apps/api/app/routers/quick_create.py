@@ -44,9 +44,10 @@ class CreateBody(BaseModel):
     brand_id: uuid.UUID
     agent_name: str = Field(..., max_length=64)
     angle: str = Field(..., min_length=2, max_length=400)
-    platform: str | None = None       # falls back to agent default
-    content_type: str | None = None   # falls back to agent default
-    product_id: uuid.UUID | None = None
+    platform: str | None = None              # falls back to agent default
+    content_type: str | None = None          # falls back to agent default
+    product_id: uuid.UUID | None = None      # legacy single-product
+    product_ids: list[uuid.UUID] | None = None  # 1-5 products for comparisons / carousels
     overrides: Overrides | None = None
 
 
@@ -65,7 +66,13 @@ def quick_create(
     meta = AGENT_METADATA[body.agent_name]
     platform = body.platform or meta.default_platform
     content_type = body.content_type or meta.default_content_type
-    product_ids = [str(body.product_id)] if body.product_id else []
+    # multi-product preferred; fall back to legacy single
+    if body.product_ids:
+        product_ids = [str(p) for p in body.product_ids][:5]
+    elif body.product_id:
+        product_ids = [str(body.product_id)]
+    else:
+        product_ids = []
 
     entry = CalendarEntry(
         brand_id=body.brand_id,

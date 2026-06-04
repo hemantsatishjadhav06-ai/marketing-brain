@@ -109,7 +109,11 @@ export default function Page() {
         <Card className="p-5 lg:col-span-2">
           <div className="flex items-center justify-between mb-3">
             <div className="text-xs font-mono text-mute">BRANDS</div>
-            <Link href="/settings/publish-targets" className="text-xs text-tennis hover:underline">Manage publish targets →</Link>
+            <div className="flex items-center gap-4">
+              <Link href="/settings/integrations" className="text-xs accent-text hover:underline">Integrations →</Link>
+              <Link href="/settings/publish-targets" className="text-xs accent-text hover:underline">Publish targets →</Link>
+              <Link href="/settings/security" className="text-xs accent-text hover:underline">Security (2FA) →</Link>
+            </div>
           </div>
           <div className="space-y-2">
             {(brands || []).map((b) => (

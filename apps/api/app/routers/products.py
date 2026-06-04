@@ -27,12 +27,19 @@ def _own_brand(db: Session, brand_id: uuid.UUID, user: User) -> Brand:
 
 
 @router.get("/{brand_id}/products", response_model=List[ProductOut])
-def list_products(brand_id: uuid.UUID, user: User = Depends(require_user), db: Session = Depends(get_db)):
+def list_products(
+    brand_id: uuid.UUID,
+    category: str | None = None,
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    """List products in this brand. Optional ?category=<name> filter so the
+    /create cascade can populate the Product dropdown after a Category pick."""
     _own_brand(db, brand_id, user)
-    rows = db.execute(
-        select(Product).where(Product.brand_id == brand_id).order_by(Product.created_at.desc())
-    ).scalars().all()
-    # double-check the guard at the result layer
+    q = select(Product).where(Product.brand_id == brand_id)
+    if category:
+        q = q.where(Product.category == category)
+    rows = db.execute(q.order_by(Product.created_at.desc())).scalars().all()
     assert_single_brand(rows, brand_id, context="products.list")
     return rows
 

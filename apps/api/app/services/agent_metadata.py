@@ -42,8 +42,10 @@ class AgentMeta:
 PLATFORMS = ["instagram", "youtube", "tiktok", "x", "linkedin", "pinterest", "blog", "email", "whatsapp", "quora", "reddit", "meta_ads", "google_ads"]
 
 
-def _common_fields(default_platform: str, default_content_type: str) -> list[AgentField]:
-    return [
+def _common_fields(default_platform: str, default_content_type: str, *, allow_multi_product: bool = False) -> list[AgentField]:
+    """Standard input fields for every agent. Some agents (carousel, ads,
+    comparison blog) accept multi-product selection."""
+    fields = [
         AgentField(
             "angle", "Angle / brief", "textarea", required=True,
             placeholder="e.g. How to choose grip size in 60 seconds",
@@ -58,10 +60,21 @@ def _common_fields(default_platform: str, default_content_type: str) -> list[Age
             default=default_content_type,
         ),
         AgentField(
-            "product_id", "Featured product (optional)", "product",
-            help="Attach a product to ground the AI's claims in real specs / price.",
+            "category_id", "Category (Magento) — filters products below", "category",
+            help="Pick a Magento category to narrow the product dropdown. Optional.",
         ),
     ]
+    if allow_multi_product:
+        fields.append(AgentField(
+            "product_ids", "Featured products (1-5, for comparison)", "product_multi",
+            help="Pick up to 5 SKUs. Carousel / Ads / Blog will compare them side-by-side; other agents use the first.",
+        ))
+    else:
+        fields.append(AgentField(
+            "product_id", "Featured product (optional)", "product",
+            help="Attach a product to ground the AI's claims in real specs / price.",
+        ))
+    return fields
 
 
 # Each override block is read by the agent at LLM-call time.
@@ -92,10 +105,10 @@ AGENT_METADATA: dict[str, AgentMeta] = {
     ),
     "carousel": AgentMeta(
         name="carousel", title="Carousel", group="Visual",
-        description="Multi-slide IG / LinkedIn carousel. Default 6 slides — page counter, hook, body, swipe to CTA.",
+        description="Multi-slide IG / LinkedIn carousel. Default 6 slides — page counter, hook, body, swipe to CTA. Pick 2-5 products for a side-by-side comparison carousel.",
         default_platform="instagram", default_content_type="carousel",
         icon="Layers", accent="text-pink-300",
-        fields=_common_fields("instagram", "carousel") + [
+        fields=_common_fields("instagram", "carousel", allow_multi_product=True) + [
             AgentField("slide_count", "Slide count", "number", default="6",
                        help="3–10 supported. 6 is the sweet spot for IG."),
         ] + OVERRIDE_FIELDS,
@@ -132,10 +145,10 @@ AGENT_METADATA: dict[str, AgentMeta] = {
     # ── Long-form ────────────────────────────────────────────────────────────
     "blog": AgentMeta(
         name="blog", title="Blog Post", group="Long-form",
-        description="700-1000 word SEO post: title + meta + 4-6 sections + CTA. Ships A + B title variants for CTR testing.",
+        description="700-1000 word SEO post: title + meta + 4-6 sections + CTA. Ships A + B title variants. Pick 2-5 products for a comparison blog.",
         default_platform="blog", default_content_type="blog",
         icon="FileText", accent="text-amber-300",
-        fields=_common_fields("blog", "blog") + OVERRIDE_FIELDS,
+        fields=_common_fields("blog", "blog", allow_multi_product=True) + OVERRIDE_FIELDS,
     ),
     "seo_geo": AgentMeta(
         name="seo_geo", title="SEO + GEO Head", group="Long-form",
@@ -169,10 +182,10 @@ AGENT_METADATA: dict[str, AgentMeta] = {
     # ── Paid ─────────────────────────────────────────────────────────────────
     "ads": AgentMeta(
         name="ads", title="Ads (Meta / Google)", group="Paid",
-        description="3 A/B/C variants per item. Char-budgeted per format. Each variant lands as its own ContentVariant.",
+        description="3 A/B/C variants per item. Char-budgeted per format. Pick multiple products to spin a comparison ad set.",
         default_platform="meta_ads", default_content_type="ad",
         icon="Megaphone", accent="text-violet-300",
-        fields=_common_fields("meta_ads", "ad") + OVERRIDE_FIELDS,
+        fields=_common_fields("meta_ads", "ad", allow_multi_product=True) + OVERRIDE_FIELDS,
     ),
     # ── Direct ───────────────────────────────────────────────────────────────
     "email": AgentMeta(
