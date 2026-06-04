@@ -26,7 +26,9 @@ type AgentMeta = {
   icon: string; accent: string; fields: Field[];
 };
 type Product = { id: string; sku: string; title: string; price: number };
-type RecentItem = { id: string; angle: string; platform: string; content_type: string; status: string; created_at: string };
+type RecentItem = { id: string; angle: string; platform: string; content_type: string; status: string };
+// /content/search returns { q, content_items: [...], ideas: [...] }
+type SearchResp = { q: string; content_items: RecentItem[]; ideas: any[] };
 
 const ICON: Record<string, any> = {
   Image: ImageIcon, Layers, Pin, Video, Mic, Film, FileText, Search,
@@ -43,28 +45,31 @@ export default function CreateHubPage() {
     return () => window.removeEventListener("storage", h);
   }, []);
 
-  const { data: agents, isLoading: aLoading } = useSWR<AgentMeta[]>("/content/agents", apiFetcher);
-  const { data: products } = useSWR<Product[]>(
+  const { data: agentsResp, isLoading: aLoading } = useSWR<AgentMeta[] | { detail?: string }>("/content/agents", apiFetcher);
+  const agents: AgentMeta[] = Array.isArray(agentsResp) ? agentsResp : [];
+  const { data: productsResp } = useSWR<Product[] | { detail?: string }>(
     brandId ? `/brands/${brandId}/products` : null, apiFetcher,
   );
+  const products: Product[] = Array.isArray(productsResp) ? productsResp : [];
   const [active, setActive] = useState<string | null>(null);
 
   // pre-select first agent on load
   useEffect(() => {
-    if (!active && agents && agents.length > 0) setActive(agents[0].name);
+    if (!active && agents.length > 0) setActive(agents[0].name);
   }, [agents, active]);
 
   const groups = useMemo(() => {
-    if (!agents) return [];
+    if (agents.length === 0) return [];
     const order = ["Visual", "Video", "Long-form", "Social", "Paid", "Direct"];
     return order.map((g) => ({ name: g, items: agents.filter((a) => a.group === g) })).filter((g) => g.items.length);
   }, [agents]);
 
   const meta = agents?.find((a) => a.name === active) || null;
-  const { data: recent } = useSWR<RecentItem[]>(
-    brandId && meta ? `/brands/${brandId}/content/search?q=${meta.default_content_type}&limit=5` : null,
+  const { data: recentResp } = useSWR<SearchResp>(
+    brandId && meta ? `/brands/${brandId}/content/search?q=${encodeURIComponent(meta.default_content_type)}&limit=5` : null,
     apiFetcher,
   );
+  const recent: RecentItem[] = Array.isArray(recentResp?.content_items) ? recentResp!.content_items : [];
 
   return (
     <AppShell>
@@ -104,8 +109,20 @@ export default function CreateHubPage() {
           </div>
 
           {/* CENTER: per-agent form */}
-          {meta ? (
-            <CreateForm meta={meta} brandId={brandId!} products={products || []} onCreated={(id) => router.push(`/studio/${id}`)} />
+          {aLoading ? (
+            <Card className="p-8 space-y-3">
+              <Skeleton className="h-8 w-1/2 rounded" />
+              <Skeleton className="h-4 w-3/4 rounded" />
+              <Skeleton className="h-24 w-full rounded mt-4" />
+              <Skeleton className="h-12 w-full rounded" />
+              <Skeleton className="h-12 w-full rounded" />
+            </Card>
+          ) : meta ? (
+            <CreateForm meta={meta} brandId={brandId!} products={products} onCreated={(id) => router.push(`/studio/${id}`)} />
+          ) : agents.length === 0 ? (
+            <Card className="p-8 text-mute text-sm">
+              Couldn't load agents. Check the API is reachable at <span className="font-mono text-ink">/content/agents</span>.
+            </Card>
           ) : (
             <Card className="p-8 text-mute text-sm">Pick an agent on the left.</Card>
           )}
@@ -114,9 +131,9 @@ export default function CreateHubPage() {
           <div className="space-y-3">
             <Card className="p-4">
               <div className="text-xs font-mono text-mute mb-3">RECENT — {meta?.title || "—"}</div>
-              {(!recent || recent.length === 0) && <div className="text-mute text-sm">No previous items of this type yet.</div>}
+              {recent.length === 0 && <div className="text-mute text-sm">No previous items of this type yet.</div>}
               <div className="space-y-2">
-                {(recent || []).map((r) => (
+                {recent.map((r) => (
                   <Link key={r.id} href={`/studio/${r.id}`}
                     className="block rounded-lg border hairline p-2 hover:bg-panel2 text-sm">
                     <div className="line-clamp-2">{r.angle}</div>
@@ -128,6 +145,23 @@ export default function CreateHubPage() {
                 ))}
               </div>
             </Card>
+            {meta && (
+              <Card className="p-4">
+                <div className="text-[10px] font-mono text-mute uppercase tracking-widest mb-2">how this connects</div>
+                <div className="text-xs space-y-1.5 font-mono">
+                  <div className="text-mute">Form submits to:</div>
+                  <div className="text-ink break-all">POST <span className="accent-text">/content/create</span></div>
+                  <div className="text-mute mt-2">Dispatches to:</div>
+                  <div className="text-ink">agents/<span className="accent-text">{meta.name}</span>.py</div>
+                  <div className="text-mute mt-2">Renders into:</div>
+                  <div className="text-ink">/studio/[id]</div>
+                  <div className="text-mute mt-2">Pipeline:</div>
+                  <div className="text-ink leading-relaxed">
+                    create → agent.run() → Critic v2 → variants A/B → Studio
+                  </div>
+                </div>
+              </Card>
+            )}
             <Card className="p-4 text-xs text-mute">
               <div className="font-mono text-[10px] mb-2 uppercase tracking-widest">tip</div>
               Each tab is its own agent. The same brand voice + cross-sport guard apply everywhere — fire one or run the calendar, your choice.
