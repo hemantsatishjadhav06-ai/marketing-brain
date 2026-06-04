@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -35,7 +35,16 @@ const ICON: Record<string, any> = {
   MessagesSquare, Twitter, ListOrdered, Megaphone, Mail, MessageCircle,
 };
 
+// Next.js requires useSearchParams in a Suspense boundary at prerender time.
 export default function CreateHubPage() {
+  return (
+    <Suspense fallback={null}>
+      <CreateHubInner />
+    </Suspense>
+  );
+}
+
+function CreateHubInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const preselectProductId = searchParams?.get("product_id") || null;
