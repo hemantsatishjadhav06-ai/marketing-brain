@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
   Image as ImageIcon, Layers, Pin, Video, Mic, Film, FileText, Search,
-  MessagesSquare, Twitter, ListOrdered, Megaphone, Mail, MessageCircle,
+  MessagesSquare, Twitter, ListOrdered, Megaphone, Mail, MessageCircle, RefreshCcw,
 } from "lucide-react";
 
 import { AppShell } from "@/components/AppShell";
@@ -220,9 +220,10 @@ function CreateForm({
 
   const set = (k: string, v: string) => setValues((s) => ({ ...s, [k]: v }));
 
-  // categories (from Magento sync cache)
-  const { data: categoriesResp } = useSWR<Category[] | { detail?: string }>(
-    `/brands/${brandId}/integrations/magento/categories`, apiFetcher,
+  // categories (from Magento sync cache or demo seed)
+  const SWR_OPTS = { revalidateOnFocus: true, revalidateOnReconnect: true, revalidateOnMount: true };
+  const { data: categoriesResp, mutate: mutateCats } = useSWR<Category[] | { detail?: string }>(
+    `/brands/${brandId}/integrations/magento/categories`, apiFetcher, SWR_OPTS,
   );
   const categories: Category[] = Array.isArray(categoriesResp)
     ? categoriesResp.filter((c) => c.product_count > 0).sort((a, b) => a.name.localeCompare(b.name))
@@ -231,8 +232,9 @@ function CreateForm({
   // products — filtered by selected category if any
   const categoryName = categories.find((c) => c.external_id === values.category_id)?.name;
   const productsKey = `/brands/${brandId}/products${categoryName ? `?category=${encodeURIComponent(categoryName)}` : ""}`;
-  const { data: productsResp } = useSWR<Product[] | { detail?: string }>(productsKey, apiFetcher);
+  const { data: productsResp, mutate: mutateProds } = useSWR<Product[] | { detail?: string }>(productsKey, apiFetcher, SWR_OPTS);
   const products: (Product & { image_urls?: string[] })[] = Array.isArray(productsResp) ? (productsResp as any) : [];
+  function reload() { mutateCats(); mutateProds(); }
 
   const allowMulti = meta.fields.some((f) => f.key === "product_ids");
 
@@ -304,8 +306,12 @@ function CreateForm({
 
         {/* CATEGORY → PRODUCT cascade (Magento sync) */}
         <div>
-          <label className="text-[10px] uppercase tracking-widest text-mute font-mono">
-            Category (Magento) — filters products below
+          <label className="text-[10px] uppercase tracking-widest text-mute font-mono flex items-center justify-between">
+            <span>Category (Magento) — filters products below</span>
+            <button type="button" onClick={reload}
+              className="inline-flex items-center gap-1 text-mute hover:text-ink normal-case tracking-normal">
+              <RefreshCcw className="size-3" /> reload
+            </button>
           </label>
           <select
             value={values.category_id || ""} onChange={(e) => set("category_id", e.target.value)}

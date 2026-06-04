@@ -34,7 +34,9 @@ export default function Page() {
   const productsKey = brandId
     ? `/brands/${brandId}/products${category ? `?category=${encodeURIComponent(category)}` : ""}`
     : null;
-  const { data, isLoading, mutate } = useSWR<Product[]>(productsKey, apiFetcher);
+  const { data, isLoading, mutate } = useSWR<Product[]>(productsKey, apiFetcher, {
+    revalidateOnFocus: true, revalidateOnReconnect: true, revalidateOnMount: true,
+  });
   const products = Array.isArray(data) ? data : [];
   const filtered = q.trim().length > 0
     ? products.filter((p) =>

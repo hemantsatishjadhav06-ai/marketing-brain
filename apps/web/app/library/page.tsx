@@ -55,7 +55,9 @@ export default function Page() {
   if (category) params.set("category", category);
   const qs = params.toString();
   const key = brandId ? `/brands/${brandId}/assets${qs ? `?${qs}` : ""}` : null;
-  const { data, isLoading } = useSWR<Asset[]>(key, apiFetcher);
+  const { data, isLoading, mutate } = useSWR<Asset[]>(key, apiFetcher, {
+    revalidateOnFocus: true, revalidateOnReconnect: true, revalidateOnMount: true,
+  });
   const { data: catsResp } = useSWR<CategoryRow[]>(brandId ? `/brands/${brandId}/integrations/magento/categories` : null, apiFetcher);
   const categories = Array.isArray(catsResp) ? catsResp.filter((c) => c.product_count > 0).sort((a, b) => a.name.localeCompare(b.name)) : [];
 
