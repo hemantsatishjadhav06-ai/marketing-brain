@@ -7,6 +7,7 @@ import clsx from "clsx";
 import {
   LayoutDashboard, Package, Brain, TrendingUp, Users, Lightbulb, Wand2,
   Calendar, Cpu, CheckSquare, FolderOpen, Send, BarChart3, Settings, LogOut,
+  Sparkles,
 } from "lucide-react";
 
 import { apiFetcher, clearToken, getToken } from "@/lib/api";
@@ -23,6 +24,7 @@ const NAV: Array<{ href: string; label: string; icon: any; group?: string }> = [
   { href: "/brand-brain", label: "Brand Brain", icon: Brain, group: "Foundation" },
   { href: "/trends", label: "Trends", icon: TrendingUp, group: "Foundation" },
   { href: "/audience", label: "Audience", icon: Users, group: "Foundation" },
+  { href: "/create", label: "Create (any agent)", icon: Sparkles, group: "Create" },
   { href: "/ideas", label: "Ideas", icon: Lightbulb, group: "Create" },
   { href: "/studio", label: "Studio", icon: Wand2, group: "Create" },
   { href: "/calendar", label: "Calendar", icon: Calendar, group: "Create" },

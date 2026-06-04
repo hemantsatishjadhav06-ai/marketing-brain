@@ -29,6 +29,7 @@ from app.routers import (
     products,
     publish_targets,
     publishing,
+    quick_create,
     repurpose,
     reviews,
     scoring,
@@ -158,6 +159,7 @@ def create_app() -> FastAPI:
     app.include_router(assets.router, prefix="/brands", tags=["assets"])
     app.include_router(publish_targets.router, prefix="/brands", tags=["publish-targets"])
     app.include_router(content.router, prefix="/content", tags=["content"])
+    app.include_router(quick_create.router, prefix="/content", tags=["quick-create"])
     app.include_router(publishing.router, prefix="/publishing", tags=["publishing"])
     app.include_router(repurpose.router, prefix="/repurpose", tags=["repurpose"])
     app.include_router(analytics.router, prefix="/brands", tags=["analytics"])

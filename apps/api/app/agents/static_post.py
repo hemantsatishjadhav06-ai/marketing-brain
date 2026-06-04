@@ -61,16 +61,20 @@ def _render_card(title: str, accent: str, sport: str) -> bytes:
 
 
 def _llm_copy(
-    brand: Brand, brain: BrandBrain | None, angle: str, product: Optional[Product]
+    brand: Brand, brain: BrandBrain | None, angle: str, product: Optional[Product],
+    overrides=None,
 ) -> tuple[dict, AgentResult]:
     from app.core.config import settings
+    from app.agents._overrides import Overrides, apply_to_system, max_tokens_for, tier_for
 
+    ov = overrides or Overrides()
     system = (
         render_cross_sport_clause(sport=brand.sport, brand_name=brand.name)
         + "\nYou are the Static Post agent. Write a punchy, on-brand caption for one Instagram-style image post.\n"
         + "Output ONLY JSON: {\"headline\": str, \"caption\": str, \"hashtags\": [str, ...], \"cta\": str}.\n"
         + "Caption ≤ 280 chars. 6–10 hashtags. CTA is 4–8 words."
     )
+    system = apply_to_system(system, ov)
     voice = (brain.voice if brain else "") or "Clear, useful, non-hypey."
     user = f"Brand: {brand.name} (sport={brand.sport})\nVoice: {voice}\nAngle: {angle}\n"
     if product:
@@ -83,7 +87,11 @@ def _llm_copy(
             "cta": "Shop the link in bio.",
         }
         return copy, AgentResult(output=copy, model="fallback")
-    res = complete(tier=LLMTier.DRAFTING, system=system, user=user, json_mode=True, max_tokens=600)
+    res = complete(
+        tier=tier_for(LLMTier.DRAFTING, ov.model),
+        system=system, user=user, json_mode=True,
+        max_tokens=max_tokens_for(600, ov.length),
+    )
     try:
         copy = res.json_data or json.loads(res.content)
     except (json.JSONDecodeError, AttributeError):
@@ -109,7 +117,8 @@ class StaticPostAgent:
         if entry.product_ids:
             product = db.get(Product, uuid.UUID(entry.product_ids[0]))
 
-        copy, agent_result = _llm_copy(brand, brain, entry.angle, product)
+        from app.agents._overrides import parse
+        copy, agent_result = _llm_copy(brand, brain, entry.angle, product, overrides=parse(entry.reason))
 
         # render image
         accent = brand.accent_color or "#CCFF00"
