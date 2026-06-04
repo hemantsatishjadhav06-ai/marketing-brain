@@ -71,6 +71,19 @@ export default function Page() {
     finally { setSyncing(false); }
   }
 
+  async function syncAll() {
+    setSyncing(true);
+    try {
+      const r = await api<{ totals: { categories_synced: number; products_upserted: number }; brand_count: number; results: any[] }>(
+        `/brands/integrations/magento/sync-all`, { method: "POST" },
+      );
+      const okCount = r.results.filter((x) => x.ok).length;
+      toast.success(`Synced ${okCount}/${r.brand_count} brands · ${r.totals.products_upserted} products total`);
+      mutate();
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSyncing(false); }
+  }
+
   async function disconnect() {
     if (!brandId) return;
     if (!confirm("Disconnect Magento for this brand? (Synced products stay.)")) return;
@@ -122,7 +135,10 @@ export default function Page() {
                   {busy ? "Saving…" : data?.magento?.connected ? "Update credentials" : "Connect"}
                 </Button>
                 <Button variant="outline" onClick={sync} disabled={!data?.magento?.connected || syncing}>
-                  {syncing ? "Syncing…" : "Sync categories + products now"}
+                  {syncing ? "Syncing…" : "Sync this brand"}
+                </Button>
+                <Button variant="outline" onClick={syncAll} disabled={syncing}>
+                  {syncing ? "…" : "Sync ALL brands in org"}
                 </Button>
                 {data?.magento?.connected && (
                   <Button variant="ghost" onClick={disconnect}>Disconnect</Button>

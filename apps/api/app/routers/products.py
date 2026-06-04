@@ -26,6 +26,76 @@ def _own_brand(db: Session, brand_id: uuid.UUID, user: User) -> Brand:
     return brand
 
 
+@router.get("/{brand_id}/products/{product_id}/performance")
+def product_performance(
+    brand_id: uuid.UUID,
+    product_id: uuid.UUID,
+    days: int = 30,
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    """Aggregate performance across every ContentItem that featured this
+    product in the last N days. Used by Studio + the Products page."""
+    from datetime import datetime, timedelta, timezone
+    from app.models.content import ContentItem
+    from app.models.publishing import ContentPerformance
+
+    brand = db.get(Brand, brand_id)
+    if not brand or brand.org_id != user.org_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Brand not found")
+    prod = db.get(Product, product_id)
+    if not prod or prod.brand_id != brand_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Product not found in this brand")
+
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    pid_str = str(product_id)
+    items = list(db.execute(
+        select(ContentItem).where(ContentItem.brand_id == brand_id)
+    ).scalars().all())
+    matched = [i for i in items if isinstance(i.product_ids, list) and pid_str in [str(p) for p in i.product_ids]]
+    if not matched:
+        return {
+            "product_id": pid_str, "sku": prod.sku, "title": prod.title,
+            "days": days, "content_items": 0,
+            "totals": {"impressions": 0, "engagements": 0, "clicks": 0, "conversions": 0, "revenue": 0.0},
+            "top_content": [],
+        }
+
+    item_ids = [i.id for i in matched]
+    perf_rows = list(db.execute(
+        select(ContentPerformance, ContentItem)
+        .join(ContentItem, ContentItem.id == ContentPerformance.content_item_id)
+        .where(ContentPerformance.content_item_id.in_(item_ids))
+        .where(ContentPerformance.created_at >= since)
+    ).all())
+
+    totals = {"impressions": 0, "engagements": 0, "clicks": 0, "conversions": 0, "revenue": 0.0}
+    top: list[dict] = []
+    for perf, item in perf_rows:
+        totals["impressions"] += int(perf.impressions or 0)
+        totals["engagements"] += int(perf.engagements or 0)
+        totals["clicks"] += int(perf.clicks or 0)
+        totals["conversions"] += int(perf.conversions or 0)
+        totals["revenue"] += float(perf.revenue or 0)
+        top.append({
+            "content_item_id": str(item.id),
+            "platform": item.platform, "content_type": item.content_type,
+            "angle": item.angle,
+            "impressions": int(perf.impressions or 0),
+            "engagements": int(perf.engagements or 0),
+            "revenue": float(perf.revenue or 0),
+        })
+    top.sort(key=lambda r: r["engagements"], reverse=True)
+    return {
+        "product_id": pid_str, "sku": prod.sku, "title": prod.title,
+        "image_url": (prod.image_urls or [None])[0],
+        "days": days,
+        "content_items": len(matched),
+        "totals": totals,
+        "top_content": top[:10],
+    }
+
+
 @router.get("/{brand_id}/products", response_model=List[ProductOut])
 def list_products(
     brand_id: uuid.UUID,

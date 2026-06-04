@@ -38,26 +38,42 @@ async function downloadAsset(contentItemId: string, assetId: string) {
   toast.success("Downloaded");
 }
 
+type CategoryRow = { external_id: string; name: string; product_count: number };
+
 export default function Page() {
   const [brandId, setBrandId] = useState<string | null>(null);
   const [kind, setKind] = useState("");
+  const [category, setCategory] = useState("");
   useEffect(() => {
     setBrandId(getSelectedBrand());
     const h = () => setBrandId(getSelectedBrand());
     window.addEventListener("storage", h);
     return () => window.removeEventListener("storage", h);
   }, []);
-  const key = brandId ? `/brands/${brandId}/assets${kind ? `?kind=${kind}` : ""}` : null;
+  const params = new URLSearchParams();
+  if (kind) params.set("kind", kind);
+  if (category) params.set("category", category);
+  const qs = params.toString();
+  const key = brandId ? `/brands/${brandId}/assets${qs ? `?${qs}` : ""}` : null;
   const { data, isLoading } = useSWR<Asset[]>(key, apiFetcher);
+  const { data: catsResp } = useSWR<CategoryRow[]>(brandId ? `/brands/${brandId}/integrations/magento/categories` : null, apiFetcher);
+  const categories = Array.isArray(catsResp) ? catsResp.filter((c) => c.product_count > 0).sort((a, b) => a.name.localeCompare(b.name)) : [];
 
   return (
     <AppShell>
       <PageHeader title="Library" description="Every asset every agent has produced. Download any single one or open the full content item." />
-      <div className="flex gap-2 mb-4">
+      <div className="flex flex-wrap gap-2 mb-4">
         <select className="rounded-lg bg-panel2 border hairline px-3 py-1.5 text-sm" value={kind} onChange={(e) => setKind(e.target.value)}>
           <option value="">All kinds</option>
           {["image", "carousel", "video", "audio", "blog", "caption", "hashtags", "thumbnail"].map((k) => <option key={k} value={k}>{k}</option>)}
         </select>
+        <select className="rounded-lg bg-panel2 border hairline px-3 py-1.5 text-sm" value={category} onChange={(e) => setCategory(e.target.value)}>
+          <option value="">All categories</option>
+          {categories.map((c) => <option key={c.external_id} value={c.name}>{c.name} ({c.product_count})</option>)}
+        </select>
+        {(kind || category) && (
+          <button onClick={() => { setKind(""); setCategory(""); }} className="text-xs text-mute hover:text-ink font-mono px-2 self-center">clear ✕</button>
+        )}
         <span className="text-xs font-mono text-mute ml-auto self-center">{data?.length ?? 0} assets</span>
       </div>
       {!brandId && <Card className="p-8 text-mute text-sm">Select a brand in the top bar.</Card>}

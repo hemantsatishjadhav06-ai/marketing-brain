@@ -74,6 +74,32 @@ def magento_connect(
     return {"connected": True, "base_url": base_url}
 
 
+@router.post("/integrations/magento/sync-all", status_code=status.HTTP_202_ACCEPTED)
+def magento_sync_all(
+    user: User = Depends(require_role("marketer")),
+    db: Session = Depends(get_db),
+):
+    """Sync Magento across every brand in the user's org. Aggregates per-brand
+    results so the UI can show a one-line summary plus a per-brand breakdown."""
+    brands = list(db.execute(
+        select(Brand).where(Brand.org_id == user.org_id)
+    ).scalars().all())
+    results: list[dict] = []
+    totals = {"categories_synced": 0, "products_upserted": 0, "skus_seen": 0}
+    for b in brands:
+        try:
+            r = magento_sync(db, b.id)
+            r["brand_id"] = str(b.id); r["sport"] = b.sport; r["ok"] = True
+            for k in totals:
+                totals[k] += int(r.get(k, 0))
+        except ValueError as e:
+            r = {"brand_id": str(b.id), "sport": b.sport, "ok": False, "skipped": True, "reason": str(e)}
+        except Exception as e:  # noqa: BLE001
+            r = {"brand_id": str(b.id), "sport": b.sport, "ok": False, "error": str(e)[:200]}
+        results.append(r)
+    return {"totals": totals, "brand_count": len(brands), "results": results}
+
+
 @router.post("/{brand_id}/integrations/magento/sync", status_code=status.HTTP_202_ACCEPTED)
 def magento_sync_endpoint(
     brand_id: uuid.UUID,

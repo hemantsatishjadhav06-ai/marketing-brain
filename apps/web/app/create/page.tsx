@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
   Image as ImageIcon, Layers, Pin, Video, Mic, Film, FileText, Search,
@@ -37,6 +37,9 @@ const ICON: Record<string, any> = {
 
 export default function CreateHubPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const preselectProductId = searchParams?.get("product_id") || null;
+  const preselectAgent = searchParams?.get("agent") || null;
   const [brandId, setBrandId] = useState<string | null>(null);
   useEffect(() => {
     setBrandId(getSelectedBrand());
@@ -49,10 +52,15 @@ export default function CreateHubPage() {
   const agents: AgentMeta[] = Array.isArray(agentsResp) ? agentsResp : [];
   const [active, setActive] = useState<string | null>(null);
 
-  // pre-select first agent on load
+  // pre-select agent — from ?agent= query param if valid, else first
   useEffect(() => {
-    if (!active && agents.length > 0) setActive(agents[0].name);
-  }, [agents, active]);
+    if (active || agents.length === 0) return;
+    if (preselectAgent && agents.some((a) => a.name === preselectAgent)) {
+      setActive(preselectAgent);
+    } else {
+      setActive(agents[0].name);
+    }
+  }, [agents, active, preselectAgent]);
 
   const groups = useMemo(() => {
     if (agents.length === 0) return [];
@@ -114,7 +122,12 @@ export default function CreateHubPage() {
               <Skeleton className="h-12 w-full rounded" />
             </Card>
           ) : meta ? (
-            <CreateForm meta={meta} brandId={brandId!} onCreated={(id) => router.push(`/studio/${id}`)} />
+            <CreateForm
+              meta={meta}
+              brandId={brandId!}
+              preselectProductId={preselectProductId}
+              onCreated={(id) => router.push(`/studio/${id}`)}
+            />
           ) : agents.length === 0 ? (
             <Card className="p-8 text-mute text-sm">
               Couldn't load agents. Check the API is reachable at <span className="font-mono text-ink">/content/agents</span>.
@@ -173,22 +186,28 @@ export default function CreateHubPage() {
 type Category = { external_id: string; name: string; level: number; product_count: number };
 
 function CreateForm({
-  meta, brandId, onCreated,
+  meta, brandId, preselectProductId, onCreated,
 }: {
   meta: AgentMeta; brandId: string;
+  preselectProductId?: string | null;
   onCreated: (contentItemId: string) => void;
 }) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
-  // reset when agent changes
+  // reset when agent changes; apply preselect if any
   useEffect(() => {
     const initial: Record<string, string> = {};
     for (const f of meta.fields) initial[f.key] = f.default || "";
+    if (preselectProductId) {
+      initial.product_id = preselectProductId;
+      setSelectedProductIds([preselectProductId]);
+    } else {
+      setSelectedProductIds([]);
+    }
     setValues(initial);
-    setSelectedProductIds([]);
-  }, [meta.name]);
+  }, [meta.name, preselectProductId]);
 
   const set = (k: string, v: string) => setValues((s) => ({ ...s, [k]: v }));
 

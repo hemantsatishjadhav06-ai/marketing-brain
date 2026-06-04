@@ -45,7 +45,14 @@ type Item = {
   payload: any;
   variants: Variant[];
   reviews: Review[];
+  product_ids?: string[];
   created_at: string;
+};
+type ProductPerf = {
+  product_id: string; sku: string; title: string;
+  image_url: string | null; days: number; content_items: number;
+  totals: { impressions: number; engagements: number; clicks: number; conversions: number; revenue: number };
+  top_content: Array<{ content_item_id: string; angle: string; platform: string; engagements: number; revenue: number }>;
 };
 
 function EditableField({
@@ -285,6 +292,12 @@ export default function Page() {
   const params = useParams<{ id: string }>();
   const id = params?.id as string;
   const { data, mutate } = useSWR<Item>(id ? `/content/${id}` : null, apiFetcher);
+  // first product (if any) → its 30-day perf across ALL content
+  const productId = data?.product_ids?.[0] || (data?.payload?.product_ids?.[0]) || null;
+  const { data: productPerf } = useSWR<ProductPerf>(
+    data?.brand_id && productId ? `/brands/${data.brand_id}/products/${productId}/performance?days=30` : null,
+    apiFetcher,
+  );
 
   async function runCritic() {
     if (!data) return;
@@ -401,6 +414,34 @@ export default function Page() {
               ))}
             </div>
           </Card>
+          {productPerf && (
+            <Card className="p-4">
+              <div className="text-xs font-mono text-mute mb-3">PRODUCT PERFORMANCE — last {productPerf.days}d</div>
+              <div className="flex gap-3 items-center">
+                {productPerf.image_url ? <img src={productPerf.image_url} className="size-12 rounded object-cover bg-bg2" alt="" /> : <div className="size-12 rounded bg-bg2" />}
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium line-clamp-1">{productPerf.title}</div>
+                  <div className="text-[10px] font-mono text-mute">{productPerf.sku}</div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
+                <div><div className="text-[10px] font-mono text-mute">impressions</div><div className="font-mono">{productPerf.totals.impressions.toLocaleString()}</div></div>
+                <div><div className="text-[10px] font-mono text-mute">engagements</div><div className="font-mono accent-text">{productPerf.totals.engagements.toLocaleString()}</div></div>
+                <div><div className="text-[10px] font-mono text-mute">clicks</div><div className="font-mono">{productPerf.totals.clicks.toLocaleString()}</div></div>
+                <div><div className="text-[10px] font-mono text-mute">revenue</div><div className="font-mono">${productPerf.totals.revenue.toFixed(0)}</div></div>
+              </div>
+              <div className="text-[10px] font-mono text-mute mt-3">across {productPerf.content_items} content items featuring this SKU</div>
+              {productPerf.top_content.length > 0 && (
+                <div className="mt-3 space-y-1">
+                  <div className="text-[10px] font-mono text-mute uppercase tracking-widest">top this period</div>
+                  {productPerf.top_content.slice(0, 3).map((t) => (
+                    <a key={t.content_item_id} href={`/studio/${t.content_item_id}`}
+                       className="block text-xs text-mute hover:text-ink line-clamp-1">· {t.angle}</a>
+                  ))}
+                </div>
+              )}
+            </Card>
+          )}
           <Card className="p-4">
             <div className="text-xs font-mono text-mute mb-3">VARIANTS — {data.variants.length}</div>
             {data.variants.length === 0 && <div className="text-mute text-sm">No variants.</div>}
