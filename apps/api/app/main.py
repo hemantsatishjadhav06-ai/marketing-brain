@@ -89,46 +89,53 @@ def _seed_owner() -> None:
 
         db = SessionLocal()
         try:
-            existing = db.execute(select(User).where(User.email == settings.DEFAULT_OWNER_EMAIL)).scalar_one_or_none()
-            if existing:
-                return
-            org = Org(name=settings.DEFAULT_ORG_NAME, monthly_cost_cap_usd=settings.DEFAULT_MONTHLY_COST_CAP_USD)
-            db.add(org)
-            db.flush()
-            owner = User(
-                org_id=org.id,
-                email=settings.DEFAULT_OWNER_EMAIL,
-                password_hash=hash_password(settings.DEFAULT_OWNER_PASSWORD),
-                role="owner",
-                active=True,
-            )
-            db.add(owner)
-            # Three default racket-sport brands so the cockpit feels real out of the box.
+            # ── owner + org ────────────────────────────────────────────────
+            owner = db.execute(select(User).where(User.email == settings.DEFAULT_OWNER_EMAIL)).scalar_one_or_none()
+            if owner is None:
+                org = Org(name=settings.DEFAULT_ORG_NAME, monthly_cost_cap_usd=settings.DEFAULT_MONTHLY_COST_CAP_USD)
+                db.add(org); db.flush()
+                owner = User(
+                    org_id=org.id, email=settings.DEFAULT_OWNER_EMAIL,
+                    password_hash=hash_password(settings.DEFAULT_OWNER_PASSWORD),
+                    role="owner", active=True,
+                )
+                db.add(owner); db.flush()
+                log.info("seeded default org + owner")
+            org = db.get(Org, owner.org_id)
+
+            # ── brands (idempotent — only add what's missing) ──────────────
             seed_brands = [
                 ("tennis",     "Tennis Outlet",     "https://tennisoutlet.in",     "#CCFF00", ["string", "tension", "grip", "racket", "drill"], os.environ.get("MAGENTO_BASE_URL_TENNIS",     "https://tennisoutlet.in")),
                 ("padel",      "Padel Outlet",      "https://padeloutlet.in",      "#22D3EE", ["padel", "grip", "court", "drill", "tournament"], os.environ.get("MAGENTO_BASE_URL_PADEL",      "https://padeloutlet.in")),
                 ("pickleball", "Pickleball Outlet", "https://pickleballoutlet.in", "#F59E0B", ["paddle", "court", "pickleball", "drill", "rules"], os.environ.get("MAGENTO_BASE_URL_PICKLEBALL", "https://pickleballoutlet.in")),
             ]
             shared_magento_token = os.environ.get("MAGENTO_TOKEN", "").strip()
-            from app.services.magento_sync import save_config
+            from app.services.magento_sync import is_configured, save_config
 
             for sport, name, website, accent, kws, magento_url in seed_brands:
-                brand = Brand(org_id=org.id, sport=sport, name=name, website_url=website, accent_color=accent)
-                db.add(brand); db.flush()
-                db.add(BrandBrain(
-                    brand_id=brand.id,
-                    voice=f"Clear, useful, no hype. Voice of {sport} players who play three times a week.",
-                    seo_keywords=kws,
-                ))
-                db.flush()
-                if shared_magento_token and magento_url:
+                brand = db.execute(select(Brand).where(Brand.org_id == org.id).where(Brand.sport == sport)).scalar_one_or_none()
+                if brand is None:
+                    brand = Brand(org_id=org.id, sport=sport, name=name, website_url=website, accent_color=accent)
+                    db.add(brand); db.flush()
+                    log.info("seeded brand %s", sport)
+
+                brain = db.execute(select(BrandBrain).where(BrandBrain.brand_id == brand.id)).scalar_one_or_none()
+                if brain is None:
+                    db.add(BrandBrain(
+                        brand_id=brand.id,
+                        voice=f"Clear, useful, no hype. Voice of {sport} players who play three times a week.",
+                        seo_keywords=kws,
+                    ))
+                    db.flush()
+
+                # Connect Magento if creds in env AND not already configured
+                if shared_magento_token and magento_url and not is_configured(db, brand.id):
                     try:
                         save_config(db, brand.id, base_url=magento_url, token=shared_magento_token)
-                        log.info("magento config seeded for %s", sport)
+                        log.info("magento config wired for %s", sport)
                     except Exception as e:  # noqa: BLE001
-                        log.warning("magento seed failed for %s: %s", sport, e)
+                        log.warning("magento wire failed for %s: %s", sport, e)
             db.commit()
-            log.info("seeded default org/owner + 3 brands (tennis/padel/pickleball)")
         finally:
             db.close()
     except Exception as e:  # noqa: BLE001
