@@ -158,8 +158,10 @@ def create_app() -> FastAPI:
     app.include_router(reviews.router, prefix="/brands", tags=["reviews"])
     app.include_router(assets.router, prefix="/brands", tags=["assets"])
     app.include_router(publish_targets.router, prefix="/brands", tags=["publish-targets"])
-    app.include_router(content.router, prefix="/content", tags=["content"])
+    # IMPORTANT: register quick_create BEFORE content so /content/agents and
+    # /content/create don't get swallowed by /content/{content_id}'s path-param matcher.
     app.include_router(quick_create.router, prefix="/content", tags=["quick-create"])
+    app.include_router(content.router, prefix="/content", tags=["content"])
     app.include_router(publishing.router, prefix="/publishing", tags=["publishing"])
     app.include_router(repurpose.router, prefix="/repurpose", tags=["repurpose"])
     app.include_router(analytics.router, prefix="/brands", tags=["analytics"])
