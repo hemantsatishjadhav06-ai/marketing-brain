@@ -318,7 +318,10 @@ function CreateForm({
           </select>
           {categories.length === 0 && (
             <div className="text-[11px] text-mute mt-1">
-              No Magento categories yet. <Link href="/settings/integrations" className="accent-text hover:underline">Connect Magento</Link> + Sync to populate this dropdown.
+              No Magento categories yet. <Link href="/settings/integrations" className="accent-text hover:underline">Connect Magento</Link>
+              {" or "}
+              <Link href="/products" className="accent-text hover:underline">seed demo products</Link>
+              {" "}to populate this dropdown.
             </div>
           )}
         </div>

@@ -57,16 +57,46 @@ export default function Page() {
     finally { setSyncing(false); }
   }
 
+  async function seedDemo() {
+    if (!brandId) return;
+    setSyncing(true);
+    try {
+      const r = await api<{ skipped: boolean; reason?: string; products_created: number }>(
+        `/brands/${brandId}/products/seed-demo`, { method: "POST" },
+      );
+      if (r.skipped) toast.info(r.reason || "Skipped");
+      else toast.success(`Seeded ${r.products_created} demo products + categories`);
+      mutate();
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSyncing(false); }
+  }
+
+  async function seedDemoAll() {
+    setSyncing(true);
+    try {
+      const r = await api<{ products_created_total: number; results: any[] }>(
+        `/brands/products/seed-demo-all`, { method: "POST" },
+      );
+      toast.success(`Seeded ${r.products_created_total} demo products across all brands`);
+      mutate();
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSyncing(false); }
+  }
+
   return (
     <AppShell>
       <PageHeader
         title="Products"
         description="Brand-scoped product catalogue from Magento. Click Generate on any row to fire any agent against that SKU."
         action={
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center flex-wrap">
             <Button variant="outline" onClick={syncNow} disabled={!brandId || syncing}>
               <RefreshCcw className="size-4" />
               {syncing ? "Syncing…" : "Sync from Magento"}
+            </Button>
+            <Button variant="outline" onClick={seedDemo} disabled={!brandId || syncing}>
+              <Sparkles className="size-4" />
+              Seed demo products
             </Button>
             <Link href="/settings/integrations" className="text-xs accent-text hover:underline self-center">Configure →</Link>
           </div>
@@ -94,8 +124,20 @@ export default function Page() {
           {!isLoading && filtered.length === 0 && (
             <Card className="p-10 text-center">
               <div className="font-serif text-2xl">No products yet</div>
-              <div className="text-mute text-sm mt-2">
-                Connect Magento in <Link href="/settings/integrations" className="accent-text hover:underline">Settings → Integrations</Link>, then click "Sync from Magento".
+              <div className="text-mute text-sm mt-2 max-w-md mx-auto">
+                Two ways to populate this catalogue:
+              </div>
+              <div className="mt-5 flex gap-2 justify-center flex-wrap">
+                <Button onClick={seedDemo} disabled={syncing}>
+                  <Sparkles className="size-4" /> Seed demo products (no Magento needed)
+                </Button>
+                <Link href="/settings/integrations" className="rounded-xl border hairline px-4 py-2 text-sm hover:bg-panel2">
+                  Connect Magento →
+                </Link>
+              </div>
+              <div className="text-[11px] text-mute mt-4">
+                Demo seeds 8 sample SKUs + a fake category tree so /create + /library work immediately.
+                Idempotent — safe to click multiple times.
               </div>
             </Card>
           )}

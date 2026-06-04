@@ -26,6 +26,30 @@ def _own_brand(db: Session, brand_id: uuid.UUID, user: User) -> Brand:
     return brand
 
 
+@router.post("/{brand_id}/products/seed-demo", status_code=status.HTTP_201_CREATED)
+def seed_demo_products(
+    brand_id: uuid.UUID,
+    user: User = Depends(require_role("marketer")),
+    db: Session = Depends(get_db),
+):
+    """Drop 8 sample SKUs + a fake category tree into this brand so the cockpit
+    is usable without Magento. Idempotent — skips brands that already have products."""
+    from app.services.demo_seed import seed_demo
+    brand = _own_brand(db, brand_id, user)
+    return seed_demo(db, brand_id, brand.sport)
+
+
+@router.post("/products/seed-demo-all", status_code=status.HTTP_201_CREATED)
+def seed_demo_all_brands(
+    user: User = Depends(require_role("marketer")),
+    db: Session = Depends(get_db),
+):
+    """Seed demo products into every brand in the user's org. One-click setup."""
+    from app.services.demo_seed import seed_demo_all
+    rows = db.execute(select(Brand).where(Brand.org_id == user.org_id)).scalars().all()
+    return seed_demo_all(db, {b.sport: b.id for b in rows})
+
+
 @router.get("/{brand_id}/products/{product_id}/performance")
 def product_performance(
     brand_id: uuid.UUID,
