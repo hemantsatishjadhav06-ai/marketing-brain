@@ -7,8 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#fbfaf6;--panel:#ffffff;--panel2:#f7f5ea;--line:#e8e4d2;--txt:#1f242c;--mut:#737884;
---yel:#eab308;--yelD:#a16207;--yelBg:#fef9e7;--grn:#16a34a;--grnBg:#f0fdf4;--err:#dc2626;--r:14px}
+:root{--bg:#f7f8fc;--panel:#ffffff;--panel2:#f1f3fa;--line:#e3e7f2;--txt:#171a21;--mut:#697082;
+--yel:#6366f1;--yelD:#4338ca;--yelBg:#eef2ff;--grn:#10b981;--grnBg:#ecfdf5;--err:#e11d48;--r:14px}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--txt);font:14px/1.55 'Inter',-apple-system,sans-serif;min-height:100vh}
 h1,h2,h3,h4{font-weight:700;letter-spacing:-.01em}
@@ -17,7 +17,7 @@ h1,h2,h3,h4{font-weight:700;letter-spacing:-.01em}
 #shell.on{display:flex}
 aside{width:240px;min-width:240px;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
 .logo{display:flex;align-items:center;gap:9px;padding:20px 18px 14px;font-size:16px;font-weight:800}
-.logo .dot{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,#facc15,#84cc16);display:grid;place-items:center;font-size:14px}
+.logo .dot{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,#6366f1,#a855f7);display:grid;place-items:center;font-size:14px}
 nav{flex:1;overflow-y:auto;padding:6px 10px}
 .navsec{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--mut);padding:14px 10px 5px}
 .navitem{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:9px;cursor:pointer;color:var(--txt);font-weight:500;margin:1px 0}
@@ -36,8 +36,8 @@ main{flex:1;padding:26px 34px;max-width:1160px}
 input,select,textarea{width:100%;background:#fff;border:1px solid var(--line);border-radius:9px;color:var(--txt);padding:10px 13px;font-size:13.5px;margin:4px 0 11px;font-family:inherit}
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--yel);box-shadow:0 0 0 3px rgba(234,179,8,.15)}
 label{font-size:12px;color:var(--mut);font-weight:600}
-button{background:var(--yel);color:#3b2f04;border:none;border-radius:9px;padding:10px 18px;font-size:13.5px;font-weight:700;cursor:pointer;transition:.12s;font-family:inherit}
-button:hover{background:#d4a407;transform:translateY(-1px)}
+button{background:var(--yel);color:#fff;border:none;border-radius:9px;padding:10px 18px;font-size:13.5px;font-weight:700;cursor:pointer;transition:.12s;font-family:inherit}
+button:hover{background:#4f46e5;transform:translateY(-1px)}
 button:disabled{opacity:.5;cursor:wait;transform:none}
 button.ghost{background:#fff;border:1px solid var(--line);color:var(--txt)}
 button.ghost:hover{background:var(--panel2)}
@@ -51,7 +51,7 @@ button.sm{padding:6px 12px;font-size:12px;border-radius:8px}
 .tabs{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:18px;border-bottom:1px solid var(--line);padding-bottom:10px}
 .tab{padding:7px 14px;border-radius:8px;color:var(--mut);cursor:pointer;font-size:13px;font-weight:600}
 .tab:hover{background:var(--panel2)}
-.tab.on{background:var(--yel);color:#3b2f04}
+.tab.on{background:var(--yel);color:#fff}
 .idea{background:#fff;border:1px solid var(--line);border-radius:12px;padding:15px;box-shadow:0 1px 2px rgba(40,35,10,.04)}
 .idea h4{font-size:13.5px;margin-bottom:5px}
 .idea .hook{color:var(--yelD);font-size:12.5px;font-style:italic;margin-bottom:7px}
@@ -85,8 +85,15 @@ img.asset{max-width:420px;width:100%;border-radius:10px;border:1px solid var(--l
 .feeditem .when{color:var(--mut);font-size:11px;min-width:74px}
 .aplog{font-family:ui-monospace,monospace;font-size:11.5px;background:var(--panel2);border-radius:8px;padding:10px;max-height:170px;overflow-y:auto;color:#4b5160}
 .brandlogo{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);object-fit:contain;background:#fff}
+.phone{width:300px;border:1px solid var(--line);border-radius:22px;overflow:hidden;background:#fff;box-shadow:0 4px 18px rgba(20,20,60,.08)}
+.phone .ph-h{display:flex;align-items:center;gap:8px;padding:9px 12px;font-size:12px;font-weight:700}
+.phone .ph-h img{width:26px;height:26px;border-radius:50%;border:1px solid var(--line);object-fit:contain}
+.phone .ph-img{width:100%;aspect-ratio:4/5;object-fit:cover;display:block;background:var(--panel2)}
+.phone .ph-a{display:flex;gap:12px;padding:8px 12px;font-size:17px;color:#444}
+.phone .ph-c{padding:0 12px 12px;font-size:11.5px;color:#333;max-height:70px;overflow:hidden}
+.apbadge{font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px}
 /* ---------- login ---------- */
-#login{display:none;min-height:100vh;align-items:center;justify-content:center;background:linear-gradient(160deg,#fbfaf6 60%,#fef9e7)}
+#login{display:none;min-height:100vh;align-items:center;justify-content:center;background:linear-gradient(160deg,#f7f8fc 60%,#eef2ff)}
 #login.on{display:flex}
 .logincard{background:#fff;border:1px solid var(--line);border-radius:18px;padding:38px;width:380px;box-shadow:0 20px 60px rgba(40,35,10,.08)}
 </style>
@@ -173,7 +180,7 @@ function renderSidebar(){
   for(const [g,list] of Object.entries(groups)){
     h+=`<div class="navsec">${g?("📁 "+esc(g)):"Brands"}</div>`;
     list.forEach(b=>{
-      const col=(((b.profile||{}).brand_kit||{}).colors||[])[0]||"#eab308";
+      const col=(((b.profile||{}).brand_kit||{}).colors||[])[0]||"#6366f1";
       h+=`<div class="navitem ${state.brand&&state.brand.id===b.id?'on':''}" onclick="openBrand('${b.id}')"><span class="bdot" style="background:${col}"></span>${esc(b.name)}</div>`;
     });
   }
@@ -187,8 +194,16 @@ async function renderDash(){
   m.innerHTML=`<h1 style="font-size:21px;margin-bottom:4px">Dashboard</h1>
   <p class="sub">${isAdmin()?"All client brands at a glance — and the autopilot that runs them.":"Your brand at a glance."}</p>
   <div id="dashBody"><span class="spinner"></span></div>`;
-  const [feed, ap] = await Promise.all([api("/activity"), api("/autopilot/status")]);
+  const [feed, ap, dg] = await Promise.all([api("/activity"), api("/autopilot/status"), api("/digest")]);
   let h="";
+  h+=`<div class="card" style="border-left:4px solid var(--yel);border-radius:0 14px 14px 0"><h2>\ud83d\udcc5 Due today (${dg.due_today.length})</h2>`+
+    (dg.due_today.length? dg.due_today.map(d=>`<div class="feeditem"><span class="when">${esc(d.time||"")}</span><span class="tag y" style="margin:0">${esc(d.brand)}</span><span class="tag" style="margin:0">${esc(d.channel||"")}</span><span>${esc(d.title||"")}</span></div>`).join("")
+    : '<p class="sub" style="margin:6px 0 0">Nothing scheduled for today.</p>')+`</div>`;
+  if(dg.needs_approval.length||dg.changes_requested.length){
+    h+=`<div class="card" style="border-left:4px solid var(--warn);border-radius:0 14px 14px 0"><h2>\u270b Needs review (${dg.needs_approval.length+dg.changes_requested.length})</h2>`+
+      dg.needs_approval.map(d=>`<div class="feeditem"><span class="tag y" style="margin:0">${esc(d.brand)}</span><span class="tag" style="margin:0">${esc(d.format||"")}</span><span>${esc(d.title||"")}</span><button class="sm ghost" onclick="openBrand('${d.brand_id}').then(()=>{state.tab='creatives';renderBrand()})">review</button></div>`).join("")+
+      dg.changes_requested.map(d=>`<div class="feeditem"><span class="tag" style="margin:0;color:var(--err);border-color:var(--err)">changes requested</span><span class="tag y" style="margin:0">${esc(d.brand)}</span><span>${esc(d.title||"")} \u2014 <i>${esc(d.comment||"")}</i></span></div>`).join("")+`</div>`;
+  }
   h+=`<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));margin-bottom:16px">
     <div class="kpi"><b>${BRANDS.length}</b><span>brands</span></div>
     <div class="kpi"><b>${BRANDS.filter(b=>b.status==='ready').length}</b><span>fully set up</span></div>
@@ -615,14 +630,24 @@ async function tabCreatives(){
   const b=state.brand; const crs=await api(`/brands/${b.id}/creatives`);
   $("tabBody").innerHTML = crs.length? crs.map(c=>{const p=c.payload;return `
     <div class="card">
-      <div class="row"><h2>${esc(p.title)}</h2><span class="tag y">${c.channel}</span><span class="tag">${esc(p.format)}</span></div>
+      <div class="row"><h2>${esc(p.title)}</h2><span class="tag y">${c.channel}</span><span class="tag">${esc(p.format)}</span>${apBadge(p)}</div>
       ${renderPackage(p)}
-      ${c.asset_path?`<img class="asset" src="/workspaces/${b.grp?b.grp+"/":""}${b.slug}/${c.asset_path}?t=${Date.now()}">`:""}
+      ${c.asset_path?`<div class="row" style="align-items:flex-start;margin-top:10px">
+        <div class="phone"><div class="ph-h">${logoUrl(b)?`<img src="${logoUrl(b)}">`:""}<span>${esc(b.name)}</span></div>
+          <img class="ph-img" src="/workspaces/${b.grp?b.grp+"/":""}${b.slug}/${c.asset_path}?t=${Date.now()}">
+          <div class="ph-a"><span>❤️</span><span>💬</span><span>➤</span></div>
+          <div class="ph-c"><b>${esc(b.name.toLowerCase().replace(/\s/g,""))}</b> ${esc((p.caption||"").slice(0,120))}</div></div>
+        </div>`:""}
       <div class="row" style="margin-top:12px">
         <button class="sm" onclick="genImage('${c.id}',this)">🎨 Generate branded visual</button>
+        ${c.asset_path&&(p.format==="reel"||p.script)?`<button class="sm" onclick="buildVideo('${c.id}',this)">🎬 Build video</button>`:""}
         <button class="sm grn" onclick="publishCreative('${c.id}','simulated',this)">📤 Publish (simulated)</button>
         <button class="sm ghost" onclick="publishCreative('${c.id}','live',this)">🔴 Publish live</button>
-      </div></div>`;}).join("") : '<div class="card"><p class="sub">No creatives yet — produce one from Ideas or run autopilot.</p></div>';
+        <span style="flex:1"></span>
+        <button class="sm grn" onclick="approve('${c.id}','approved',this)">✓ Approve</button>
+        <button class="sm ghost" onclick="approve('${c.id}','changes_requested',this)">✎ Request changes</button>
+      </div>
+      <div id="vout_${c.id}"></div></div>`;}).join("") : '<div class="card"><p class="sub">No creatives yet — produce one from Ideas or run autopilot.</p></div>';
 }
 function renderPackage(p){
   let h="";
@@ -660,6 +685,82 @@ async function publishCreative(cid,mode,btn){
   }catch(e){ toast(e.message,true); busy(btn,false); }
 }
 
+function apBadge(p){
+  const a=p.approval;
+  if(!a) return `<span class="apbadge" style="background:var(--panel2);color:var(--mut)">pending review</span>`;
+  return a.state==="approved"
+    ? `<span class="apbadge" style="background:var(--grnBg);color:var(--grn)">✓ approved</span>`
+    : `<span class="apbadge" style="background:#fff1f2;color:var(--err)" title="${esc(a.comment||"")}">changes requested</span>`;
+}
+async function approve(cid,stateVal,btn){
+  let comment="";
+  if(stateVal==="changes_requested"){ comment=prompt("What should change?")||""; if(!comment) return; }
+  busy(btn,true);
+  try{ await api(`/brands/${state.brand.id}/creatives/${cid}/approval`,"POST",{state:stateVal,comment});
+    toast(stateVal==="approved"?"Approved — live publishing unlocked":"Changes requested"); tabCreatives();
+  }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+async function buildVideo(cid,btn){
+  busy(btn,true,"Rendering video…");
+  try{
+    const b=state.brand;
+    const c=(await api(`/brands/${b.id}/creatives`)).find(x=>x.id===cid);
+    const p=c.payload, s=p.script||{};
+    const img=new Image(); img.crossOrigin="anonymous";
+    img.src=`/workspaces/${b.grp?b.grp+"/":""}${b.slug}/${c.asset_path}?t=${Date.now()}`;
+    await new Promise((res,rej)=>{img.onload=res;img.onerror=()=>rej(new Error("couldn't load visual"));});
+    const cv=document.createElement("canvas"); cv.width=540; cv.height=960;
+    const ctx=cv.getContext("2d");
+    const stream=cv.captureStream(30);
+    const rec=new MediaRecorder(stream,{mimeType:MediaRecorder.isTypeSupported("video/webm;codecs=vp9")?"video/webm;codecs=vp9":"video/webm"});
+    const chunks=[]; rec.ondataavailable=e=>chunks.push(e.data);
+    const done=new Promise(res=>{rec.onstop=res;});
+    rec.start();
+    const colors=(((b.profile||{}).brand_kit||{}).colors)||["#6366f1"];
+    const hook=(s.hook_options||[p.title])[0]||p.title;
+    const texts=(s.shots||[]).map(sh=>sh.on_screen_text).filter(Boolean).slice(0,4);
+    if(!texts.length) texts.push(p.cta||"Follow for more");
+    function wrap(t,x,y,maxW,lh){
+      const words=String(t).split(" "); let line="", yy=y;
+      for(const w of words){ const test=line?line+" "+w:w;
+        if(ctx.measureText(test).width>maxW&&line){ ctx.fillText(line,x,yy); line=w; yy+=lh; } else line=test; }
+      ctx.fillText(line,x,yy);
+    }
+    const FPS=30, hookSec=2.2, perText=1.8, outroSec=2;
+    const total=Math.round(FPS*(hookSec+texts.length*perText+outroSec));
+    for(let f=0;f<total;f++){
+      const t=f/FPS;
+      ctx.fillStyle="#0c0e16"; ctx.fillRect(0,0,540,960);
+      if(t<hookSec){
+        ctx.fillStyle=colors[0]; ctx.fillRect(0,0,540,960);
+        ctx.fillStyle="#fff"; ctx.font="700 44px Inter,Arial"; ctx.textAlign="center";
+        wrap(hook,270,420,460,54);
+      } else if(t<hookSec+texts.length*perText){
+        const i=Math.floor((t-hookSec)/perText);
+        const zt=((t-hookSec)%perText)/perText;
+        const z=1.05+zt*0.08;
+        const iw=540*z, ih=iw*img.height/img.width;
+        ctx.drawImage(img,(540-iw)/2,(960-ih)/2,iw,ih);
+        ctx.fillStyle="rgba(0,0,0,.45)"; ctx.fillRect(0,700,540,260);
+        ctx.fillStyle="#fff"; ctx.font="700 34px Inter,Arial"; ctx.textAlign="center";
+        wrap(texts[i]||"",270,790,470,44);
+      } else {
+        ctx.fillStyle=colors[0]; ctx.fillRect(0,0,540,960);
+        ctx.fillStyle="#fff"; ctx.font="700 40px Inter,Arial"; ctx.textAlign="center";
+        wrap(p.cta||"Follow "+b.name,270,440,460,50);
+        ctx.font="400 24px Inter,Arial"; ctx.fillText(b.website||"",270,560);
+      }
+      await new Promise(r=>setTimeout(r,1000/FPS));
+    }
+    rec.stop(); await done;
+    const blob=new Blob(chunks,{type:"video/webm"});
+    const url=URL.createObjectURL(blob);
+    $("vout_"+cid).innerHTML=`<div class="row" style="margin-top:10px"><video src="${url}" controls style="width:240px;border-radius:12px;border:1px solid var(--line)"></video>
+      <a href="${url}" download="${esc(b.slug)}-reel.webm"><button class="sm">⬇ Download video</button></a>
+      <span class="sub" style="margin:0">Draft animatic — hook → visual with captions → CTA. Use as a base or post as-is.</span></div>`;
+    busy(btn,false); toast("Video ready below the creative");
+  }catch(e){ toast(e.message,true); busy(btn,false); }
+}
 async function tabPublish(){
   const b=state.brand; const log=await api(`/brands/${b.id}/publish`);
   $("tabBody").innerHTML = log.length? log.map(l=>`

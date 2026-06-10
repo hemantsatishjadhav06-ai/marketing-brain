@@ -797,6 +797,114 @@ def _run_autopilot(bid, cfg: AutopilotIn):
         AUTOPILOT[bid]["state"] = "failed"
 
 
+# ------------------------------------------------------------- measure loop / cron
+
+CYCLE_SECS = 7 * 86400  # weekly self-refresh per brand
+
+
+@app.get("/api/cron")
+def cron(key: str = ""):
+    """Keep-alive + self-learning heartbeat. Point an external pinger
+    (cron-job.org / UptimeRobot, every 10 min) at /api/cron?key=CRON_KEY.
+    Each ping keeps the free instance awake; once per week per brand it
+    refreshes trend scans and analytics insights in the background."""
+    expected = os.environ.get("CRON_KEY", "")
+    if not expected or key != expected:
+        return {"ok": True, "alive": True}  # plain keep-alive without key
+    kicked = []
+    for b in db.list_brands():
+        if b.get("status") != "ready":
+            continue
+        profile = b.get("profile") or {}
+        last = profile.get("last_auto_cycle", 0)
+        if time.time() - last > CYCLE_SECS:
+            profile["last_auto_cycle"] = time.time()
+            db.update_brand(b["id"], profile=profile)
+            threading.Thread(target=_auto_cycle, args=(b["id"],), daemon=True).start()
+            kicked.append(b["name"])
+            break  # one brand per ping keeps load tiny
+    return {"ok": True, "alive": True, "cycled": kicked}
+
+
+def _auto_cycle(bid):
+    """Weekly per-brand self-refresh: new trend scan + fresh insights."""
+    try:
+        b = db.get_brand(bid)
+        if not b:
+            return
+        if trend_scanner.enabled():
+            signals = trend_scanner.scan(trend_scanner.default_keywords(b))
+            if signals.get("ok"):
+                profile = b.get("profile") or {}
+                profile["trend_scan"] = signals
+                db.update_brand(bid, profile=profile)
+                b = db.get_brand(bid)
+                try:
+                    out = ai_engine.trend_radar(b, signals)
+                    ws.write_json(_wslug(b), "brand-profile/trend-radar.json", out)
+                except Exception:
+                    pass
+        rows = db.list_docs("metrics", bid)
+        if rows:
+            data = [{"channel": r["channel"], "post": r["post_ref"], **(r["payload"] or {})} for r in rows]
+            try:
+                out = ai_engine.analyze_performance(b, data)
+                ws.write_json(_wslug(b), "analytics/latest-insights.json", out)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
+# ------------------------------------------------------------- approvals
+
+class ApprovalIn(BaseModel):
+    state: str  # approved|changes_requested
+    comment: str = ""
+
+
+@app.post("/api/brands/{bid}/creatives/{cid}/approval")
+def set_approval(bid: str, cid: str, body: ApprovalIn, user=Depends(current_user)):
+    _brand_or_404(bid, user)
+    c = db.get_doc("creatives", cid)
+    if not c:
+        raise HTTPException(404, "Creative not found")
+    if body.state not in ("approved", "changes_requested"):
+        raise HTTPException(400, "state must be approved or changes_requested")
+    payload = c["payload"]
+    payload["approval"] = {"state": body.state, "comment": body.comment[:1000],
+                           "by": user.get("uid"), "role": user.get("role"), "at": time.time()}
+    db.update_doc("creatives", cid, payload=payload)
+    return db.get_doc("creatives", cid)
+
+
+@app.get("/api/digest")
+def digest(user=Depends(current_user)):
+    """Command-center data: today's calendar items + creatives awaiting approval."""
+    from datetime import date as _date
+    today = _date.today().isoformat()
+    brand_list = db.list_brands() if user["role"] == "admin" else \
+        [b for b in [db.get_brand(user.get("brand_id") or "")] if b]
+    due_today, needs_approval, changes_requested = [], [], []
+    for b in brand_list:
+        for c in db.list_docs("calendar_items", b["id"]):
+            if c.get("date") == today:
+                due_today.append({"brand": b["name"], "brand_id": b["id"], "time": c.get("time"),
+                                  "channel": c.get("channel"), "title": (c.get("payload") or {}).get("title")})
+        for cr in db.list_docs("creatives", b["id"]):
+            ap = (cr.get("payload") or {}).get("approval")
+            item = {"brand": b["name"], "brand_id": b["id"], "id": cr["id"], "channel": cr.get("channel"),
+                    "title": (cr.get("payload") or {}).get("title"), "format": cr.get("format")}
+            if not ap:
+                needs_approval.append(item)
+            elif ap.get("state") == "changes_requested":
+                item["comment"] = ap.get("comment")
+                changes_requested.append(item)
+    due_today.sort(key=lambda x: x.get("time") or "")
+    return {"today": today, "due_today": due_today,
+            "needs_approval": needs_approval[:15], "changes_requested": changes_requested[:15]}
+
+
 # ------------------------------------------------------------- activity feed
 
 @app.get("/api/activity")
@@ -838,6 +946,9 @@ def publish(bid: str, body: PublishIn, user=Depends(current_user)):
     full_caption = (caption + "\n\n" + tags).strip()
 
     if body.mode == "live":
+        ap = (c["payload"].get("approval") or {})
+        if ap.get("state") != "approved":
+            raise HTTPException(400, "This creative isn't approved yet — live publishing requires approval (Creatives tab).")
         creds = db.get_connectors(bid).get(channel)
         if not creds:
             raise HTTPException(400, f"No credentials saved for {channel}. Save connector settings first, or use simulated mode.")
