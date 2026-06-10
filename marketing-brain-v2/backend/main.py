@@ -117,6 +117,27 @@ class ScrapeImportIn(BaseModel):
     scrape: dict
 
 
+class RepurposeIn(BaseModel):
+    source: str
+    count: int = 5
+    platform: str = "instagram"
+
+
+class SeoIn(BaseModel):
+    topic: str
+    platform: str = "youtube"
+
+
+class ScoreIn(BaseModel):
+    kind: str = "idea"  # idea|creative
+    id: str
+
+
+class CompetitorIn(BaseModel):
+    url: str
+    name: str = ""
+
+
 class AutopilotIn(BaseModel):
     ideas_per_channel: int = 4
     creatives_per_channel: int = 1
@@ -470,6 +491,103 @@ def _composite_logo(b, image_bytes):
         return out.getvalue()
     except Exception:
         return image_bytes  # never fail the request because of the overlay
+
+
+# ------------------------------------------------------------- growth engine
+
+@app.post("/api/brands/{bid}/repurpose")
+def repurpose(bid: str, body: RepurposeIn, user=Depends(current_user)):
+    b = _brand_or_404(bid, user)
+    if len(body.source.strip()) < 200:
+        raise HTTPException(400, "Paste at least a few paragraphs of transcript/article to clip from")
+    try:
+        clips = ai_engine.repurpose_longform(b, body.source, body.count, body.platform)
+    except Exception as e:
+        raise HTTPException(502, f"Repurposing failed: {e}")
+    # save each clip as a ready idea so it can flow into the normal pipeline
+    saved = []
+    for clip in clips:
+        idea = {"title": clip.get("title"), "format": "reel", "hook": clip.get("hook"),
+                "concept": clip.get("short_script"), "pillar": "repurposed",
+                "funnel_stage": "awareness", "effort": "low",
+                "why_it_works": clip.get("why_this_moment"), "cta": "",
+                "virality": clip.get("virality"), "source_quote": clip.get("quote"),
+                "timestamp": clip.get("timestamp_or_section")}
+        iid = db.insert_doc("ideas", bid, idea, channel=body.platform)
+        saved.append({"id": iid, "clip": clip})
+    ws.write_json(_wslug(b), f"{body.platform}/ideas/repurposed-{db.new_id()}.json", clips)
+    return {"clips": saved}
+
+
+@app.post("/api/brands/{bid}/seo")
+def seo(bid: str, body: SeoIn, user=Depends(current_user)):
+    b = _brand_or_404(bid, user)
+    try:
+        out = ai_engine.seo_research(b, body.topic, body.platform)
+    except Exception as e:
+        raise HTTPException(502, f"SEO research failed: {e}")
+    ws.write_json(_wslug(b), f"brand-profile/seo-{ws.slugify(body.topic)[:40]}.json", out)
+    return out
+
+
+@app.post("/api/brands/{bid}/trends")
+def trends(bid: str, user=Depends(current_user)):
+    b = _brand_or_404(bid, user)
+    try:
+        out = ai_engine.trend_radar(b)
+    except Exception as e:
+        raise HTTPException(502, f"Trend radar failed: {e}")
+    ws.write_json(_wslug(b), "brand-profile/trend-radar.json", out)
+    return {"trends": out, "note": "AI-inferred trend hypotheses — validate against platform data before betting big."}
+
+
+@app.post("/api/brands/{bid}/score")
+def score(bid: str, body: ScoreIn, user=Depends(current_user)):
+    b = _brand_or_404(bid, user)
+    table = "ideas" if body.kind == "idea" else "creatives"
+    doc = db.get_doc(table, body.id)
+    if not doc:
+        raise HTTPException(404, f"{body.kind} not found")
+    try:
+        result = ai_engine.score_virality(b, doc["payload"])
+    except Exception as e:
+        raise HTTPException(502, f"Scoring failed: {e}")
+    payload = doc["payload"]
+    payload["virality"] = {"score": result.get("score"), **(result.get("breakdown") or {})}
+    payload["virality_verdict"] = result.get("verdict")
+    db.update_doc(table, body.id, payload=payload)
+    return result
+
+
+@app.post("/api/brands/{bid}/competitors")
+def add_competitor(bid: str, body: CompetitorIn, user=Depends(current_user)):
+    b = _brand_or_404(bid, user)
+    comp_scrape = scraper.scrape_company(body.url)
+    name = body.name or (comp_scrape.get("meta") or {}).get("title") or body.url
+    if not comp_scrape.get("ok"):
+        # still produce a battlecard from the name alone, marked low-confidence
+        comp_scrape["text_sample"] = f"(site unreachable from server — analysis based on name '{name}' and AI knowledge only)"
+    try:
+        card = ai_engine.competitor_battlecard(b, name, comp_scrape)
+    except Exception as e:
+        raise HTTPException(502, f"Battlecard failed: {e}")
+    card["_scrape_ok"] = comp_scrape.get("ok", False)
+    cid = db.insert_doc("competitors", bid, card, name=name[:120], url=body.url)
+    ws.write_json(_wslug(b), f"brand-profile/competitor-{ws.slugify(name)[:40]}.json", card)
+    return db.get_doc("competitors", cid)
+
+
+@app.get("/api/brands/{bid}/competitors")
+def list_competitors(bid: str, user=Depends(current_user)):
+    _brand_or_404(bid, user)
+    return db.list_docs("competitors", bid)
+
+
+@app.delete("/api/brands/{bid}/competitors/{cid}")
+def del_competitor(bid: str, cid: str, user=Depends(current_user)):
+    _brand_or_404(bid, user)
+    db.delete_docs("competitors", bid, id=cid)
+    return {"ok": True}
 
 
 # ------------------------------------------------------------- autopilot

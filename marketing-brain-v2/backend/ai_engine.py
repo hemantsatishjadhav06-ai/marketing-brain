@@ -156,8 +156,10 @@ Return JSON: {{"ideas": [{{
  "funnel_stage": "awareness|consideration|conversion",
  "effort": "low|medium|high",
  "why_it_works": "the psychological/algorithmic reason this performs",
- "cta": "..."
-}}]}}"""
+ "cta": "...",
+ "virality": {{"score": 0-99, "hook_strength": 0-10, "flow": 0-10, "trend_fit": 0-10, "share_trigger": "the emotion/utility that makes people share this"}}
+}}]}}
+Score honestly — most ideas are 40-70; reserve 85+ for genuinely exceptional concepts."""
     out = _json_chat(system, user, max_tokens=4500)
     return out.get("ideas", out if isinstance(out, list) else [])
 
@@ -281,6 +283,135 @@ def generate_image(prompt, brand_name="", colors=None):
     except Exception:
         return None
     return None
+
+
+# ---------------------------------------------------------------- growth engine
+# (inspired by the best of OpusClip + vidIQ, adapted to this stack)
+
+def score_virality(brand, content):
+    """OpusClip-style 0-99 virality score with hook/flow/trend sub-scores."""
+    system = (
+        "You are a short-form content analyst trained on what makes videos and posts go viral. "
+        "Score honestly and harshly — average content scores 40-60. Reserve 85+ for exceptional."
+    )
+    user = f"""Brand context: {_brand_context(brand)}
+Content to score: {json.dumps(content, ensure_ascii=False)[:3000]}
+
+Return JSON:
+{{
+ "score": 0-99,
+ "breakdown": {{"hook_strength": 0-10, "flow": 0-10, "trend_fit": 0-10, "brand_fit": 0-10, "share_trigger": 0-10}},
+ "verdict": "one blunt sentence",
+ "fix_to_add_20_points": "the single highest-leverage change",
+ "rewrite_suggestion": {{"hook": "...", "first_3_seconds": "..."}}
+}}"""
+    return _json_chat(system, user, max_tokens=1500, temperature=0.4)
+
+
+def repurpose_longform(brand, source_text, count=5, platform="instagram"):
+    """ClipAnything for text: find the most viral-worthy moments in a long
+    transcript/article and turn each into a ready-to-shoot short."""
+    system = (
+        "You are an elite clipping editor. Given a long transcript or article, find the moments most "
+        "likely to go viral as short-form content. Prefer: strong claims, emotional peaks, surprising "
+        "facts, contrarian takes, useful lists, story payoffs. Each clip must stand alone without context."
+    )
+    user = f"""Brand context: {_brand_context(brand)}
+Target platform: {platform}
+Source content (may include timestamps):
+{source_text[:12000]}
+
+Extract the {count} best clip-worthy moments. Return JSON:
+{{"clips": [{{
+ "title": "...",
+ "timestamp_or_section": "where in the source this lives (use timestamps if present)",
+ "quote": "the exact key line(s) from the source",
+ "hook": "rewritten scroll-stopping opener",
+ "short_script": "15-40s script built around the moment: hook → payoff → CTA",
+ "on_screen_text": ["..."],
+ "caption": "...",
+ "hashtags": ["..."],
+ "virality": {{"score": 0-99, "hook_strength": 0-10, "flow": 0-10, "trend_fit": 0-10}},
+ "why_this_moment": "..."
+}}]}}
+Order clips by virality score, best first. Score honestly."""
+    out = _json_chat(system, user, max_tokens=5000)
+    return out.get("clips", [])
+
+
+def seo_research(brand, topic, platform="youtube"):
+    """vidIQ-style keyword & metadata pack. Volumes are AI estimates, marked as such."""
+    system = (
+        "You are an SEO and discoverability strategist for content platforms. You do not have live "
+        "search-volume data, so label every volume/difficulty as an informed estimate, and reason from "
+        "search-intent patterns, autocomplete-style long-tails, and niche dynamics."
+    )
+    user = f"""Brand context: {_brand_context(brand)}
+Topic: {topic}
+Platform: {platform}
+
+Return JSON:
+{{
+ "keywords": [{{"keyword": "...", "intent": "how-to|comparison|inspiration|buy|entertainment",
+   "est_volume": "high|medium|low (estimate)", "est_competition": "high|medium|low (estimate)",
+   "opportunity": 0-10, "why": "..."}}] (10-14, mix head terms and long-tails),
+ "title_options": [{{"title": "max 60 chars, keyword-front-loaded", "style": "curiosity|listicle|how-to|negative|vs"}}] (6),
+ "tags": ["..."] (15-20),
+ "description_template": "first 2 lines optimized for the keyword + CTA + chapters placeholder",
+ "thumbnail_text_options": ["max 4 words each"] (4),
+ "best_posting_window": "...",
+ "content_gap_note": "what nobody in this niche is covering on this topic"
+}}"""
+    return _json_chat(system, user, max_tokens=3500, temperature=0.5)
+
+
+def trend_radar(brand):
+    """vidIQ-style trend alerts: niche trend hypotheses with concrete angles.
+    Clearly AI-inferred, not live data."""
+    system = (
+        "You are a trend analyst for content niches. Based on durable seasonal patterns, platform "
+        "algorithm behavior, and the brand's niche dynamics, surface trend hypotheses worth testing "
+        "THIS month. Be specific to the niche, not generic. Mark confidence honestly."
+    )
+    user = f"""Brand context: {_brand_context(brand)}
+Current month: {date.today().strftime('%B %Y')}
+
+Return JSON:
+{{"trends": [{{
+ "trend": "...",
+ "type": "seasonal|format|topic|platform-behavior",
+ "confidence": "high|medium|speculative",
+ "window": "how long this stays relevant",
+ "angle_for_brand": "exactly how THIS brand rides it",
+ "example_post": {{"format": "reel|carousel|post", "hook": "...", "concept": "..."}}
+}}] (6-8)}}"""
+    out = _json_chat(system, user, max_tokens=3500)
+    return out.get("trends", [])
+
+
+def competitor_battlecard(brand, competitor_name, comp_scrape):
+    """Scrape-grounded competitive gap analysis."""
+    system = (
+        "You are a competitive intelligence analyst for marketing teams. Compare the brand against this "
+        "competitor using the scraped data. Be blunt about where the competitor is stronger."
+    )
+    user = f"""Our brand: {_brand_context(brand)}
+Competitor: {competitor_name}
+Competitor scraped data: {json.dumps({k: comp_scrape.get(k) for k in ('meta','headings','socials','social_profiles')}, ensure_ascii=False)[:2500]}
+Competitor site text: {(comp_scrape.get('text_sample') or '')[:4000]}
+
+Return JSON:
+{{
+ "positioning_summary": "how they position themselves in one paragraph",
+ "their_strengths": ["..."],
+ "their_weaknesses": ["..."],
+ "messaging_they_own": ["phrases/angles they dominate"],
+ "gaps_we_can_own": [{{"gap": "...", "content_play": "specific content series to exploit it"}}],
+ "channel_comparison": [{{"channel": "...", "them": "what they do", "us": "what we should do differently"}}],
+ "do_not_copy": "the thing they do that we should deliberately avoid",
+ "one_move_this_month": "single highest-impact competitive move"
+}}"""
+    return _json_chat(system, user, max_tokens=3500, temperature=0.5)
 
 
 # ---------------------------------------------------------------- analytics

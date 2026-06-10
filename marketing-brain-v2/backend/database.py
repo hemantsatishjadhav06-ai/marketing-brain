@@ -156,6 +156,14 @@ CREATE TABLE IF NOT EXISTS connector_settings (
     credentials TEXT NOT NULL,
     PRIMARY KEY (brand_id, platform)
 );
+CREATE TABLE IF NOT EXISTS competitors (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    name TEXT,
+    url TEXT,
+    payload TEXT NOT NULL,
+    created_at REAL
+);
 CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     email TEXT NOT NULL,

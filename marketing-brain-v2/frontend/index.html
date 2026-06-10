@@ -345,7 +345,7 @@ function kitOf(b){ return ((b.profile||{}).brand_kit)||{}; }
 function logoUrl(b){ const k=kitOf(b); return k.logo?`/workspaces/${b.grp?b.grp+"/":""}${b.slug}/${k.logo}`:null; }
 function renderBrand(){
   const b=state.brand, k=kitOf(b);
-  const tabs=["overview","brand kit","ideas","calendar","creatives","publish","analytics","connectors"];
+  const tabs=["overview","brand kit","ideas","growth","calendar","creatives","publish","analytics","competitors","connectors"];
   $("main").innerHTML=`
     <div class="row" style="margin-bottom:4px">
       ${logoUrl(b)?`<img class="brandlogo" src="${logoUrl(b)}">`:""}
@@ -357,7 +357,7 @@ function renderBrand(){
     <p class="sub">${esc(b.website||"")} ${b.grp?` · 📁 ${esc(b.grp)}`:""} · ${(b.setup?.channels||[]).join(" · ")}</p>
     <div class="tabs">${tabs.map(t=>`<div class="tab ${state.tab===t?'on':''}" onclick="state.tab='${t}';renderBrand()">${t[0].toUpperCase()+t.slice(1)}</div>`).join("")}</div>
     <div id="tabBody"><span class="spinner"></span></div>`;
-  ({"overview":tabOverview,"brand kit":tabKit,"ideas":tabIdeas,"calendar":tabCalendar,"creatives":tabCreatives,"publish":tabPublish,"analytics":tabAnalytics,"connectors":tabConnectors})[state.tab]();
+  ({"overview":tabOverview,"brand kit":tabKit,"ideas":tabIdeas,"growth":tabGrowth,"calendar":tabCalendar,"creatives":tabCreatives,"publish":tabPublish,"analytics":tabAnalytics,"competitors":tabCompetitors,"connectors":tabConnectors})[state.tab]();
 }
 async function runAutopilot(btn){
   busy(btn,true,"Engaging…");
@@ -431,7 +431,7 @@ async function tabIdeas(){
       <span class="sub" style="margin:0">per channel · learns from your analytics</span></div></div>
     <div class="grid">${ideas.map(i=>{const p=i.payload;return `
       <div class="idea">
-        <p><span class="tag y">${i.channel}</span><span class="tag">${esc(p.format)}</span><span class="tag">${esc(p.funnel_stage||"")}</span><span class="tag ${i.state==='produced'?'g':''}">${i.state}</span></p>
+        <p><span class="tag y">${i.channel}</span><span class="tag">${esc(p.format)}</span><span class="tag">${esc(p.funnel_stage||"")}</span><span class="tag ${i.state==='produced'?'g':''}">${i.state}</span>${p.virality?`<span class="tag" style="background:${p.virality.score>=75?'var(--grnBg)':'var(--yelBg)'};border-color:${p.virality.score>=75?'#bbf7d0':'var(--yel)'};color:${p.virality.score>=75?'var(--grn)':'var(--yelD)'}">🔥 ${p.virality.score}</span>`:""}</p>
         <h4>${esc(p.title)}</h4>
         <p class="hook">"${esc(p.hook||"")}"</p>
         <p>${esc(p.concept||"")}</p>
@@ -439,6 +439,7 @@ async function tabIdeas(){
         <div class="row" style="margin-top:9px">
           ${i.state!=="produced"?`<button class="sm" onclick="makeCreative('${i.id}',this)">🎬 Produce</button>`:""}
           <button class="sm ghost" onclick="ideaState('${i.id}','${i.state==='approved'?'proposed':'approved'}')">${i.state==='approved'?'Unapprove':'Approve'}</button>
+          ${!p.virality?`<button class="sm ghost" onclick="scoreIdea('${i.id}',this)">🔥 Score</button>`:""}
         </div></div>`;}).join("")||'<p class="sub">No ideas yet — generate some or run autopilot.</p>'}</div>`;
 }
 async function genIdeas(btn){
@@ -447,6 +448,114 @@ async function genIdeas(btn){
     toast(`${r.ideas.length} ideas generated`); tabIdeas(); }catch(e){ toast(e.message,true); busy(btn,false); }
 }
 async function ideaState(id,s){ await api(`/brands/${state.brand.id}/ideas/${id}/state`,"POST",{state:s}); tabIdeas(); }
+
+async function scoreIdea(id,btn){
+  busy(btn,true,"Scoring…");
+  try{ const r=await api(`/brands/${state.brand.id}/score`,"POST",{kind:"idea",id});
+    toast(`🔥 ${r.score}/99 — ${r.verdict||""}`); tabIdeas(); }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+
+/* ---------- growth engine ---------- */
+async function tabGrowth(){
+  const b=state.brand;
+  $("tabBody").innerHTML=`
+    <div class="card"><h2>✂️ Clip-finder (repurpose long content)</h2>
+      <p class="sub">Paste a podcast/video transcript, blog post, or webinar notes. The Brain finds the most viral-worthy moments and turns each into a scored, ready-to-shoot short. Clips land in your Ideas tab.</p>
+      <textarea id="rpSource" rows="6" placeholder="Paste transcript or article here (timestamps welcome)…"></textarea>
+      <div class="row">
+        <select id="rpPlatform" style="width:140px;margin:0">${(b.setup?.channels||["instagram"]).map(c=>`<option>${c}</option>`).join("")}</select>
+        <select id="rpCount" style="width:90px;margin:0"><option>3</option><option selected>5</option><option>8</option></select>
+        <button onclick="runRepurpose(this)">Find viral moments</button></div>
+      <div id="rpOut"></div></div>
+    <div class="card"><h2>🔎 Keyword & SEO research</h2>
+      <p class="sub">vidIQ-style metadata pack: keywords with intent + opportunity, titles, tags, description, thumbnail text. Volumes are AI estimates.</p>
+      <div class="row">
+        <input id="seoTopic" placeholder="topic, e.g. 'best tennis racket for beginners'" style="flex:1;margin:0">
+        <select id="seoPlatform" style="width:130px;margin:0"><option>youtube</option><option>instagram</option><option>blog</option><option>tiktok</option></select>
+        <button onclick="runSeo(this)">Research</button></div>
+      <div id="seoOut"></div></div>
+    <div class="card"><div class="row"><h2>📡 Trend radar</h2><button class="grn sm" onclick="runTrends(this)">Scan trends for this niche</button></div>
+      <p class="sub">Trend hypotheses for this month with a concrete angle for this brand. AI-inferred — validate before betting big.</p>
+      <div id="trendOut"></div></div>`;
+}
+async function runRepurpose(btn){
+  const src=$("rpSource").value;
+  if(src.trim().length<200) return toast("Paste at least a few paragraphs",true);
+  busy(btn,true,"Clipping…");
+  try{
+    const r=await api(`/brands/${state.brand.id}/repurpose`,"POST",{source:src,count:parseInt($("rpCount").value),platform:$("rpPlatform").value});
+    $("rpOut").innerHTML=`<h3 style="margin-top:14px">${r.clips.length} clips found (saved to Ideas)</h3><div class="grid">`+r.clips.map(({clip:c})=>`
+      <div class="idea"><p><span class="tag g">🔥 ${c.virality?.score??"—"}</span><span class="tag">${esc(c.timestamp_or_section||"")}</span></p>
+        <h4>${esc(c.title)}</h4><p class="hook">"${esc(c.hook||"")}"</p>
+        <p style="white-space:pre-wrap">${esc(c.short_script||"")}</p>
+        <details><summary>Quote & caption</summary><p class="sub">"${esc(c.quote||"")}"</p><pre>${esc(c.caption||"")}</pre></details>
+      </div>`).join("")+`</div>`;
+    busy(btn,false);
+  }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+async function runSeo(btn){
+  const topic=$("seoTopic").value.trim();
+  if(!topic) return toast("Enter a topic",true);
+  busy(btn,true,"Researching…");
+  try{
+    const r=await api(`/brands/${state.brand.id}/seo`,"POST",{topic,platform:$("seoPlatform").value});
+    $("seoOut").innerHTML=`
+      <div class="markdown" style="margin-top:12px"><table><tr><th>Keyword</th><th>Intent</th><th>Vol*</th><th>Comp*</th><th>Opp</th></tr>
+      ${(r.keywords||[]).map(k=>`<tr><td><b>${esc(k.keyword)}</b></td><td>${esc(k.intent)}</td><td>${esc(k.est_volume)}</td><td>${esc(k.est_competition)}</td><td>${k.opportunity}/10</td></tr>`).join("")}</table>
+      <p class="sub">*AI estimates, not live data</p></div>
+      <h3>Title options</h3><ul class="checklist">${(r.title_options||[]).map(t=>`<li><b>${esc(t.title)}</b> <span class="tag">${esc(t.style)}</span></li>`).join("")}</ul>
+      <h3>Tags</h3><p>${(r.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</p>
+      <h3>Thumbnail text</h3><p>${(r.thumbnail_text_options||[]).map(t=>`<span class="tag y">${esc(t)}</span>`).join("")}</p>
+      <h3>Description template</h3><pre>${esc(r.description_template||"")}</pre>
+      <p class="sub">🕳 Content gap: ${esc(r.content_gap_note||"")} · ⏰ ${esc(r.best_posting_window||"")}</p>`;
+    busy(btn,false);
+  }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+async function runTrends(btn){
+  busy(btn,true,"Scanning…");
+  try{
+    const r=await api(`/brands/${state.brand.id}/trends`,"POST");
+    $("trendOut").innerHTML=`<div class="grid" style="margin-top:10px">`+(r.trends||[]).map(t=>`
+      <div class="idea"><p><span class="tag ${t.confidence==='high'?'g':'y'}">${esc(t.confidence)}</span><span class="tag">${esc(t.type)}</span><span class="tag">${esc(t.window||"")}</span></p>
+        <h4>${esc(t.trend)}</h4><p>${esc(t.angle_for_brand)}</p>
+        <details><summary>Example post</summary><p class="hook">"${esc(t.example_post?.hook||"")}"</p><p class="sub">${esc(t.example_post?.concept||"")}</p></details>
+      </div>`).join("")+`</div>`;
+    busy(btn,false);
+  }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+
+/* ---------- competitors ---------- */
+async function tabCompetitors(){
+  const b=state.brand; const comps=await api(`/brands/${b.id}/competitors`);
+  $("tabBody").innerHTML=`
+    <div class="card"><h2>⚔️ Competitor tracker</h2>
+      <p class="sub">Add a competitor's website — the Brain scrapes it and builds a battlecard: their positioning, weaknesses, and the gaps you can own.</p>
+      <div class="row">
+        <input id="compUrl" placeholder="competitor website, e.g. racquetguys.com" style="flex:1;margin:0">
+        <input id="compName" placeholder="name (optional)" style="width:170px;margin:0">
+        <button onclick="addCompetitor(this)">Analyze</button></div></div>
+    ${comps.map(c=>{const p=c.payload;return `
+    <div class="card"><div class="row"><h2>${esc(c.name||"")}</h2>${p._scrape_ok?'<span class="tag g">site scraped</span>':'<span class="tag">AI knowledge only</span>'}
+      <button class="sm ghost" onclick="delCompetitor('${c.id}')">remove</button></div>
+      <p class="sub">${esc(p.positioning_summary||"")}</p>
+      <div class="grid">
+        <div class="idea"><h4 style="color:var(--err)">Their strengths</h4><ul class="checklist">${(p.their_strengths||[]).map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>
+        <div class="idea"><h4 style="color:var(--grn)">Their weaknesses</h4><ul class="checklist">${(p.their_weaknesses||[]).map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>
+      </div>
+      <h3>🕳 Gaps we can own</h3><ul class="checklist">${(p.gaps_we_can_own||[]).map(g=>`<li><b>${esc(g.gap)}</b> — ${esc(g.content_play)}</li>`).join("")}</ul>
+      <h3>🎯 One move this month</h3><p class="sub">${esc(p.one_move_this_month||"")}</p>
+      <details><summary>Channel-by-channel + what not to copy</summary>
+        <ul class="checklist">${(p.channel_comparison||[]).map(c2=>`<li><b>${esc(c2.channel)}</b>: them — ${esc(c2.them)}; us — ${esc(c2.us)}</li>`).join("")}</ul>
+        <p class="sub">🚫 ${esc(p.do_not_copy||"")}</p></details>
+    </div>`;}).join("")||""}`;
+}
+async function addCompetitor(btn){
+  const url=$("compUrl").value.trim(); if(!url) return toast("Enter a website",true);
+  busy(btn,true,"Scraping & analyzing…");
+  try{ await api(`/brands/${state.brand.id}/competitors`,"POST",{url,name:$("compName").value.trim()});
+    toast("Battlecard ready"); tabCompetitors(); }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+async function delCompetitor(cid){ await api(`/brands/${state.brand.id}/competitors/${cid}`,"DELETE"); tabCompetitors(); }
 
 async function tabCalendar(){
   const b=state.brand; const cal=await api(`/brands/${b.id}/calendar`);
