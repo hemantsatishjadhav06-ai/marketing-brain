@@ -142,6 +142,10 @@ def generate_ideas(brand, channel, count=6, insights=None, options=None):
     )
     insight_block = f"\nPerformance insights to exploit (double down on what works): {json.dumps(insights)[:1500]}" if insights else ""
     o = options or {}
+    if o.get("trend_signals"):
+        insight_block += (f"\nREAL search-demand signals scraped from Google for this niche — weave the strongest "
+                          f"ones into the ideas (these are what people actually search): "
+                          f"{json.dumps(o['trend_signals'], ensure_ascii=False)[:2500]}")
     filters = []
     if o.get("formats"):
         filters.append(f"ONLY use these formats: {', '.join(o['formats'])}.")
@@ -380,16 +384,25 @@ Return JSON:
     return _json_chat(system, user, max_tokens=3500, temperature=0.5)
 
 
-def trend_radar(brand):
-    """vidIQ-style trend alerts: niche trend hypotheses with concrete angles.
-    Clearly AI-inferred, not live data."""
-    system = (
-        "You are a trend analyst for content niches. Based on durable seasonal patterns, platform "
-        "algorithm behavior, and the brand's niche dynamics, surface trend hypotheses worth testing "
-        "THIS month. Be specific to the niche, not generic. Mark confidence honestly."
-    )
+def trend_radar(brand, signals=None):
+    """Trend alerts. When `signals` (live scraped SERP data) is provided, every
+    trend must be grounded in it; otherwise AI-inferred hypotheses."""
+    if signals and signals.get("ok"):
+        system = (
+            "You are a trend analyst. You are given REAL scraped Google search signals for this brand's "
+            "niche (related queries, people-also-ask, top-ranking titles). Derive trends ONLY from these "
+            "signals — every trend must cite which signal(s) support it. Real demand beats speculation."
+        )
+        signal_block = f"\nLIVE SCRAPED SIGNALS (Google, {date.today().isoformat()}): {json.dumps(signals['results'], ensure_ascii=False)[:5000]}"
+    else:
+        system = (
+            "You are a trend analyst for content niches. Based on durable seasonal patterns, platform "
+            "algorithm behavior, and the brand's niche dynamics, surface trend hypotheses worth testing "
+            "THIS month. Be specific to the niche, not generic. Mark confidence honestly."
+        )
+        signal_block = ""
     user = f"""Brand context: {_brand_context(brand)}
-Current month: {date.today().strftime('%B %Y')}
+Current month: {date.today().strftime('%B %Y')}{signal_block}
 
 Return JSON:
 {{"trends": [{{
@@ -398,6 +411,7 @@ Return JSON:
  "confidence": "high|medium|speculative",
  "window": "how long this stays relevant",
  "angle_for_brand": "exactly how THIS brand rides it",
+ "evidence": "which scraped signal(s) support this, or 'inferred' if none",
  "example_post": {{"format": "reel|carousel|post", "hook": "...", "concept": "..."}}
 }}] (6-8)}}"""
     out = _json_chat(system, user, max_tokens=3500)

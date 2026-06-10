@@ -22,7 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import ai_engine, auth, connectors, database as db, scraper, workspace as ws
+from . import ai_engine, auth, connectors, database as db, scraper, trend_scanner, workspace as ws
 
 app = FastAPI(title="Marketing Brain v2", version="3.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -362,6 +362,11 @@ def _generate_ideas(b, channels, count, options=None):
     setup_data = b.get("setup") or {}
     channels = channels or setup_data.get("channels") or ["instagram"]
     insights = _latest_insights(bid)
+    # auto-match fresh scraped trend signals into idea generation
+    scan_data = trend_scanner.fresh_scan_of(b)
+    if scan_data:
+        options = dict(options or {})
+        options["trend_signals"] = scan_data.get("results")
     created, errors = [], []
     for ch in channels:
         try:
@@ -581,15 +586,37 @@ def seo(bid: str, body: SeoIn, user=Depends(current_user)):
     return out
 
 
+class TrendsIn(BaseModel):
+    keywords: list[str] = []
+    live: bool = True  # scrape real signals via Apify when a token is configured
+
+
 @app.post("/api/brands/{bid}/trends")
-def trends(bid: str, user=Depends(current_user)):
+def trends(bid: str, body: TrendsIn = None, user=Depends(current_user)):
     b = _brand_or_404(bid, user)
+    body = body or TrendsIn()
+    signals = None
+    if body.live and trend_scanner.enabled():
+        signals = trend_scanner.fresh_scan_of(b) if not body.keywords else None
+        if not signals:
+            kws = body.keywords or trend_scanner.default_keywords(b)
+            signals = trend_scanner.scan(kws)
+            if signals.get("ok"):
+                profile = b.get("profile") or {}
+                profile["trend_scan"] = signals
+                db.update_brand(bid, profile=profile)
+                b = db.get_brand(bid)
     try:
-        out = ai_engine.trend_radar(b)
+        out = ai_engine.trend_radar(b, signals)
     except Exception as e:
         raise HTTPException(502, f"Trend radar failed: {e}")
     ws.write_json(_wslug(b), "brand-profile/trend-radar.json", out)
-    return {"trends": out, "note": "AI-inferred trend hypotheses — validate against platform data before betting big."}
+    live_used = bool(signals and signals.get("ok"))
+    return {"trends": out, "live_data": live_used,
+            "scanned_keywords": (signals or {}).get("keywords") if live_used else None,
+            "scanned_at": (signals or {}).get("scanned_at") if live_used else None,
+            "note": "Grounded in scraped Google search signals." if live_used else
+                    "AI-inferred hypotheses (no Apify token or scan failed) — validate before betting big."}
 
 
 @app.post("/api/brands/{bid}/score")

@@ -498,8 +498,9 @@ async function tabGrowth(){
         <select id="seoPlatform" style="width:130px;margin:0"><option>youtube</option><option>instagram</option><option>blog</option><option>tiktok</option></select>
         <button onclick="runSeo(this)">Research</button></div>
       <div id="seoOut"></div></div>
-    <div class="card"><div class="row"><h2>📡 Trend radar</h2><button class="grn sm" onclick="runTrends(this)">Scan trends for this niche</button></div>
-      <p class="sub">Trend hypotheses for this month with a concrete angle for this brand. AI-inferred — validate before betting big.</p>
+    <div class="card"><div class="row"><h2>📡 Trend radar</h2><button class="grn sm" onclick="runTrends(this)">Scan live trends</button></div>
+      <p class="sub">Scrapes REAL Google search signals for this niche (via Apify), then turns them into trends with an angle for this brand. Scans are cached for 7 days and automatically feed idea generation + autopilot. Leave keywords empty to auto-derive from the brand profile.</p>
+      <input id="trendKw" placeholder="optional keywords, comma separated — e.g. tennis racket india, tennis shoes">
       <div id="trendOut"></div></div>`;
 }
 async function runRepurpose(btn){
@@ -536,12 +537,18 @@ async function runSeo(btn){
   }catch(e){ toast(e.message,true); busy(btn,false); }
 }
 async function runTrends(btn){
-  busy(btn,true,"Scanning…");
+  busy(btn,true,"Scraping Google + analyzing…");
+  const kws=$("trendKw").value.split(",").map(x=>x.trim()).filter(Boolean);
   try{
-    const r=await api(`/brands/${state.brand.id}/trends`,"POST");
-    $("trendOut").innerHTML=`<div class="grid" style="margin-top:10px">`+(r.trends||[]).map(t=>`
+    const r=await api(`/brands/${state.brand.id}/trends`,"POST",{keywords:kws,live:true});
+    $("trendOut").innerHTML=`
+      <p style="margin-top:10px">${r.live_data
+        ?`<span class="tag g">✓ live Google data</span> <span class="sub">scanned: ${(r.scanned_keywords||[]).join(", ")}</span>`
+        :`<span class="tag">AI-inferred</span> <span class="sub">${esc(r.note)}</span>`}</p>
+      <div class="grid" style="margin-top:6px">`+(r.trends||[]).map(t=>`
       <div class="idea"><p><span class="tag ${t.confidence==='high'?'g':'y'}">${esc(t.confidence)}</span><span class="tag">${esc(t.type)}</span><span class="tag">${esc(t.window||"")}</span></p>
         <h4>${esc(t.trend)}</h4><p>${esc(t.angle_for_brand)}</p>
+        ${t.evidence&&t.evidence!=='inferred'?`<p class="sub">📊 ${esc(t.evidence)}</p>`:""}
         <details><summary>Example post</summary><p class="hook">"${esc(t.example_post?.hook||"")}"</p><p class="sub">${esc(t.example_post?.concept||"")}</p></details>
       </div>`).join("")+`</div>`;
     busy(btn,false);
