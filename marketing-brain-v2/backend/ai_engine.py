@@ -1,0 +1,291 @@
+"""The generation brain: OpenRouter-backed strategy, ideas, calendars,
+deep creative production packages, image generation, and analytics insights.
+"""
+import base64
+import json
+import os
+import re
+from datetime import date, timedelta
+
+import httpx
+
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+MODEL = os.environ.get("OPENROUTER_MODEL", "openai/gpt-4o-mini")
+IMAGE_MODEL = os.environ.get("OPENROUTER_IMAGE_MODEL", "google/gemini-2.5-flash-image")
+
+
+def _key():
+    k = os.environ.get("OPENROUTER_API_KEY", "").strip()
+    if not k:
+        raise RuntimeError("OPENROUTER_API_KEY is not set. Add it to your .env file.")
+    return k
+
+
+def _chat(messages, max_tokens=4000, temperature=0.8, model=None):
+    payload = {
+        "model": model or MODEL,
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+    }
+    headers = {
+        "Authorization": f"Bearer {_key()}",
+        "HTTP-Referer": "https://marketing-brain.app",
+        "X-Title": "Marketing Brain v2",
+    }
+    with httpx.Client(timeout=120) as cli:
+        r = cli.post(OPENROUTER_URL, json=payload, headers=headers)
+        r.raise_for_status()
+        data = r.json()
+    return data["choices"][0]["message"]["content"]
+
+
+def _json_chat(system, user, max_tokens=4000, temperature=0.8):
+    """Chat that must return JSON; robust extraction with one retry."""
+    msgs = [
+        {"role": "system", "content": system + "\nRespond ONLY with valid JSON. No markdown fences, no commentary."},
+        {"role": "user", "content": user},
+    ]
+    for attempt in range(2):
+        raw = _chat(msgs, max_tokens=max_tokens, temperature=temperature if attempt == 0 else 0.4)
+        parsed = _extract_json(raw)
+        if parsed is not None:
+            return parsed
+        msgs.append({"role": "assistant", "content": raw[:2000]})
+        msgs.append({"role": "user", "content": "That was not valid JSON. Return the same content as strictly valid JSON only."})
+    raise ValueError("Model did not return valid JSON")
+
+
+def _extract_json(text):
+    text = text.strip()
+    fence = re.search(r"```(?:json)?\s*(.*?)```", text, re.S)
+    if fence:
+        text = fence.group(1).strip()
+    for candidate in (text, text[text.find("{"): text.rfind("}") + 1], text[text.find("["): text.rfind("]") + 1]):
+        try:
+            return json.loads(candidate)
+        except Exception:
+            continue
+    return None
+
+
+def _brand_context(brand):
+    """Compact context block reused by every prompt."""
+    p = brand.get("profile") or {}
+    s = brand.get("setup") or {}
+    scrape = brand.get("scrape") or {}
+    ctx = {
+        "brand_name": brand["name"],
+        "website": brand.get("website"),
+        "what_we_know_from_site": (scrape.get("meta") or {}),
+        "voice": p.get("brand_voice"),
+        "audience": p.get("target_audience"),
+        "positioning": p.get("positioning"),
+        "content_pillars": p.get("content_pillars"),
+        "active_channels": s.get("channels"),
+        "goals": s.get("goals"),
+        "cadence": s.get("cadence"),
+        "language": s.get("language", "English"),
+    }
+    return json.dumps({k: v for k, v in ctx.items() if v}, ensure_ascii=False)
+
+
+# ---------------------------------------------------------------- analysis
+
+def analyze_brand(brand):
+    """Step 3: turn the scrape into a brand profile + setup suggestions."""
+    scrape = brand.get("scrape") or {}
+    system = (
+        "You are a senior brand strategist and head of social media. Given raw data scraped from a "
+        "company's website and social links, produce a complete brand marketing profile. Be specific to "
+        "THIS company, not generic. If data is thin, make intelligent inferences and mark them."
+    )
+    user = f"""Company: {brand['name']}
+Website data (truncated): {json.dumps({k: scrape.get(k) for k in ('meta', 'headings', 'socials', 'social_profiles')}, ensure_ascii=False)[:3000]}
+Site text sample: {(scrape.get('text_sample') or '')[:5000]}
+
+Return JSON with exactly these keys:
+{{
+ "summary": "2-3 sentence plain description of what this company does",
+ "industry": "...",
+ "products_services": ["..."],
+ "brand_voice": {{"tone": "...", "personality": ["..."], "words_we_use": ["..."], "words_we_avoid": ["..."]}},
+ "target_audience": [{{"persona": "...", "age": "...", "pains": ["..."], "desires": ["..."], "where_they_hang_out": ["..."]}}],
+ "positioning": "one-line positioning statement",
+ "content_pillars": [{{"name": "...", "description": "...", "share_pct": 30}}],
+ "competitors_guess": ["..."],
+ "recommended_channels": [{{"channel": "instagram|linkedin|twitter|youtube|tiktok|facebook|blog|email", "priority": "high|medium|low", "why": "...", "formats": ["reel", "carousel", "..."], "posting_frequency": "e.g. 4x/week"}}],
+ "suggested_goals": ["..."],
+ "quick_wins": ["3-5 immediately actionable marketing moves"],
+ "inferences": ["things you guessed due to thin data"]
+}}"""
+    return _json_chat(system, user, max_tokens=4500, temperature=0.6)
+
+
+# ---------------------------------------------------------------- ideas
+
+def generate_ideas(brand, channel, count=6, insights=None):
+    system = (
+        "You are a viral-content creative director who replaces an entire social media team. "
+        "Generate scroll-stopping, on-brand content ideas. Every idea must be concrete enough to shoot/produce "
+        "tomorrow — no vague themes."
+    )
+    insight_block = f"\nPerformance insights to exploit (double down on what works): {json.dumps(insights)[:1500]}" if insights else ""
+    user = f"""Brand context: {_brand_context(brand)}
+Channel: {channel}{insight_block}
+
+Generate {count} distinct content ideas for {channel}. Mix formats appropriate to the channel
+(reels/shorts, carousels, single posts, stories, threads, articles). Mix funnel stages (awareness/consideration/conversion).
+
+Return JSON: {{"ideas": [{{
+ "title": "punchy internal title",
+ "format": "reel|carousel|post|story|short|thread|article|live",
+ "hook": "the first-3-seconds hook or first line",
+ "concept": "2-4 sentences: exactly what happens in this piece of content",
+ "pillar": "which content pillar this serves",
+ "funnel_stage": "awareness|consideration|conversion",
+ "effort": "low|medium|high",
+ "why_it_works": "the psychological/algorithmic reason this performs",
+ "cta": "..."
+}}]}}"""
+    out = _json_chat(system, user, max_tokens=4500)
+    return out.get("ideas", out if isinstance(out, list) else [])
+
+
+# ---------------------------------------------------------------- calendar
+
+def generate_calendar(brand, ideas_by_channel, days=30, start=None):
+    start = start or (date.today() + timedelta(days=1)).isoformat()
+    system = (
+        "You are a social media operations manager. Build a realistic posting calendar. "
+        "Respect platform best posting times, don't overload single days, sequence campaigns logically "
+        "(awareness before conversion), and leave breathing room."
+    )
+    idea_summaries = []
+    for ch, ideas in ideas_by_channel.items():
+        for i in ideas:
+            idea_summaries.append({"idea_id": i["id"], "channel": ch, "title": i["payload"].get("title"),
+                                   "format": i["payload"].get("format"), "funnel_stage": i["payload"].get("funnel_stage")})
+    user = f"""Brand context: {_brand_context(brand)}
+Start date: {start}. Horizon: {days} days.
+Approved ideas to schedule (each may be used once): {json.dumps(idea_summaries, ensure_ascii=False)[:4000]}
+
+Return JSON: {{"calendar": [{{
+ "idea_id": "id from list above (or null for a lightweight filler like a story/poll you invent)",
+ "channel": "...",
+ "date": "YYYY-MM-DD",
+ "time": "HH:MM 24h, optimal for that platform/audience",
+ "title": "...",
+ "format": "...",
+ "notes": "1 line of scheduling rationale"
+}}]}}
+Schedule ALL provided ideas plus tasteful fillers to hit the brand's cadence. Max ~2 items per day total."""
+    out = _json_chat(system, user, max_tokens=5000, temperature=0.5)
+    return out.get("calendar", [])
+
+
+# ---------------------------------------------------------------- creatives
+
+FORMAT_SPECS = {
+    "reel": """For a REEL/SHORT produce:
+ "script": {"duration_seconds": 20-45, "hook_options": ["3 alternative spoken/visual hooks"],
+   "shots": [{"t": "0-3s", "camera": "shot type & movement", "action": "what happens on screen",
+              "dialogue_or_vo": "...", "on_screen_text": "...", "broll": "..."}],
+   "audio": {"style": "trending audio style to search for (describe, don't name a specific song)", "voiceover": true/false},
+   "transitions": ["..."], "loop_trick": "how the end loops to the start"},
+ "filming_guide": {"location": "...", "props": ["..."], "lighting": "...", "phone_or_camera_settings": "...",
+   "editing_app_steps": ["concrete CapCut/editing steps"]},
+ "thumbnail_concept": "...", """,
+    "carousel": """For a CAROUSEL produce:
+ "slides": [{"n": 1, "headline": "...", "body": "...", "visual_direction": "exact layout/imagery for designer", "design_notes": "fonts/colors usage"}] (6-10 slides, slide 1 = hook, last = CTA), """,
+    "post": """For a SINGLE POST produce:
+ "copy_variants": [{"variant": "A", "text": "full post copy"}, {"variant": "B", "text": "different angle"}],
+ "visual_direction": "exact description of the image/graphic", """,
+    "story": """For a STORY (sequence) produce:
+ "frames": [{"n": 1, "content": "...", "sticker_or_interaction": "poll/quiz/slider/question", "on_screen_text": "..."}], """,
+    "thread": """For a THREAD produce:
+ "tweets": [{"n": 1, "text": "max 280 chars"}] (first tweet = hook, 6-12 tweets), """,
+    "article": """For an ARTICLE/BLOG produce:
+ "outline": [{"h2": "...", "key_points": ["..."]}], "draft_intro": "first 2 paragraphs", "seo": {"primary_keyword": "...", "secondary": ["..."], "meta_description": "..."}, """,
+}
+
+
+def produce_creative(brand, idea_payload, channel, insights=None):
+    fmt = (idea_payload.get("format") or "post").lower()
+    spec = FORMAT_SPECS.get(fmt, FORMAT_SPECS["post"])
+    system = (
+        "You are an elite content production team (scriptwriter + director + copywriter + designer) in one. "
+        "Produce a COMPLETE, ready-to-execute production package. A junior intern should be able to shoot/"
+        "design/publish this without asking a single question. Be hyper-specific."
+    )
+    insight_block = f"\nWhat has performed well so far: {json.dumps(insights)[:1000]}" if insights else ""
+    user = f"""Brand context: {_brand_context(brand)}
+Channel: {channel}. Format: {fmt}.
+Idea: {json.dumps(idea_payload, ensure_ascii=False)[:1500]}{insight_block}
+
+Return JSON with these keys:
+{{
+ "title": "...",
+ "format": "{fmt}",
+ {spec}
+ "caption": "the full publish-ready caption with line breaks and emoji used tastefully",
+ "hashtags": {{"broad": ["..."], "niche": ["..."], "branded": ["..."]}},
+ "cta": "...",
+ "best_time_hint": "...",
+ "accessibility": {{"alt_text": "...", "captions_required": true/false}},
+ "kpis_to_watch": ["..."],
+ "image_prompt": "a detailed text-to-image prompt for the key visual/thumbnail of this content"
+}}"""
+    return _json_chat(system, user, max_tokens=5000)
+
+
+# ---------------------------------------------------------------- images
+
+def generate_image(prompt, brand_name=""):
+    """Generate an image via OpenRouter (Gemini image model). Returns bytes or None."""
+    payload = {
+        "model": IMAGE_MODEL,
+        "messages": [{"role": "user", "content": f"Generate an image: {prompt}. Style: premium social media creative for brand '{brand_name}'. No text artifacts, no watermarks."}],
+        "modalities": ["image", "text"],
+    }
+    headers = {"Authorization": f"Bearer {_key()}", "X-Title": "Marketing Brain v2"}
+    try:
+        with httpx.Client(timeout=180) as cli:
+            r = cli.post(OPENROUTER_URL, json=payload, headers=headers)
+            r.raise_for_status()
+            data = r.json()
+        msg = data["choices"][0]["message"]
+        images = msg.get("images") or []
+        if images:
+            url = images[0].get("image_url", {}).get("url", "")
+            if url.startswith("data:image"):
+                b64 = url.split(",", 1)[1]
+                return base64.b64decode(b64)
+            if url.startswith("http"):
+                with httpx.Client(timeout=60) as cli:
+                    return cli.get(url).content
+    except Exception:
+        return None
+    return None
+
+
+# ---------------------------------------------------------------- analytics
+
+def analyze_performance(brand, metrics_rows):
+    system = (
+        "You are a social media analyst. Find patterns in this performance data and produce insights that "
+        "should change what content gets made next. Be blunt about what's failing."
+    )
+    user = f"""Brand context: {_brand_context(brand)}
+Performance data: {json.dumps(metrics_rows, ensure_ascii=False)[:5000]}
+
+Return JSON:
+{{
+ "headline": "one-sentence overall verdict",
+ "what_works": [{{"pattern": "...", "evidence": "...", "action": "do more of..."}}],
+ "what_fails": [{{"pattern": "...", "evidence": "...", "action": "stop/change..."}}],
+ "channel_grades": [{{"channel": "...", "grade": "A-F", "note": "..."}}],
+ "next_content_recommendations": ["specific content moves for the next cycle"],
+ "experiment_to_run": "one A/B test to run next"
+}}"""
+    return _json_chat(system, user, max_tokens=3000, temperature=0.4)

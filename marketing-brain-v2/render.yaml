@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: marketing-brain-v2
+    runtime: python
+    plan: free
+    rootDir: marketing-brain-v2
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_MODEL
+        value: openai/gpt-4o-mini
+      - key: OPENROUTER_IMAGE_MODEL
+        value: google/gemini-2.5-flash-image
