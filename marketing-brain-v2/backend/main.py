@@ -132,6 +132,21 @@ def scrape(bid: str):
     return result
 
 
+class ScrapeImportIn(BaseModel):
+    scrape: dict
+
+
+@app.post("/api/brands/{bid}/scrape/import")
+def scrape_import(bid: str, body: ScrapeImportIn):
+    """Fallback for sites that block this server's IP (e.g. Cloudflare bot rules):
+    run the scrape elsewhere and import the result."""
+    _brand_or_404(bid)
+    db.update_brand(bid, scrape=body.scrape, status="scraped")
+    if body.scrape.get("socials"):
+        db.update_brand(bid, socials=body.scrape["socials"])
+    return {"ok": True}
+
+
 @app.post("/api/brands/{bid}/analyze")
 def analyze(bid: str):
     b = _brand_or_404(bid)
