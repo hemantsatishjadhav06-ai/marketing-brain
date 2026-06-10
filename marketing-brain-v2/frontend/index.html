@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Marketing Brain v2</title>
 <style>
-:root{--bg:#081120;--panel:#0e1b30;--panel2:#152540;--line:#22385c;--txt:#e6eefb;--mut:#86a0c4;--acc:#0ea5e9;--acc2:#22d3ee;--ok:#10b981;--warn:#fbbf24;--err:#fb7185;--r:14px}
+:root{--bg:#fdfdf9;--panel:#ffffff;--panel2:#faf8ef;--line:#e9e5d4;--txt:#23272e;--mut:#71767f;--acc:#eab308;--accD:#a16207;--acc2:#16a34a;--ok:#16a34a;--warn:#d97706;--err:#dc2626;--r:14px}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--txt);font:15px/1.55 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh}
-header{display:flex;align-items:center;gap:14px;padding:16px 28px;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(11,14,20,.92);backdrop-filter:blur(8px);z-index:10}
-header h1{font-size:19px;background:linear-gradient(90deg,var(--acc),var(--acc2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;cursor:pointer}
+header{display:flex;align-items:center;gap:14px;padding:16px 28px;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(255,255,255,.94);backdrop-filter:blur(8px);z-index:10}
+header h1{font-size:19px;background:linear-gradient(90deg,var(--accD),#65a30d);-webkit-background-clip:text;-webkit-text-fill-color:transparent;cursor:pointer}
 header .sp{flex:1}
 .badge{font-size:11px;padding:3px 10px;border-radius:20px;background:var(--panel2);color:var(--mut);border:1px solid var(--line)}
 main{max-width:1180px;margin:0 auto;padding:28px}
@@ -19,10 +19,10 @@ main{max-width:1180px;margin:0 auto;padding:28px}
 input,select,textarea{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:10px;color:var(--txt);padding:11px 14px;font-size:14px;margin:5px 0 12px;font-family:inherit}
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--acc)}
 label{font-size:13px;color:var(--mut);font-weight:600}
-button{background:linear-gradient(90deg,var(--acc),#06b6d4);color:#fff;border:none;border-radius:10px;padding:11px 22px;font-size:14px;font-weight:600;cursor:pointer;transition:.15s}
+button{background:linear-gradient(90deg,#facc15,var(--acc));color:#3b2f04;border:none;border-radius:10px;padding:11px 22px;font-size:14px;font-weight:700;cursor:pointer;transition:.15s;box-shadow:0 1px 3px rgba(0,0,0,.08)}
 button:hover{transform:translateY(-1px);filter:brightness(1.1)}
 button:disabled{opacity:.45;cursor:wait;transform:none}
-button.ghost{background:var(--panel2);border:1px solid var(--line);color:var(--txt)}
+button.ghost{background:#fff;border:1px solid var(--line);color:var(--txt);box-shadow:none}
 button.sm{padding:6px 13px;font-size:12px;border-radius:8px}
 .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
@@ -31,18 +31,18 @@ button.sm{padding:6px 13px;font-size:12px;border-radius:8px}
 .step.on{border-color:var(--acc);color:var(--txt)}
 .step.done{border-color:var(--ok);color:var(--ok)}
 .tag{display:inline-block;font-size:11px;padding:2px 9px;border-radius:14px;background:var(--panel2);border:1px solid var(--line);color:var(--mut);margin:2px 3px 2px 0}
-.tag.acc{color:var(--acc2);border-color:var(--acc2)}
+.tag.acc{color:var(--acc2);border-color:var(--acc2);background:#f0fdf4}
 .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px}
 .tab{padding:8px 16px;border-radius:10px;background:var(--panel);border:1px solid var(--line);color:var(--mut);cursor:pointer;font-size:13px;font-weight:600}
-.tab.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.tab.on{background:var(--acc);color:#3b2f04;border-color:var(--acc)}
 .idea{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:16px}
 .idea h4{font-size:14px;margin-bottom:6px}
-.idea .hook{color:var(--acc2);font-size:13px;font-style:italic;margin-bottom:8px}
+.idea .hook{color:var(--accD);font-size:13px;font-style:italic;margin-bottom:8px}
 .idea p{font-size:13px;color:var(--mut)}
 .calrow{display:grid;grid-template-columns:95px 60px 90px 1fr auto;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line);font-size:13px;align-items:center}
 .calrow:hover{background:var(--panel2)}
-pre{background:#0d1119;border:1px solid var(--line);border-radius:10px;padding:14px;font-size:12px;overflow-x:auto;white-space:pre-wrap;color:#b8c4dd}
-.toast{position:fixed;bottom:24px;right:24px;background:var(--panel2);border:1px solid var(--acc);border-radius:12px;padding:14px 20px;font-size:13px;max-width:380px;z-index:99;box-shadow:0 8px 30px rgba(0,0,0,.5)}
+pre{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px;font-size:12px;overflow-x:auto;white-space:pre-wrap;color:#3f4450}
+.toast{position:fixed;bottom:24px;right:24px;background:#fff;border:1px solid var(--acc);border-radius:12px;padding:14px 20px;font-size:13px;max-width:380px;z-index:99;box-shadow:0 8px 30px rgba(0,0,0,.15)}
 .toast.err{border-color:var(--err)}
 .spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--mut);border-top-color:var(--acc);border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px;margin-right:7px}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -50,10 +50,10 @@ pre{background:#0d1119;border:1px solid var(--line);border-radius:10px;padding:1
 .kpi b{font-size:22px;display:block}
 .kpi span{font-size:11px;color:var(--mut)}
 .checklist li{font-size:13px;color:var(--mut);margin:6px 0 6px 18px}
-details{margin:8px 0}summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--acc2)}
+details{margin:8px 0}summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--accD)}
 .chooser{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 14px}
 .choice{padding:8px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);cursor:pointer;font-size:13px;color:var(--mut)}
-.choice.on{border-color:var(--acc);color:var(--txt);background:rgba(14,165,233,.15)}
+.choice.on{border-color:var(--acc);color:var(--txt);background:rgba(234,179,8,.14)}
 img.asset{max-width:100%;border-radius:10px;border:1px solid var(--line);margin-top:8px}
 .markdown{font-size:13px}
 .markdown table{border-collapse:collapse;width:100%;margin:8px 0}

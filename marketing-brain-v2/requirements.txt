@@ -4,3 +4,4 @@ httpx>=0.25
 beautifulsoup4>=4.12
 python-dotenv>=1.0
 python-multipart>=0.0.9
+psycopg2-binary>=2.9
