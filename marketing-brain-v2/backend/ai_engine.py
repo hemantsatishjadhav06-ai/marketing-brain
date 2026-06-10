@@ -134,18 +134,33 @@ Return JSON with exactly these keys:
 
 # ---------------------------------------------------------------- ideas
 
-def generate_ideas(brand, channel, count=6, insights=None):
+def generate_ideas(brand, channel, count=6, insights=None, options=None):
     system = (
         "You are a viral-content creative director who replaces an entire social media team. "
         "Generate scroll-stopping, on-brand content ideas. Every idea must be concrete enough to shoot/produce "
         "tomorrow — no vague themes."
     )
     insight_block = f"\nPerformance insights to exploit (double down on what works): {json.dumps(insights)[:1500]}" if insights else ""
+    o = options or {}
+    filters = []
+    if o.get("formats"):
+        filters.append(f"ONLY use these formats: {', '.join(o['formats'])}.")
+    if o.get("funnel_stage"):
+        filters.append(f"ALL ideas must target the '{o['funnel_stage']}' funnel stage.")
+    if o.get("pillar"):
+        filters.append(f"ALL ideas must serve the content pillar: {o['pillar']}.")
+    if o.get("topic"):
+        filters.append(f"ALL ideas must be about this topic/campaign: {o['topic']}.")
+    if o.get("tone"):
+        filters.append(f"Tone override: {o['tone']}.")
+    if o.get("instructions"):
+        filters.append(f"Extra instructions from the marketer: {o['instructions'][:500]}")
+    filter_block = ("\nHARD REQUIREMENTS (follow exactly):\n- " + "\n- ".join(filters)) if filters else \
+        "\nMix formats appropriate to the channel and mix funnel stages (awareness/consideration/conversion)."
     user = f"""Brand context: {_brand_context(brand)}
 Channel: {channel}{insight_block}
 
-Generate {count} distinct content ideas for {channel}. Mix formats appropriate to the channel
-(reels/shorts, carousels, single posts, stories, threads, articles). Mix funnel stages (awareness/consideration/conversion).
+Generate {count} distinct content ideas for {channel}.{filter_block}
 
 Return JSON: {{"ideas": [{{
  "title": "punchy internal title",
@@ -412,6 +427,29 @@ Return JSON:
  "one_move_this_month": "single highest-impact competitive move"
 }}"""
     return _json_chat(system, user, max_tokens=3500, temperature=0.5)
+
+
+# ---------------------------------------------------------------- AI coach chat
+
+def coach_chat(brand, workspace_digest, history, message):
+    """vidIQ-AI-Coach-style chatbot grounded in everything the workspace knows
+    about this brand: profile, ideas + scores, calendar, insights, competitors."""
+    system = (
+        "You are the brand's dedicated AI marketing coach inside the Marketing Brain platform. "
+        "You have the brand's full workspace data below — use it; quote concrete items (idea titles, "
+        "scores, calendar slots, competitor gaps) instead of generic advice. Be direct, practical, and "
+        "concise (under 250 words unless asked for more). If the user asks for something the platform "
+        "can do (generate ideas, build calendar, produce creatives, score, SEO research, trends, "
+        "competitor analysis), do your best in chat AND point them to the right tab/button.\n\n"
+        f"BRAND CONTEXT: {_brand_context(brand)}\n\n"
+        f"WORKSPACE DATA: {json.dumps(workspace_digest, ensure_ascii=False)[:6000]}"
+    )
+    msgs = [{"role": "system", "content": system}]
+    for h in (history or [])[-10:]:
+        if h.get("role") in ("user", "assistant") and h.get("content"):
+            msgs.append({"role": h["role"], "content": str(h["content"])[:2000]})
+    msgs.append({"role": "user", "content": message[:3000]})
+    return _chat(msgs, max_tokens=1200, temperature=0.7)
 
 
 # ---------------------------------------------------------------- analytics

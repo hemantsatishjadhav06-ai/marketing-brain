@@ -79,6 +79,18 @@ class KitIn(BaseModel):
 class IdeasIn(BaseModel):
     channels: list[str] = []
     count: int = 6
+    # advanced customization (all optional — defaults keep the one-click flow)
+    formats: list[str] = []
+    funnel_stage: str = ""
+    pillar: str = ""
+    topic: str = ""
+    tone: str = ""
+    instructions: str = ""
+
+
+class ChatIn(BaseModel):
+    message: str
+    history: list = []
 
 
 class CalendarIn(BaseModel):
@@ -341,10 +353,11 @@ def _logo_path(b):
 @app.post("/api/brands/{bid}/ideas")
 def ideas(bid: str, body: IdeasIn, user=Depends(current_user)):
     b = _brand_or_404(bid, user)
-    return _generate_ideas(b, body.channels, body.count)
+    options = {k: getattr(body, k) for k in ("formats", "funnel_stage", "pillar", "topic", "tone", "instructions") if getattr(body, k)}
+    return _generate_ideas(b, body.channels, body.count, options)
 
 
-def _generate_ideas(b, channels, count):
+def _generate_ideas(b, channels, count, options=None):
     bid = b["id"]
     setup_data = b.get("setup") or {}
     channels = channels or setup_data.get("channels") or ["instagram"]
@@ -352,7 +365,7 @@ def _generate_ideas(b, channels, count):
     created, errors = [], []
     for ch in channels:
         try:
-            for idea in ai_engine.generate_ideas(b, ch, count, insights):
+            for idea in ai_engine.generate_ideas(b, ch, count, insights, options):
                 iid = db.insert_doc("ideas", bid, idea, channel=ch)
                 created.append({"id": iid, "channel": ch, "payload": idea, "state": "proposed"})
         except Exception as e:
@@ -491,6 +504,44 @@ def _composite_logo(b, image_bytes):
         return out.getvalue()
     except Exception:
         return image_bytes  # never fail the request because of the overlay
+
+
+# ------------------------------------------------------------- AI coach
+
+@app.post("/api/brands/{bid}/chat")
+def chat(bid: str, body: ChatIn, user=Depends(current_user)):
+    b = _brand_or_404(bid, user)
+    digest = _workspace_digest(b)
+    try:
+        reply = ai_engine.coach_chat(b, digest, body.history, body.message)
+    except Exception as e:
+        raise HTTPException(502, f"Coach unavailable: {e}")
+    return {"reply": reply}
+
+
+def _workspace_digest(b):
+    """Compact snapshot of everything the workspace knows — fed to the coach."""
+    bid = b["id"]
+    ideas_rows = db.list_docs("ideas", bid)[:15]
+    cal = db.list_docs("calendar_items", bid)
+    cal.sort(key=lambda x: ((x.get("date") or ""), (x.get("time") or "")))
+    creatives_rows = db.list_docs("creatives", bid)[:10]
+    comps = db.list_docs("competitors", bid)[:5]
+    metrics_rows = db.list_docs("metrics", bid)[:15]
+    return {
+        "ideas": [{"title": i["payload"].get("title"), "channel": i["channel"], "format": i["payload"].get("format"),
+                   "state": i["state"], "virality": (i["payload"].get("virality") or {}).get("score")}
+                  for i in ideas_rows],
+        "upcoming_calendar": [{"date": c.get("date"), "time": c.get("time"), "channel": c.get("channel"),
+                               "title": (c.get("payload") or {}).get("title")} for c in cal[:10]],
+        "creatives": [{"title": c["payload"].get("title"), "format": c.get("format"), "channel": c.get("channel"),
+                       "has_visual": bool(c.get("asset_path"))} for c in creatives_rows],
+        "competitors": [{"name": c.get("name"), "one_move": (c.get("payload") or {}).get("one_move_this_month"),
+                         "gaps": [g.get("gap") for g in (c.get("payload") or {}).get("gaps_we_can_own", [])[:3]]}
+                        for c in comps],
+        "metrics_logged": [{"channel": m.get("channel"), **(m.get("payload") or {})} for m in metrics_rows],
+        "latest_insights": _latest_insights(bid),
+    }
 
 
 # ------------------------------------------------------------- growth engine

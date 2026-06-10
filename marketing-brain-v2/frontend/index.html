@@ -345,7 +345,7 @@ function kitOf(b){ return ((b.profile||{}).brand_kit)||{}; }
 function logoUrl(b){ const k=kitOf(b); return k.logo?`/workspaces/${b.grp?b.grp+"/":""}${b.slug}/${k.logo}`:null; }
 function renderBrand(){
   const b=state.brand, k=kitOf(b);
-  const tabs=["overview","brand kit","ideas","growth","calendar","creatives","publish","analytics","competitors","connectors"];
+  const tabs=["overview","brand kit","ideas","growth","calendar","creatives","publish","analytics","competitors","coach","tools","connectors"];
   $("main").innerHTML=`
     <div class="row" style="margin-bottom:4px">
       ${logoUrl(b)?`<img class="brandlogo" src="${logoUrl(b)}">`:""}
@@ -357,7 +357,7 @@ function renderBrand(){
     <p class="sub">${esc(b.website||"")} ${b.grp?` · 📁 ${esc(b.grp)}`:""} · ${(b.setup?.channels||[]).join(" · ")}</p>
     <div class="tabs">${tabs.map(t=>`<div class="tab ${state.tab===t?'on':''}" onclick="state.tab='${t}';renderBrand()">${t[0].toUpperCase()+t.slice(1)}</div>`).join("")}</div>
     <div id="tabBody"><span class="spinner"></span></div>`;
-  ({"overview":tabOverview,"brand kit":tabKit,"ideas":tabIdeas,"growth":tabGrowth,"calendar":tabCalendar,"creatives":tabCreatives,"publish":tabPublish,"analytics":tabAnalytics,"competitors":tabCompetitors,"connectors":tabConnectors})[state.tab]();
+  ({"overview":tabOverview,"brand kit":tabKit,"ideas":tabIdeas,"growth":tabGrowth,"calendar":tabCalendar,"creatives":tabCreatives,"publish":tabPublish,"analytics":tabAnalytics,"competitors":tabCompetitors,"coach":tabCoach,"tools":tabTools,"connectors":tabConnectors})[state.tab]();
 }
 async function runAutopilot(btn){
   busy(btn,true,"Engaging…");
@@ -428,7 +428,23 @@ async function tabIdeas(){
     <div class="card"><div class="row">
       <button onclick="genIdeas(this)">⚡ Generate ideas</button>
       <select id="ideaCount" style="width:90px;margin:0"><option>4</option><option selected>6</option><option>8</option></select>
-      <span class="sub" style="margin:0">per channel · learns from your analytics</span></div></div>
+      <span class="sub" style="margin:0">per channel · learns from your analytics · autopilot uses this same engine</span></div>
+      <details style="margin-top:10px"><summary>⚙️ Advanced customization (optional — for regular/manual use)</summary>
+        <div class="row" style="margin-top:10px">
+          <div style="flex:1;min-width:200px"><label>Only these formats</label>
+            <div class="chooser" id="fmtChooser">${["reel","carousel","post","story","thread","article","live"].map(f=>`<div class="choice" data-f="${f}" onclick="this.classList.toggle('on')">${f}</div>`).join("")}</div></div>
+          <div style="width:170px"><label>Funnel stage</label>
+            <select id="optFunnel"><option value="">any (mixed)</option><option>awareness</option><option>consideration</option><option>conversion</option></select></div>
+          <div style="width:200px"><label>Content pillar</label>
+            <select id="optPillar"><option value="">any</option>${(((state.brand.profile||{}).content_pillars)||[]).map(p=>`<option>${esc(p.name)}</option>`).join("")}</select></div>
+        </div>
+        <div class="row">
+          <div style="flex:1"><label>Topic / campaign (optional)</label><input id="optTopic" placeholder="e.g. monsoon sale, new launch"></div>
+          <div style="width:220px"><label>Tone override (optional)</label><input id="optTone" placeholder="e.g. humorous, premium, urgent"></div>
+        </div>
+        <label>Extra instructions for the AI (optional)</label>
+        <input id="optInstr" placeholder="e.g. feature customer testimonials; avoid discount talk">
+      </details></div>
     <div class="grid">${ideas.map(i=>{const p=i.payload;return `
       <div class="idea">
         <p><span class="tag y">${i.channel}</span><span class="tag">${esc(p.format)}</span><span class="tag">${esc(p.funnel_stage||"")}</span><span class="tag ${i.state==='produced'?'g':''}">${i.state}</span>${p.virality?`<span class="tag" style="background:${p.virality.score>=75?'var(--grnBg)':'var(--yelBg)'};border-color:${p.virality.score>=75?'#bbf7d0':'var(--yel)'};color:${p.virality.score>=75?'var(--grn)':'var(--yelD)'}">🔥 ${p.virality.score}</span>`:""}</p>
@@ -444,7 +460,15 @@ async function tabIdeas(){
 }
 async function genIdeas(btn){
   busy(btn,true,"Brainstorming…");
-  try{ const r=await api(`/brands/${state.brand.id}/ideas`,"POST",{count:parseInt($("ideaCount").value)});
+  const body={count:parseInt($("ideaCount").value)};
+  const fmts=[...document.querySelectorAll("#fmtChooser .choice.on")].map(d=>d.dataset.f);
+  if(fmts.length) body.formats=fmts;
+  if($("optFunnel")&&$("optFunnel").value) body.funnel_stage=$("optFunnel").value;
+  if($("optPillar")&&$("optPillar").value) body.pillar=$("optPillar").value;
+  if($("optTopic")&&$("optTopic").value.trim()) body.topic=$("optTopic").value.trim();
+  if($("optTone")&&$("optTone").value.trim()) body.tone=$("optTone").value.trim();
+  if($("optInstr")&&$("optInstr").value.trim()) body.instructions=$("optInstr").value.trim();
+  try{ const r=await api(`/brands/${state.brand.id}/ideas`,"POST",body);
     toast(`${r.ideas.length} ideas generated`); tabIdeas(); }catch(e){ toast(e.message,true); busy(btn,false); }
 }
 async function ideaState(id,s){ await api(`/brands/${state.brand.id}/ideas/${id}/state`,"POST",{state:s}); tabIdeas(); }
@@ -668,6 +692,110 @@ async function genInsights(btn){
       <p class="sub">🧪 ${esc(ins.experiment_to_run||"")}</p>`;
     busy(btn,false);
   }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+
+/* ---------- AI coach ---------- */
+let CHAT = {};
+async function tabCoach(){
+  const bid=state.brand.id;
+  CHAT[bid]=CHAT[bid]||[];
+  $("tabBody").innerHTML=`
+    <div class="card" style="display:flex;flex-direction:column;height:62vh">
+      <h2>💬 AI Coach</h2>
+      <p class="sub">Knows this brand's full workspace: profile, ideas + virality scores, calendar, creatives, competitor gaps, and analytics. Ask anything.</p>
+      <div id="chatBox" style="flex:1;overflow-y:auto;padding:6px 2px"></div>
+      <div class="row" style="margin-top:10px">
+        <input id="chatMsg" placeholder="e.g. What should we post this week? Which idea has the best shot?" style="flex:1;margin:0" onkeydown="if(event.key==='Enter')sendChat(this)">
+        <button onclick="sendChat(this)">Send</button></div>
+      <div class="row" style="margin-top:6px">
+        ${["What should we post this week?","Which of our ideas will perform best and why?","How do we beat our competitors this month?","Write 3 hooks for our top idea"].map(q=>`<button class="sm ghost" onclick="$('chatMsg').value='${q.replace(/'/g,"\\'")}';sendChat()">${q}</button>`).join("")}
+      </div></div>`;
+  renderChat();
+}
+function renderChat(){
+  const box=$("chatBox"); if(!box) return;
+  const msgs=CHAT[state.brand.id]||[];
+  box.innerHTML = msgs.length? msgs.map(m=>`
+    <div style="margin:8px 0;display:flex;${m.role==='user'?'justify-content:flex-end':''}">
+      <div style="max-width:78%;padding:10px 14px;border-radius:13px;font-size:13px;white-space:pre-wrap;${m.role==='user'
+        ?'background:var(--yelBg);border:1px solid var(--yel)'
+        :'background:var(--panel2);border:1px solid var(--line)'}">${esc(m.content)}</div></div>`).join("")
+    : '<p class="sub">No messages yet — ask the coach something, it answers with your real data.</p>';
+  box.scrollTop=box.scrollHeight;
+}
+async function sendChat(btn){
+  const inp=$("chatMsg"); const msg=inp.value.trim(); if(!msg) return;
+  const bid=state.brand.id;
+  CHAT[bid].push({role:"user",content:msg}); inp.value=""; renderChat();
+  CHAT[bid].push({role:"assistant",content:"…"}); renderChat();
+  try{
+    const r=await api(`/brands/${bid}/chat`,"POST",{message:msg,history:CHAT[bid].slice(0,-2)});
+    CHAT[bid][CHAT[bid].length-1]={role:"assistant",content:r.reply};
+  }catch(e){ CHAT[bid][CHAT[bid].length-1]={role:"assistant",content:"⚠️ "+e.message}; }
+  renderChat();
+}
+
+/* ---------- tools: real-estate calculators ---------- */
+function fmtINR(n){ return "₹"+Math.round(n).toLocaleString("en-IN"); }
+async function tabTools(){
+  $("tabBody").innerHTML=`
+    <p class="sub">Client-facing calculators — use them in consultations or embed the numbers in content/lead magnets.</p>
+    <div class="card"><h2>🏠 EMI calculator</h2>
+      <div class="row">
+        <div style="flex:1"><label>Loan amount (₹)</label><input id="emiAmt" type="number" value="5000000"></div>
+        <div style="width:140px"><label>Rate % p.a.</label><input id="emiRate" type="number" value="8.5" step="0.1"></div>
+        <div style="width:130px"><label>Tenure (years)</label><input id="emiYrs" type="number" value="20"></div>
+        <button onclick="calcEMI()">Calculate</button></div>
+      <div id="emiOut"></div></div>
+    <div class="card"><h2>💰 Affordability / loan eligibility</h2>
+      <p class="sub">Rule of thumb: banks allow ~50% of net monthly income towards EMIs.</p>
+      <div class="row">
+        <div style="flex:1"><label>Net monthly income (₹)</label><input id="affInc" type="number" value="150000"></div>
+        <div style="flex:1"><label>Existing EMIs (₹/month)</label><input id="affEmi" type="number" value="0"></div>
+        <div style="width:130px"><label>Rate % p.a.</label><input id="affRate" type="number" value="8.5" step="0.1"></div>
+        <div style="width:120px"><label>Tenure (yrs)</label><input id="affYrs" type="number" value="20"></div>
+        <button onclick="calcAfford()">Calculate</button></div>
+      <div id="affOut"></div></div>
+    <div class="card"><h2>🧾 Total cost of purchase (stamp duty & charges)</h2>
+      <div class="row">
+        <div style="flex:1"><label>Property price (₹)</label><input id="sdPrice" type="number" value="8000000"></div>
+        <div style="width:160px"><label>Stamp duty %</label><input id="sdPct" type="number" value="6" step="0.5"></div>
+        <div style="width:160px"><label>Registration %</label><input id="sdReg" type="number" value="1" step="0.5"></div>
+        <button onclick="calcStamp()">Calculate</button></div>
+      <p class="sub">Telangana ~6% + 0.5–1% registration; varies by state — confirm locally.</p>
+      <div id="sdOut"></div></div>`;
+  calcEMI(); calcAfford(); calcStamp();
+}
+function emiOf(P,annualRate,years){ const r=annualRate/1200,n=years*12; return r? P*r*Math.pow(1+r,n)/(Math.pow(1+r,n)-1) : P/n; }
+function calcEMI(){
+  const P=+$("emiAmt").value||0, rate=+$("emiRate").value||0, yrs=+$("emiYrs").value||1;
+  const emi=emiOf(P,rate,yrs), total=emi*yrs*12;
+  $("emiOut").innerHTML=`<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr));margin-top:12px">
+    <div class="kpi"><b>${fmtINR(emi)}</b><span>monthly EMI</span></div>
+    <div class="kpi"><b>${fmtINR(total-P)}</b><span>total interest</span></div>
+    <div class="kpi"><b>${fmtINR(total)}</b><span>total payment</span></div></div>`;
+}
+function calcAfford(){
+  const inc=+$("affInc").value||0, ex=+$("affEmi").value||0, rate=+$("affRate").value||8.5, yrs=+$("affYrs").value||20;
+  const capacity=Math.max(0,inc*0.5-ex);
+  const r=rate/1200,n=yrs*12;
+  const maxLoan=r? capacity*(Math.pow(1+r,n)-1)/(r*Math.pow(1+r,n)) : capacity*n;
+  const budget=maxLoan/0.8; // assuming 20% down payment
+  $("affOut").innerHTML=`<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr));margin-top:12px">
+    <div class="kpi"><b>${fmtINR(capacity)}</b><span>EMI capacity /mo</span></div>
+    <div class="kpi"><b>${fmtINR(maxLoan)}</b><span>max eligible loan</span></div>
+    <div class="kpi"><b>${fmtINR(budget)}</b><span>property budget (20% down)</span></div>
+    <div class="kpi"><b>${fmtINR(budget-maxLoan)}</b><span>down payment needed</span></div></div>
+    <p class="sub" style="margin-top:8px">Indicative only — actual eligibility depends on the lender, credit score, and age.</p>`;
+}
+function calcStamp(){
+  const P=+$("sdPrice").value||0, sd=+$("sdPct").value||0, reg=+$("sdReg").value||0;
+  const duty=P*sd/100, regAmt=P*reg/100, legal=Math.min(P*0.005,50000);
+  $("sdOut").innerHTML=`<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr));margin-top:12px">
+    <div class="kpi"><b>${fmtINR(duty)}</b><span>stamp duty</span></div>
+    <div class="kpi"><b>${fmtINR(regAmt)}</b><span>registration</span></div>
+    <div class="kpi"><b>${fmtINR(legal)}</b><span>legal/misc (est.)</span></div>
+    <div class="kpi"><b>${fmtINR(P+duty+regAmt+legal)}</b><span>all-in cost</span></div></div>`;
 }
 
 async function tabConnectors(){
