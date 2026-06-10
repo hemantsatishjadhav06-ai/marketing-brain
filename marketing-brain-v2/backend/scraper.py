@@ -122,7 +122,9 @@ def scrape_company(website, socials_hint=None):
         "pages_crawled": [], "errors": [],
     }
 
-    html, final_url = _fetch(website)
+    html, final_url = _fetch(website, timeout=20)
+    if not html:  # one retry — some hosts are slow on first hit
+        html, final_url = _fetch(website, timeout=25)
     if not html:
         result["errors"].append(f"Could not fetch {website} (site may block bots or be down)")
         return result
