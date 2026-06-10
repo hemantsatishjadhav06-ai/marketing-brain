@@ -156,6 +156,14 @@ CREATE TABLE IF NOT EXISTS connector_settings (
     credentials TEXT NOT NULL,
     PRIMARY KEY (brand_id, platform)
 );
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL,
+    pw_hash TEXT NOT NULL,
+    role TEXT DEFAULT 'client',
+    brand_id TEXT DEFAULT '',
+    created_at REAL
+);
 """
 
 
@@ -362,6 +370,56 @@ def set_connector(brand_id, platform, credentials):
                 "INSERT OR REPLACE INTO connector_settings (brand_id,platform,credentials) VALUES (?,?,?)",
                 (brand_id, platform, json.dumps(credentials)),
             )
+
+
+# ---------- users ----------
+
+def create_user(email, pw_hash, role="client", brand_id=""):
+    uid = new_id()
+    email = email.strip().lower()
+    if IS_REST:
+        _rest("POST", "users", body={"id": uid, "email": email, "pw_hash": pw_hash,
+                                     "role": role, "brand_id": brand_id or "", "created_at": _now()})
+        return uid
+    with _lock, _conn() as c:
+        c.execute("INSERT INTO users (id,email,pw_hash,role,brand_id,created_at) VALUES (?,?,?,?,?,?)",
+                  (uid, email, pw_hash, role, brand_id or "", _now()))
+    return uid
+
+
+def get_user_by_email(email):
+    email = email.strip().lower()
+    if IS_REST:
+        rows = _rest("GET", "users", params={"email": f"eq.{email}", "limit": 1})
+        return rows[0] if rows else None
+    with _conn() as c:
+        r = c.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+    return dict(r) if r else None
+
+
+def list_users():
+    if IS_REST:
+        return [{k: v for k, v in r.items() if k != "pw_hash"}
+                for r in _rest("GET", "users", params={"order": "created_at.asc"})]
+    with _conn() as c:
+        rows = c.execute("SELECT id,email,role,brand_id,created_at FROM users ORDER BY created_at").fetchall()
+    return [dict(r) for r in rows]
+
+
+def delete_user(uid):
+    if IS_REST:
+        _rest("DELETE", "users", params={"id": f"eq.{uid}"})
+        return
+    with _lock, _conn() as c:
+        c.execute("DELETE FROM users WHERE id=?", (uid,))
+
+
+def update_user_password(uid, pw_hash):
+    if IS_REST:
+        _rest("PATCH", "users", params={"id": f"eq.{uid}"}, body={"pw_hash": pw_hash})
+        return
+    with _lock, _conn() as c:
+        c.execute("UPDATE users SET pw_hash=? WHERE id=?", (pw_hash, uid))
 
 
 def get_connectors(brand_id):

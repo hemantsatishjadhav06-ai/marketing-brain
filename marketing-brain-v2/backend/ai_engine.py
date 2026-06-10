@@ -74,6 +74,8 @@ def _brand_context(brand):
     p = brand.get("profile") or {}
     s = brand.get("setup") or {}
     scrape = brand.get("scrape") or {}
+    kit = p.get("brand_kit") or {}
+    colors = kit.get("colors") or (scrape.get("colors") or [])[:4]
     ctx = {
         "brand_name": brand["name"],
         "website": brand.get("website"),
@@ -86,8 +88,16 @@ def _brand_context(brand):
         "goals": s.get("goals"),
         "cadence": s.get("cadence"),
         "language": s.get("language", "English"),
+        "brand_colors_hex": colors,
+        "visual_style": kit.get("style"),
     }
     return json.dumps({k: v for k, v in ctx.items() if v}, ensure_ascii=False)
+
+
+def brand_palette(brand):
+    p = brand.get("profile") or {}
+    kit = p.get("brand_kit") or {}
+    return kit.get("colors") or ((brand.get("scrape") or {}).get("colors") or [])[:4]
 
 
 # ---------------------------------------------------------------- analysis
@@ -234,18 +244,22 @@ Return JSON with these keys:
  "best_time_hint": "...",
  "accessibility": {{"alt_text": "...", "captions_required": true/false}},
  "kpis_to_watch": ["..."],
- "image_prompt": "a detailed text-to-image prompt for the key visual/thumbnail of this content"
+ "image_prompt": "a detailed text-to-image prompt for the key visual/thumbnail. MUST name the exact brand hex colors from the brand context as the dominant palette, describe composition, and say 'leave clean negative space in the bottom-right corner for a logo'"
 }}"""
     return _json_chat(system, user, max_tokens=5000)
 
 
 # ---------------------------------------------------------------- images
 
-def generate_image(prompt, brand_name=""):
+def generate_image(prompt, brand_name="", colors=None):
     """Generate an image via OpenRouter (Gemini image model). Returns bytes or None."""
+    color_note = f" STRICT BRAND PALETTE: use these exact hex colors as the dominant scheme: {', '.join(colors)}." if colors else ""
     payload = {
         "model": IMAGE_MODEL,
-        "messages": [{"role": "user", "content": f"Generate an image: {prompt}. Style: premium social media creative for brand '{brand_name}'. No text artifacts, no watermarks."}],
+        "messages": [{"role": "user", "content": (
+            f"Generate an image: {prompt}.{color_note} Style: premium social media creative for brand "
+            f"'{brand_name}'. Leave clean negative space in the bottom-right corner for a logo overlay. "
+            f"No text artifacts, no watermarks.")}],
         "modalities": ["image", "text"],
     }
     headers = {"Authorization": f"Bearer {_key()}", "X-Title": "Marketing Brain v2"}
