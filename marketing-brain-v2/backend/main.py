@@ -511,6 +511,64 @@ def _composite_logo(b, image_bytes):
         return image_bytes  # never fail the request because of the overlay
 
 
+# ------------------------------------------------------------- blog & email marketing
+
+class BlogIn(BaseModel):
+    topic: str
+    keyword: str = ""
+
+
+class EmailIn(BaseModel):
+    etype: str = "newsletter"   # newsletter|promo|welcome|nurture|winback|launch
+    topic: str = ""
+    email_count: int = 1        # >1 builds a sequence
+
+
+class PlaybookIn(BaseModel):
+    pass
+
+
+@app.post("/api/brands/{bid}/blog")
+def blog(bid: str, body: BlogIn, user=Depends(current_user)):
+    b = _brand_or_404(bid, user)
+    try:
+        art = ai_engine.write_blog(b, body.topic, body.keyword, _latest_insights(bid))
+    except Exception as e:
+        raise HTTPException(502, f"Blog generation failed: {e}")
+    art["format"] = "blog"
+    cid = db.insert_doc("creatives", bid, art, channel="blog", format="blog")
+    md = f"# {art.get('title','')}\n\n*{art.get('meta_description','')}*\n\n{art.get('body_markdown','')}\n\n{art.get('cta','')}"
+    ws.write_text(_wslug(b), f"blog/creatives/{cid}-{ws.slugify(art.get('title','post'))[:40]}.md", md)
+    ws.write_json(_wslug(b), f"blog/creatives/{cid}.json", art)
+    return db.get_doc("creatives", cid)
+
+
+@app.post("/api/brands/{bid}/email")
+def email(bid: str, body: EmailIn, user=Depends(current_user)):
+    b = _brand_or_404(bid, user)
+    try:
+        out = ai_engine.write_email(b, body.etype, body.topic, max(1, min(7, body.email_count)), _latest_insights(bid))
+    except Exception as e:
+        raise HTTPException(502, f"Email generation failed: {e}")
+    out["format"] = "email"
+    out["etype"] = body.etype
+    out.setdefault("title", out.get("sequence_name") or f"{body.etype}: {body.topic or 'untitled'}"[:80])
+    cid = db.insert_doc("creatives", bid, out, channel="email", format="email")
+    ws.write_json(_wslug(b), f"email/creatives/{cid}.json", out)
+    return db.get_doc("creatives", cid)
+
+
+@app.post("/api/brands/{bid}/playbook")
+def playbook(bid: str, user=Depends(current_user)):
+    b = _brand_or_404(bid, user)
+    try:
+        tactics = ai_engine.tactics_playbook(b, _latest_insights(bid))
+    except Exception as e:
+        raise HTTPException(502, f"Playbook generation failed: {e}")
+    ws.write_json(_wslug(b), "brand-profile/tactics-playbook.json", tactics)
+    return {"tactics": tactics}
+
+
 # ------------------------------------------------------------- AI coach
 
 @app.post("/api/brands/{bid}/chat")

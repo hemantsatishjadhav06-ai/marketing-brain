@@ -345,7 +345,7 @@ function kitOf(b){ return ((b.profile||{}).brand_kit)||{}; }
 function logoUrl(b){ const k=kitOf(b); return k.logo?`/workspaces/${b.grp?b.grp+"/":""}${b.slug}/${k.logo}`:null; }
 function renderBrand(){
   const b=state.brand, k=kitOf(b);
-  const tabs=["overview","brand kit","ideas","growth","calendar","creatives","publish","analytics","competitors","coach","tools","connectors"];
+  const tabs=["overview","brand kit","ideas","growth","campaigns","calendar","creatives","publish","analytics","competitors","coach","connectors"];
   $("main").innerHTML=`
     <div class="row" style="margin-bottom:4px">
       ${logoUrl(b)?`<img class="brandlogo" src="${logoUrl(b)}">`:""}
@@ -357,7 +357,7 @@ function renderBrand(){
     <p class="sub">${esc(b.website||"")} ${b.grp?` · 📁 ${esc(b.grp)}`:""} · ${(b.setup?.channels||[]).join(" · ")}</p>
     <div class="tabs">${tabs.map(t=>`<div class="tab ${state.tab===t?'on':''}" onclick="state.tab='${t}';renderBrand()">${t[0].toUpperCase()+t.slice(1)}</div>`).join("")}</div>
     <div id="tabBody"><span class="spinner"></span></div>`;
-  ({"overview":tabOverview,"brand kit":tabKit,"ideas":tabIdeas,"growth":tabGrowth,"calendar":tabCalendar,"creatives":tabCreatives,"publish":tabPublish,"analytics":tabAnalytics,"competitors":tabCompetitors,"coach":tabCoach,"tools":tabTools,"connectors":tabConnectors})[state.tab]();
+  ({"overview":tabOverview,"brand kit":tabKit,"ideas":tabIdeas,"growth":tabGrowth,"campaigns":tabCampaigns,"calendar":tabCalendar,"creatives":tabCreatives,"publish":tabPublish,"analytics":tabAnalytics,"competitors":tabCompetitors,"coach":tabCoach,"connectors":tabConnectors})[state.tab]();
 }
 async function runAutopilot(btn){
   busy(btn,true,"Engaging…");
@@ -626,6 +626,11 @@ async function tabCreatives(){
 }
 function renderPackage(p){
   let h="";
+  if(p.format==="blog"&&p.body_markdown){
+    return `<p class="sub">${esc(p.meta_description||"")}</p><pre style="max-height:300px;overflow-y:auto">${esc(p.body_markdown)}</pre>
+      <h3>FAQ</h3><ul class="checklist">${(p.faq||[]).map(f=>`<li><b>${esc(f.q)}</b> — ${esc(f.a)}</li>`).join("")}</ul>`;
+  }
+  if(p.format==="email") return renderEmailPkg(p);
   if(p.script){const s=p.script;
     h+=`<h3>🎬 Script (~${s.duration_seconds}s)</h3><p class="sub">Hooks: ${(s.hook_options||[]).map(x=>`"${esc(x)}"`).join(" · ")}</p>
     <div class="markdown"><table><tr><th>Time</th><th>Camera</th><th>Action</th><th>VO</th><th>Text</th></tr>
@@ -742,67 +747,84 @@ async function sendChat(btn){
   renderChat();
 }
 
-/* ---------- tools: real-estate calculators ---------- */
-function fmtINR(n){ return "₹"+Math.round(n).toLocaleString("en-IN"); }
-async function tabTools(){
+/* ---------- campaigns: blog + email + tactics ---------- */
+async function tabCampaigns(){
+  const b=state.brand;
   $("tabBody").innerHTML=`
-    <p class="sub">Client-facing calculators — use them in consultations or embed the numbers in content/lead magnets.</p>
-    <div class="card"><h2>🏠 EMI calculator</h2>
+    <div class="card"><h2>\u270d\ufe0f Blog marketing</h2>
+      <p class="sub">Full publish-ready SEO article in the brand voice: outline, 900-1300 word draft, meta description, FAQ (people-also-ask), internal links, social snippets. Saved to Creatives + workspace.</p>
       <div class="row">
-        <div style="flex:1"><label>Loan amount (₹)</label><input id="emiAmt" type="number" value="5000000"></div>
-        <div style="width:140px"><label>Rate % p.a.</label><input id="emiRate" type="number" value="8.5" step="0.1"></div>
-        <div style="width:130px"><label>Tenure (years)</label><input id="emiYrs" type="number" value="20"></div>
-        <button onclick="calcEMI()">Calculate</button></div>
-      <div id="emiOut"></div></div>
-    <div class="card"><h2>💰 Affordability / loan eligibility</h2>
-      <p class="sub">Rule of thumb: banks allow ~50% of net monthly income towards EMIs.</p>
+        <input id="blogTopic" placeholder="topic \u2014 e.g. how to choose your first padel racket" style="flex:1;margin:0">
+        <input id="blogKw" placeholder="primary keyword (optional)" style="width:230px;margin:0">
+        <button onclick="runBlog(this)">Write article</button></div>
+      <div id="blogOut"></div></div>
+    <div class="card"><h2>\ud83d\udce7 Email & newsletter marketing</h2>
+      <p class="sub">Single newsletter or a full automated sequence: A/B subject lines, preview text, complete copy, send timing, segmentation. Saved to Creatives + workspace.</p>
       <div class="row">
-        <div style="flex:1"><label>Net monthly income (₹)</label><input id="affInc" type="number" value="150000"></div>
-        <div style="flex:1"><label>Existing EMIs (₹/month)</label><input id="affEmi" type="number" value="0"></div>
-        <div style="width:130px"><label>Rate % p.a.</label><input id="affRate" type="number" value="8.5" step="0.1"></div>
-        <div style="width:120px"><label>Tenure (yrs)</label><input id="affYrs" type="number" value="20"></div>
-        <button onclick="calcAfford()">Calculate</button></div>
-      <div id="affOut"></div></div>
-    <div class="card"><h2>🧾 Total cost of purchase (stamp duty & charges)</h2>
-      <div class="row">
-        <div style="flex:1"><label>Property price (₹)</label><input id="sdPrice" type="number" value="8000000"></div>
-        <div style="width:160px"><label>Stamp duty %</label><input id="sdPct" type="number" value="6" step="0.5"></div>
-        <div style="width:160px"><label>Registration %</label><input id="sdReg" type="number" value="1" step="0.5"></div>
-        <button onclick="calcStamp()">Calculate</button></div>
-      <p class="sub">Telangana ~6% + 0.5–1% registration; varies by state — confirm locally.</p>
-      <div id="sdOut"></div></div>`;
-  calcEMI(); calcAfford(); calcStamp();
+        <select id="emType" style="width:150px;margin:0">
+          <option value="newsletter">newsletter</option><option value="promo">promo</option>
+          <option value="welcome">welcome</option><option value="nurture">nurture</option>
+          <option value="winback">win-back</option><option value="launch">launch</option></select>
+        <input id="emTopic" placeholder="topic/occasion (optional \u2014 AI picks the best)" style="flex:1;margin:0">
+        <select id="emCount" style="width:130px;margin:0"><option value="1">single email</option><option value="3">3-email seq</option><option value="5">5-email seq</option></select>
+        <button onclick="runEmail(this)">Write email(s)</button></div>
+      <div id="emailOut"></div></div>
+    <div class="card"><div class="row"><h2>\ud83c\udfaf Marketing tactics playbook</h2>
+      <button class="grn sm" onclick="runPlaybook(this)">Generate playbook</button></div>
+      <p class="sub">10 concrete growth tactics beyond posting \u2014 acquisition, retention, referral, community \u2014 ranked by impact vs effort, each with first-week actions.</p>
+      <div id="pbOut"></div></div>`;
 }
-function emiOf(P,annualRate,years){ const r=annualRate/1200,n=years*12; return r? P*r*Math.pow(1+r,n)/(Math.pow(1+r,n)-1) : P/n; }
-function calcEMI(){
-  const P=+$("emiAmt").value||0, rate=+$("emiRate").value||0, yrs=+$("emiYrs").value||1;
-  const emi=emiOf(P,rate,yrs), total=emi*yrs*12;
-  $("emiOut").innerHTML=`<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr));margin-top:12px">
-    <div class="kpi"><b>${fmtINR(emi)}</b><span>monthly EMI</span></div>
-    <div class="kpi"><b>${fmtINR(total-P)}</b><span>total interest</span></div>
-    <div class="kpi"><b>${fmtINR(total)}</b><span>total payment</span></div></div>`;
+async function runBlog(btn){
+  const topic=$("blogTopic").value.trim(); if(!topic) return toast("Enter a topic",true);
+  busy(btn,true,"Writing article\u2026");
+  try{
+    const c=await api(`/brands/${state.brand.id}/blog`,"POST",{topic,keyword:$("blogKw").value.trim()});
+    const p=c.payload;
+    $("blogOut").innerHTML=`<div style="margin-top:14px">
+      <h3>${esc(p.title)}</h3><p class="sub">${esc(p.meta_description||"")} \u00b7 /${esc(p.slug||"")}</p>
+      <pre style="max-height:340px;overflow-y:auto">${esc(p.body_markdown||"")}</pre>
+      <h3>FAQ</h3><ul class="checklist">${(p.faq||[]).map(f=>`<li><b>${esc(f.q)}</b> \u2014 ${esc(f.a)}</li>`).join("")}</ul>
+      <p class="sub">\ud83d\udd17 Internal links: ${(p.internal_link_ideas||[]).join(" \u00b7 ")}</p>
+      <details><summary>Social snippets</summary><pre>${esc(JSON.stringify(p.social_snippets||{},null,2))}</pre></details>
+      <p class="sub">Saved to Creatives \u2014 generate the hero visual from there.</p></div>`;
+    busy(btn,false);
+  }catch(e){ toast(e.message,true); busy(btn,false); }
 }
-function calcAfford(){
-  const inc=+$("affInc").value||0, ex=+$("affEmi").value||0, rate=+$("affRate").value||8.5, yrs=+$("affYrs").value||20;
-  const capacity=Math.max(0,inc*0.5-ex);
-  const r=rate/1200,n=yrs*12;
-  const maxLoan=r? capacity*(Math.pow(1+r,n)-1)/(r*Math.pow(1+r,n)) : capacity*n;
-  const budget=maxLoan/0.8; // assuming 20% down payment
-  $("affOut").innerHTML=`<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr));margin-top:12px">
-    <div class="kpi"><b>${fmtINR(capacity)}</b><span>EMI capacity /mo</span></div>
-    <div class="kpi"><b>${fmtINR(maxLoan)}</b><span>max eligible loan</span></div>
-    <div class="kpi"><b>${fmtINR(budget)}</b><span>property budget (20% down)</span></div>
-    <div class="kpi"><b>${fmtINR(budget-maxLoan)}</b><span>down payment needed</span></div></div>
-    <p class="sub" style="margin-top:8px">Indicative only — actual eligibility depends on the lender, credit score, and age.</p>`;
+async function runEmail(btn){
+  busy(btn,true,"Writing\u2026");
+  try{
+    const c=await api(`/brands/${state.brand.id}/email`,"POST",{etype:$("emType").value,topic:$("emTopic").value.trim(),email_count:parseInt($("emCount").value)});
+    $("emailOut").innerHTML=`<div style="margin-top:14px">${renderEmailPkg(c.payload)}</div>`;
+    busy(btn,false);
+  }catch(e){ toast(e.message,true); busy(btn,false); }
 }
-function calcStamp(){
-  const P=+$("sdPrice").value||0, sd=+$("sdPct").value||0, reg=+$("sdReg").value||0;
-  const duty=P*sd/100, regAmt=P*reg/100, legal=Math.min(P*0.005,50000);
-  $("sdOut").innerHTML=`<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr));margin-top:12px">
-    <div class="kpi"><b>${fmtINR(duty)}</b><span>stamp duty</span></div>
-    <div class="kpi"><b>${fmtINR(regAmt)}</b><span>registration</span></div>
-    <div class="kpi"><b>${fmtINR(legal)}</b><span>legal/misc (est.)</span></div>
-    <div class="kpi"><b>${fmtINR(P+duty+regAmt+legal)}</b><span>all-in cost</span></div></div>`;
+function renderEmailPkg(p){
+  if(p.emails){ // sequence
+    return `<h3>${esc(p.sequence_name||"Sequence")}</h3><p class="sub">${esc(p.goal||"")}</p>`+
+      p.emails.map(e=>`<div class="idea" style="margin:8px 0">
+        <p><span class="tag y">${esc(e.send_day||"")}</span><span class="tag">${esc(e.purpose||"")}</span></p>
+        <b>Subjects:</b> ${(e.subject_variants||[]).map(s=>`<span class="tag">${esc(s)}</span>`).join("")}
+        <pre>${esc(e.body_markdown||"")}</pre></div>`).join("")+
+      `<p class="sub">\ud83d\udeaa Exit: ${esc(p.exit_condition||"")} \u00b7 \ud83c\udfaf ${esc(p.segmentation_tip||"")}</p>`;
+  }
+  return `<b>Subjects:</b> ${(p.subject_variants||[]).map(s=>`<span class="tag">${esc(s)}</span>`).join("")}
+    <p class="sub">Preview: ${esc(p.preview_text||"")}</p>
+    <pre>${esc(p.body_markdown||"")}</pre>
+    <p class="sub">\u23f0 ${esc(p.best_send_time||"")} \u00b7 \ud83c\udfaf ${esc(p.segmentation_tip||"")}</p>`;
+}
+async function runPlaybook(btn){
+  busy(btn,true,"Strategizing\u2026");
+  try{
+    const r=await api(`/brands/${state.brand.id}/playbook`,"POST");
+    $("pbOut").innerHTML=`<div class="grid" style="margin-top:10px">`+(r.tactics||[]).map(t=>`
+      <div class="idea"><p><span class="tag y">${esc(t.category)}</span><span class="tag">${esc(t.funnel_stage)}</span>
+        <span class="tag ${t.impact==='high'?'g':''}">impact: ${esc(t.impact)}</span><span class="tag">effort: ${esc(t.effort)}</span></p>
+        <h4>${esc(t.name)}</h4><p>${esc(t.summary)}</p>
+        <details><summary>Execution steps</summary><ol class="checklist">${(t.steps||[]).map(s=>`<li>${esc(s)}</li>`).join("")}</ol>
+          <p class="sub">\ud83d\udcc5 This week: ${esc(t.first_week_action||"")} \u00b7 \ud83d\udcca KPI: ${esc(t.kpi||"")}</p></details>
+      </div>`).join("")+`</div>`;
+    busy(btn,false);
+  }catch(e){ toast(e.message,true); busy(btn,false); }
 }
 
 async function tabConnectors(){

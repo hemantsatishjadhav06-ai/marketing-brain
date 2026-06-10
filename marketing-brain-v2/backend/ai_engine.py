@@ -443,6 +443,104 @@ Return JSON:
     return _json_chat(system, user, max_tokens=3500, temperature=0.5)
 
 
+# ---------------------------------------------------------------- blog & email marketing
+
+def write_blog(brand, topic, keyword="", insights=None):
+    """Full SEO blog article, publish-ready."""
+    system = (
+        "You are a senior content marketer and SEO writer. Write a complete, publish-ready blog article "
+        "in the brand's voice. No filler, no 'in today's fast-paced world' openers. Concrete examples, "
+        "scannable structure, search-intent satisfied in the first 150 words."
+    )
+    kw = keyword or topic
+    insight_block = f"\nWhat performs for this brand: {json.dumps(insights)[:800]}" if insights else ""
+    user = f"""Brand context: {_brand_context(brand)}
+Topic: {topic}
+Primary keyword: {kw}{insight_block}
+
+Return JSON:
+{{
+ "title": "max 60 chars, keyword included",
+ "slug": "url-slug",
+ "meta_description": "max 155 chars",
+ "outline": [{{"h2": "...", "h3s": ["..."]}}],
+ "body_markdown": "the COMPLETE article in markdown, 900-1300 words, with ## headings, short paragraphs, one bulleted list, one comparison or example per section, natural keyword usage",
+ "internal_link_ideas": ["other pages/posts this brand should link to from this article"],
+ "faq": [{{"q": "...", "a": "2-3 sentence answer"}}] (3, targeting people-also-ask),
+ "cta": "closing call to action paragraph",
+ "social_snippets": {{"linkedin": "...", "twitter": "..."}},
+ "image_prompt": "hero image prompt using the brand's hex colors, clean space bottom-right for logo"
+}}"""
+    return _json_chat(system, user, max_tokens=6000, temperature=0.7)
+
+
+def write_email(brand, etype="newsletter", topic="", email_count=1, insights=None):
+    """Newsletter or multi-email sequence, publish-ready."""
+    system = (
+        "You are an email marketing specialist with high open/click benchmarks. Write emails people "
+        "actually read: short paragraphs, one job per email, specific subject lines (no clickbait), "
+        "mobile-first formatting, a single clear CTA."
+    )
+    insight_block = f"\nWhat performs for this brand: {json.dumps(insights)[:800]}" if insights else ""
+    if email_count > 1:
+        shape = f"""Return JSON:
+{{
+ "sequence_name": "...",
+ "goal": "...",
+ "emails": [{{
+   "n": 1, "send_day": "Day 0|Day 2|...", "purpose": "...",
+   "subject_variants": ["A", "B"], "preview_text": "max 90 chars",
+   "body_markdown": "complete email copy with greeting, body, CTA button text in **bold**, sign-off",
+   "cta": {{"text": "...", "links_to": "..."}}
+ }}] ({email_count} emails),
+ "exit_condition": "when a subscriber should leave this sequence",
+ "segmentation_tip": "...", "kpis": ["..."]
+}}"""
+    else:
+        shape = """Return JSON:
+{
+ "subject_variants": ["A", "B", "C"],
+ "preview_text": "max 90 chars",
+ "body_markdown": "complete email: hook line, 2-4 short sections (use ### mini-headers), one clear CTA button text in **bold**, sign-off, P.S. line",
+ "cta": {"text": "...", "links_to": "..."},
+ "best_send_time": "...",
+ "segmentation_tip": "who should and shouldn't get this",
+ "kpis": ["..."]
+}"""
+    user = f"""Brand context: {_brand_context(brand)}
+Email type: {etype}
+Topic/occasion: {topic or 'pick the highest-value topic for this brand right now'}{insight_block}
+
+{shape}"""
+    return _json_chat(system, user, max_tokens=5500, temperature=0.7)
+
+
+def tactics_playbook(brand, insights=None):
+    """A cross-channel marketing tactics playbook ranked by impact vs effort."""
+    system = (
+        "You are a growth marketing strategist. Produce concrete, niche-specific marketing tactics this "
+        "brand can execute — beyond just posting content. Think: UGC engines, referral loops, WhatsApp "
+        "broadcasts, partnerships, community plays, offline-to-online, retention plays. No generic advice; "
+        "every tactic must name exactly what THIS brand does."
+    )
+    insight_block = f"\nPerformance data to consider: {json.dumps(insights)[:800]}" if insights else ""
+    user = f"""Brand context: {_brand_context(brand)}{insight_block}
+
+Return JSON:
+{{"tactics": [{{
+ "name": "...",
+ "category": "acquisition|activation|retention|referral|revenue|community",
+ "funnel_stage": "awareness|consideration|conversion|loyalty",
+ "effort": "low|medium|high", "impact": "low|medium|high",
+ "summary": "2 sentences: exactly what to do",
+ "steps": ["3-5 concrete execution steps"],
+ "kpi": "the one number that tells you it's working",
+ "first_week_action": "what to do in the next 7 days"
+}}] (10, ordered by impact-to-effort ratio, at least 2 per category where sensible)}}"""
+    out = _json_chat(system, user, max_tokens=5000, temperature=0.7)
+    return out.get("tactics", [])
+
+
 # ---------------------------------------------------------------- AI coach chat
 
 def coach_chat(brand, workspace_digest, history, message):
