@@ -132,6 +132,19 @@ Return JSON with exactly these keys:
     return _json_chat(system, user, max_tokens=4500, temperature=0.6)
 
 
+# ---------------------------------------------------------------- IG algorithm knowledge (2026, publicly confirmed signals)
+
+IG_ALGO_2026 = """INSTAGRAM RANKING SIGNALS (publicly confirmed, 2026):
+1. WATCH TIME is the #1 signal — total seconds watched, completion %, rewatches. First 3 seconds decide everything; loops count as rewatch.
+2. SENDS PER REACH (DM shares) are weighted 3-5x likes — content people forward to a specific friend ("tag someone who...", relatable in-group humor, useful finds) gets accelerated to new audiences.
+3. SAVES (~3x likes) — reference value: checklists, how-tos, price lists, things to come back to.
+4. LIKES PER REACH matter but least among the big four.
+5. ORIGINALITY: original content gets 40-60% more distribution; visible reposts/watermarks (TikTok etc.) are penalized; 10+ reposts in 30 days removes the account from recommendations.
+6. SURFACES weigh differently: Reels = watch time + sends; Feed = relationship; Stories = recency; Explore = engagement velocity.
+7. Reels up to 3 minutes now reach non-followers; keyword SEO in caption/on-screen text matters for search.
+IMPLICATIONS: engineer the first 3 seconds; build in ONE deliberate send-trigger and ONE save-reason per piece; design loops; write keyword-rich captions; never use watermarked footage."""
+
+
 # ---------------------------------------------------------------- ideas
 
 def generate_ideas(brand, channel, count=6, insights=None, options=None):
@@ -161,8 +174,9 @@ def generate_ideas(brand, channel, count=6, insights=None, options=None):
         filters.append(f"Extra instructions from the marketer: {o['instructions'][:500]}")
     filter_block = ("\nHARD REQUIREMENTS (follow exactly):\n- " + "\n- ".join(filters)) if filters else \
         "\nMix formats appropriate to the channel and mix funnel stages (awareness/consideration/conversion)."
+    algo_block = f"\n{IG_ALGO_2026}" if channel in ("instagram", "reels") else ""
     user = f"""Brand context: {_brand_context(brand)}
-Channel: {channel}{insight_block}
+Channel: {channel}{insight_block}{algo_block}
 
 Generate {count} distinct content ideas for {channel}.{filter_block}
 
@@ -250,6 +264,8 @@ def produce_creative(brand, idea_payload, channel, insights=None):
         "design/publish this without asking a single question. Be hyper-specific."
     )
     insight_block = f"\nWhat has performed well so far: {json.dumps(insights)[:1000]}" if insights else ""
+    if channel in ("instagram", "reels"):
+        insight_block += f"\n{IG_ALGO_2026}\nBake one explicit SEND-TRIGGER and one SAVE-REASON into this piece."
     user = f"""Brand context: {_brand_context(brand)}
 Channel: {channel}. Format: {fmt}.
 Idea: {json.dumps(idea_payload, ensure_ascii=False)[:1500]}{insight_block}
@@ -268,6 +284,37 @@ Return JSON with these keys:
  "image_prompt": "a detailed text-to-image prompt for the key visual/thumbnail. MUST name the exact brand hex colors from the brand context as the dominant palette, describe composition, and say 'leave clean negative space in the bottom-right corner for a logo'"
 }}"""
     return _json_chat(system, user, max_tokens=5000)
+
+
+def algo_audit(brand, creative_payload):
+    """Audit a creative against Instagram's confirmed 2026 ranking signals."""
+    system = (
+        "You are an Instagram growth engineer. Audit this content against the ranking signals below. "
+        "Score harshly — published averages score 4-6 per signal. Every fix must be concrete and "
+        "copy-pasteable, not advice.\n\n" + IG_ALGO_2026
+    )
+    user = f"""Brand context: {_brand_context(brand)}
+Creative to audit: {json.dumps(creative_payload, ensure_ascii=False)[:4000]}
+
+Return JSON:
+{{
+ "signals": [
+  {{"signal": "watch_time", "score": 0-10, "issue": "...", "fix": "exact change to make"}},
+  {{"signal": "send_trigger", "score": 0-10, "issue": "...", "fix": "..."}},
+  {{"signal": "save_value", "score": 0-10, "issue": "...", "fix": "..."}},
+  {{"signal": "comment_spark", "score": 0-10, "issue": "...", "fix": "..."}},
+  {{"signal": "originality", "score": 0-10, "issue": "...", "fix": "..."}},
+  {{"signal": "seo_keywords", "score": 0-10, "issue": "...", "fix": "..."}},
+  {{"signal": "loop_design", "score": 0-10, "issue": "...", "fix": "..."}}
+ ],
+ "algo_score": 0-99 (weighted: watch_time and send_trigger count double),
+ "verdict": "one blunt sentence",
+ "optimized_hook": "rewritten first-3-seconds hook engineered for retention",
+ "optimized_caption_opening": "rewritten first line with searchable keywords",
+ "send_trigger_line": "one line to add that makes people DM this to a friend",
+ "save_reason_addition": "one element to add that makes people save it"
+}}"""
+    return _json_chat(system, user, max_tokens=2500, temperature=0.4)
 
 
 # ---------------------------------------------------------------- images

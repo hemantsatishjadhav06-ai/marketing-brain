@@ -750,6 +750,23 @@ def del_competitor(bid: str, cid: str, user=Depends(current_user)):
     return {"ok": True}
 
 
+@app.post("/api/brands/{bid}/creatives/{cid}/algo-audit")
+def algo_audit(bid: str, cid: str, user=Depends(current_user)):
+    """Audit a creative against Instagram's confirmed ranking signals."""
+    b = _brand_or_404(bid, user)
+    c = db.get_doc("creatives", cid)
+    if not c:
+        raise HTTPException(404, "Creative not found")
+    try:
+        audit = ai_engine.algo_audit(b, c["payload"])
+    except Exception as e:
+        raise HTTPException(502, f"Algo audit failed: {e}")
+    payload = c["payload"]
+    payload["algo_audit"] = audit
+    db.update_doc("creatives", cid, payload=payload)
+    return audit
+
+
 # ------------------------------------------------------------- autopilot
 
 @app.post("/api/brands/{bid}/autopilot")
