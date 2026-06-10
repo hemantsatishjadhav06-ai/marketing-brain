@@ -30,6 +30,7 @@ class BrandIn(BaseModel):
     name: str
     website: str
     socials: dict = {}
+    group: str = ""  # optional portfolio folder shared by sibling brands
 
 
 class SetupIn(BaseModel):
@@ -77,6 +78,11 @@ class ConnectorIn(BaseModel):
     credentials: dict
 
 
+def _wslug(b):
+    """Workspace path segment: group/slug for grouped brands."""
+    return (b["grp"] + "/" + b["slug"]) if b.get("grp") else b["slug"]
+
+
 def _brand_or_404(bid):
     b = db.get_brand(bid)
     if not b:
@@ -94,7 +100,8 @@ def health():
 @app.post("/api/brands")
 def create_brand(body: BrandIn):
     slug = ws.slugify(body.name)
-    bid = db.create_brand(body.name, slug, body.website, body.socials)
+    grp = ws.slugify(body.group) if body.group else ""
+    bid = db.create_brand(body.name, slug, body.website, body.socials, grp)
     return db.get_brand(bid)
 
 
@@ -144,13 +151,13 @@ def setup(bid: str, body: SetupIn):
     profile = b.get("profile") or {}
     profile.update(body.profile_overrides or {})
     setup_data = {"channels": body.channels, "goals": body.goals, "cadence": body.cadence, "language": body.language}
-    root = ws.create_workspace(b["slug"], body.channels)
+    root = ws.create_workspace(_wslug(b), body.channels)
     db.update_brand(bid, profile=profile, setup=setup_data, status="ready")
     b = db.get_brand(bid)
-    ws.write_json(b["slug"], "brand-profile/profile.json", profile)
-    ws.write_json(b["slug"], "brand-profile/setup.json", setup_data)
+    ws.write_json(_wslug(b), "brand-profile/profile.json", profile)
+    ws.write_json(_wslug(b), "brand-profile/setup.json", setup_data)
     if b.get("scrape"):
-        ws.write_json(b["slug"], "brand-profile/scrape-snapshot.json", b["scrape"])
+        ws.write_json(_wslug(b), "brand-profile/scrape-snapshot.json", b["scrape"])
     return {"ok": True, "workspace": root, "brand": b}
 
 
@@ -175,9 +182,9 @@ def ideas(bid: str, body: IdeasIn):
         by_ch = {}
         for c in created:
             by_ch.setdefault(c["channel"], []).append(c["payload"])
-        ws.write_json(b["slug"], "brand-profile/latest-idea-batch.json", by_ch)
+        ws.write_json(_wslug(b), "brand-profile/latest-idea-batch.json", by_ch)
         for ch, chunk in by_ch.items():
-            ws.write_json(b["slug"], f"{ch}/ideas/ideas-{db.new_id()}.json", chunk)
+            ws.write_json(_wslug(b), f"{ch}/ideas/ideas-{db.new_id()}.json", chunk)
     if errors and not created:
         raise HTTPException(502, "; ".join(errors))
     return {"ideas": created, "errors": errors}
@@ -216,7 +223,7 @@ def calendar(bid: str, body: CalendarIn):
         cid = db.insert_doc("calendar_items", bid, payload, idea_id=entry.get("idea_id"),
                             channel=entry.get("channel"), date=entry.get("date"), time=entry.get("time"))
         items.append(db.get_doc("calendar_items", cid))
-    ws.write_json(b["slug"], "brand-profile/content-calendar.json", cal)
+    ws.write_json(_wslug(b), "brand-profile/content-calendar.json", cal)
     return {"calendar": items}
 
 
@@ -244,8 +251,8 @@ def creative(bid: str, body: CreativeIn):
     db.update_doc("ideas", body.idea_id, state="produced")
     c = db.get_doc("creatives", cid)
     md = ws.creative_markdown(c)
-    ws.write_text(b["slug"], f"{idea['channel']}/creatives/{cid}-{ws.slugify(pkg.get('title','creative'))[:40]}.md", md)
-    ws.write_json(b["slug"], f"{idea['channel']}/creatives/{cid}.json", pkg)
+    ws.write_text(_wslug(b), f"{idea['channel']}/creatives/{cid}-{ws.slugify(pkg.get('title','creative'))[:40]}.md", md)
+    ws.write_json(_wslug(b), f"{idea['channel']}/creatives/{cid}.json", pkg)
     return c
 
 
@@ -265,9 +272,9 @@ def image(bid: str, body: ImageIn):
     if not blob:
         raise HTTPException(502, "Image generation failed (model returned no image). You can retry or use the visual direction text with any image tool.")
     rel = f"{c['channel']}/assets/{body.creative_id}.png"
-    path = ws.write_bytes(b["slug"], rel, blob)
+    path = ws.write_bytes(_wslug(b), rel, blob)
     db.update_doc("creatives", body.creative_id, asset_path=rel)
-    return {"ok": True, "asset_url": f"/workspaces/{b['slug']}/{rel}", "path": path}
+    return {"ok": True, "asset_url": f"/workspaces/{_wslug(b)}/{rel}", "path": path}
 
 
 # ------------------------------------------------------------- publishing
@@ -292,7 +299,7 @@ def publish(bid: str, body: PublishIn):
         if c.get("asset_path"):
             public_base = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
             if public_base:
-                image_url = f"{public_base}/workspaces/{b['slug']}/{c['asset_path']}"
+                image_url = f"{public_base}/workspaces/{_wslug(b)}/{c['asset_path']}"
         try:
             result = connectors.publish(channel, creds, full_caption, image_url)
             status = "published"
@@ -306,7 +313,7 @@ def publish(bid: str, body: PublishIn):
 
     pid = db.insert_doc("publish_queue", bid, result, creative_id=body.creative_id, channel=channel,
                         scheduled_for=body.scheduled_for, mode=body.mode, status=status)
-    ws.write_json(b["slug"], f"{channel}/published/{pid}.json",
+    ws.write_json(_wslug(b), f"{channel}/published/{pid}.json",
                   {"creative_id": body.creative_id, "mode": body.mode, "status": status, "result": result})
     return db.get_doc("publish_queue", pid)
 
@@ -357,7 +364,7 @@ def insights(bid: str):
         out = ai_engine.analyze_performance(b, data)
     except Exception as e:
         raise HTTPException(502, f"Insight generation failed: {e}")
-    ws.write_json(b["slug"], "analytics/latest-insights.json", out)
+    ws.write_json(_wslug(b), "analytics/latest-insights.json", out)
     return out
 
 
@@ -367,7 +374,7 @@ def _latest_insights(bid):
         return None
     try:
         import json as _json
-        path = os.path.join(ws.brand_dir(b["slug"]), "analytics", "latest-insights.json")
+        path = os.path.join(ws.brand_dir(_wslug(b)), "analytics", "latest-insights.json")
         if os.path.exists(path):
             with open(path, encoding="utf-8") as f:
                 return _json.load(f)

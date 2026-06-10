@@ -93,6 +93,11 @@ def init_db():
             );
             """
         )
+        # migrations for older databases
+        try:
+            c.execute("ALTER TABLE brands ADD COLUMN grp TEXT DEFAULT ''")
+        except sqlite3.OperationalError:
+            pass  # column already exists
 
 
 def _now():
@@ -105,12 +110,12 @@ def new_id():
 
 # ---------- brands ----------
 
-def create_brand(name, slug, website, socials):
+def create_brand(name, slug, website, socials, grp=""):
     bid = new_id()
     with _lock, _conn() as c:
         c.execute(
-            "INSERT INTO brands (id,name,slug,website,socials,created_at) VALUES (?,?,?,?,?,?)",
-            (bid, name, slug, website, json.dumps(socials or {}), _now()),
+            "INSERT INTO brands (id,name,slug,website,socials,grp,created_at) VALUES (?,?,?,?,?,?,?)",
+            (bid, name, slug, website, json.dumps(socials or {}), grp or "", _now()),
         )
     return bid
 

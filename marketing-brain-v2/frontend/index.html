@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Marketing Brain v2</title>
 <style>
-:root{--bg:#0b0e14;--panel:#131825;--panel2:#1a2132;--line:#242d42;--txt:#e8ecf4;--mut:#8a94ab;--acc:#6c5ce7;--acc2:#00cec9;--ok:#00b894;--warn:#fdcb6e;--err:#ff7675;--r:14px}
+:root{--bg:#081120;--panel:#0e1b30;--panel2:#152540;--line:#22385c;--txt:#e6eefb;--mut:#86a0c4;--acc:#0ea5e9;--acc2:#22d3ee;--ok:#10b981;--warn:#fbbf24;--err:#fb7185;--r:14px}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--txt);font:15px/1.55 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh}
 header{display:flex;align-items:center;gap:14px;padding:16px 28px;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(11,14,20,.92);backdrop-filter:blur(8px);z-index:10}
@@ -19,7 +19,7 @@ main{max-width:1180px;margin:0 auto;padding:28px}
 input,select,textarea{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:10px;color:var(--txt);padding:11px 14px;font-size:14px;margin:5px 0 12px;font-family:inherit}
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--acc)}
 label{font-size:13px;color:var(--mut);font-weight:600}
-button{background:linear-gradient(90deg,var(--acc),#8e7cf3);color:#fff;border:none;border-radius:10px;padding:11px 22px;font-size:14px;font-weight:600;cursor:pointer;transition:.15s}
+button{background:linear-gradient(90deg,var(--acc),#06b6d4);color:#fff;border:none;border-radius:10px;padding:11px 22px;font-size:14px;font-weight:600;cursor:pointer;transition:.15s}
 button:hover{transform:translateY(-1px);filter:brightness(1.1)}
 button:disabled{opacity:.45;cursor:wait;transform:none}
 button.ghost{background:var(--panel2);border:1px solid var(--line);color:var(--txt)}
@@ -53,7 +53,7 @@ pre{background:#0d1119;border:1px solid var(--line);border-radius:10px;padding:1
 details{margin:8px 0}summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--acc2)}
 .chooser{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 14px}
 .choice{padding:8px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);cursor:pointer;font-size:13px;color:var(--mut)}
-.choice.on{border-color:var(--acc);color:var(--txt);background:rgba(108,92,231,.15)}
+.choice.on{border-color:var(--acc);color:var(--txt);background:rgba(14,165,233,.15)}
 img.asset{max-width:100%;border-radius:10px;border:1px solid var(--line);margin-top:8px}
 .markdown{font-size:13px}
 .markdown table{border-collapse:collapse;width:100%;margin:8px 0}
@@ -108,7 +108,7 @@ async function renderHome(){
       <div class="idea">
         <h4>${esc(b.name)}</h4>
         <p>${esc(b.website||"")}</p>
-        <p><span class="tag ${b.status==='ready'?'acc':''}">${b.status}</span>
+        <p>${b.grp?`<span class="tag" style="border-color:var(--acc2);color:var(--acc2)">📁 ${esc(b.grp)}</span>`:""}<span class="tag ${b.status==='ready'?'acc':''}">${b.status}</span>
         ${(b.setup?.channels||[]).map(c=>`<span class="tag">${c}</span>`).join("")}</p>
         <div class="row" style="margin-top:10px">
           <button class="sm" onclick="openBrand('${b.id}')">Open workspace</button>
@@ -135,6 +135,8 @@ function renderWizard(){
       <label>Website</label><input id="wSite" placeholder="e.g. bombaybrew.in">
       <label>Known social handles (optional, comma separated platform:handle)</label>
       <input id="wSoc" placeholder="instagram:bombaybrew, linkedin:company/bombay-brew">
+      <label>Portfolio group (optional — sibling brands share one workspace folder)</label>
+      <input id="wGroup" placeholder="e.g. outlet-group">
       <button onclick="wizCreate(this)">Scan online presence →</button>
     </div>`;
   }
@@ -195,7 +197,7 @@ async function wizCreate(btn){
   $("wSoc").value.split(",").map(x=>x.trim()).filter(Boolean).forEach(x=>{const [k,...v]=x.split(":"); if(v.length) socials[k.trim()]=v.join(":").trim();});
   busy(btn,true,"Scanning site…");
   try{
-    const b=await api("/brands","POST",{name,website:site,socials});
+    const b=await api("/brands","POST",{name,website:site,socials,group:$("wGroup").value.trim()});
     state.wizard={step:2,brandId:b.id,name};
     state.wizard.scrape = await api(`/brands/${b.id}/scrape`,"POST");
     renderWizard();
