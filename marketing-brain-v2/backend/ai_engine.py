@@ -418,6 +418,33 @@ Return JSON:
     return out.get("trends", [])
 
 
+def shortlist_competitors(brand, serp_domains):
+    """Merge SERP-ranked domains with profile guesses into a ranked competitor shortlist."""
+    p = brand.get("profile") or {}
+    system = (
+        "You are a competitive intelligence analyst. You get (a) domains that actually rank on Google "
+        "for this brand's niche keywords (strong evidence of real competition) and (b) AI-guessed "
+        "competitor names. Produce a ranked shortlist of TRUE direct competitors. Exclude publishers, "
+        "blogs, news sites, and government/association sites unless they sell competing products/services."
+    )
+    user = f"""Brand context: {_brand_context(brand)}
+Domains ranking for our niche keywords (with hit counts and example page titles):
+{json.dumps(serp_domains, ensure_ascii=False)[:3500]}
+Previously guessed competitors: {json.dumps(p.get('competitors_guess') or [])[:500]}
+
+Return JSON:
+{{"competitors": [{{
+ "name": "company name",
+ "url": "https://domain",
+ "threat": "high|medium|low",
+ "type": "direct|indirect|marketplace|content",
+ "evidence": "why we believe they compete (SERP hits, titles, or inference)",
+ "watch_for": "the one thing to monitor about them"
+}}] (5-8, highest threat first)}}"""
+    out = _json_chat(system, user, max_tokens=2500, temperature=0.4)
+    return out.get("competitors", [])
+
+
 def competitor_battlecard(brand, competitor_name, comp_scrape):
     """Scrape-grounded competitive gap analysis."""
     system = (

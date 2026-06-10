@@ -695,6 +695,30 @@ def score(bid: str, body: ScoreIn, user=Depends(current_user)):
     return result
 
 
+@app.post("/api/brands/{bid}/competitors/discover")
+def discover_competitors(bid: str, user=Depends(current_user)):
+    """Find competitors automatically: scrape who ranks on Google for the brand's
+    niche keywords, then AI-shortlist the real threats."""
+    b = _brand_or_404(bid, user)
+    if not trend_scanner.enabled():
+        raise HTTPException(400, "Competitor discovery needs the APIFY_TOKEN configured")
+    from urllib.parse import urlparse
+    own = urlparse(b.get("website") or "").netloc.replace("www.", "")
+    kws = trend_scanner.default_keywords(b)
+    serp = trend_scanner.discover_competitor_domains(kws, own)
+    if not serp:
+        raise HTTPException(502, "SERP discovery returned nothing — try again or add competitors manually")
+    try:
+        shortlist = ai_engine.shortlist_competitors(b, serp)
+    except Exception as e:
+        raise HTTPException(502, f"Shortlisting failed: {e}")
+    ws.write_json(_wslug(b), "brand-profile/discovered-competitors.json", shortlist)
+    already = {c.get("url", "") for c in db.list_docs("competitors", bid)}
+    for c in shortlist:
+        c["already_analyzed"] = c.get("url", "") in already
+    return {"keywords_used": kws, "serp_domains_found": len(serp), "competitors": shortlist}
+
+
 @app.post("/api/brands/{bid}/competitors")
 def add_competitor(bid: str, body: CompetitorIn, user=Depends(current_user)):
     b = _brand_or_404(bid, user)

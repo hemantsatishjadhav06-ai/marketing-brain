@@ -574,9 +574,11 @@ async function runTrends(btn){
 async function tabCompetitors(){
   const b=state.brand; const comps=await api(`/brands/${b.id}/competitors`);
   $("tabBody").innerHTML=`
-    <div class="card"><h2>⚔️ Competitor tracker</h2>
-      <p class="sub">Add a competitor's website — the Brain scrapes it and builds a battlecard: their positioning, weaknesses, and the gaps you can own.</p>
-      <div class="row">
+    <div class="card"><div class="row"><h2>⚔️ Competitor tracker</h2>
+      <button class="grn" onclick="discoverComps(this)">🔍 Find competitors automatically</button></div>
+      <p class="sub">Auto-discovery scrapes Google for your niche keywords and shortlists who actually competes with you. Or add one manually below.</p>
+      <div id="discOut"></div>
+      <div class="row" style="margin-top:8px">
         <input id="compUrl" placeholder="competitor website, e.g. racquetguys.com" style="flex:1;margin:0">
         <input id="compName" placeholder="name (optional)" style="width:170px;margin:0">
         <button onclick="addCompetitor(this)">Analyze</button></div></div>
@@ -594,6 +596,21 @@ async function tabCompetitors(){
         <ul class="checklist">${(p.channel_comparison||[]).map(c2=>`<li><b>${esc(c2.channel)}</b>: them — ${esc(c2.them)}; us — ${esc(c2.us)}</li>`).join("")}</ul>
         <p class="sub">🚫 ${esc(p.do_not_copy||"")}</p></details>
     </div>`;}).join("")||""}`;
+}
+async function discoverComps(btn){
+  busy(btn,true,"Scanning Google for rivals…");
+  try{
+    const r=await api(`/brands/${state.brand.id}/competitors/discover`,"POST");
+    $("discOut").innerHTML=`<p class="sub" style="margin-top:10px">Scanned: ${(r.keywords_used||[]).join(", ")} · ${r.serp_domains_found} ranking domains found</p>
+      <div class="grid">`+(r.competitors||[]).map(c=>`
+      <div class="idea"><p><span class="tag ${c.threat==='high'?'':'y'}" style="${c.threat==='high'?'color:var(--err);border-color:var(--err)':''}">${esc(c.threat)} threat</span><span class="tag">${esc(c.type)}</span>${c.already_analyzed?'<span class="tag g">analyzed</span>':''}</p>
+        <h4>${esc(c.name)}</h4><p class="sub">${esc(c.url)}</p>
+        <p>${esc(c.evidence||"")}</p>
+        <p class="sub">👁 ${esc(c.watch_for||"")}</p>
+        ${!c.already_analyzed?`<button class="sm" style="margin-top:8px" onclick="$('compUrl').value='${esc(c.url)}';$('compName').value='${esc(c.name).replace(/'/g,"")}';addCompetitor(this)">⚔️ Build battlecard</button>`:""}
+      </div>`).join("")+`</div>`;
+    busy(btn,false);
+  }catch(e){ toast(e.message,true); busy(btn,false); }
 }
 async function addCompetitor(btn){
   const url=$("compUrl").value.trim(); if(!url) return toast("Enter a website",true);

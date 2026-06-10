@@ -67,6 +67,43 @@ def scan(keywords, country="in"):
     return signals
 
 
+MARKETPLACE_NOISE = ("amazon.", "flipkart.", "wikipedia.", "youtube.", "instagram.", "facebook.",
+                     "quora.", "reddit.", "linkedin.", "pinterest.", "indiamart.", "justdial.",
+                     "myntra.", "ajio.", "meesho.", "decathlon.")  # big platforms, not direct rivals
+
+
+def discover_competitor_domains(keywords, own_domain="", country="in"):
+    """Scrape SERPs for niche keywords and harvest the domains that actually rank.
+    Those are the brand's real search competitors."""
+    from urllib.parse import urlparse
+    domains = {}
+    with httpx.Client(timeout=90) as cli:
+        for kw in keywords[:3]:
+            try:
+                r = cli.post(
+                    f"https://api.apify.com/v2/acts/{ACTOR}/run-sync-get-dataset-items",
+                    params={"token": APIFY_TOKEN},
+                    json={"queries": kw, "countryCode": country, "maxPagesPerQuery": 1,
+                          "resultsPerPage": 15, "saveHtml": False, "mobileResults": False},
+                )
+                r.raise_for_status()
+                items = r.json()
+                for o in (items[0].get("organicResults") or []) if items else []:
+                    url = o.get("url") or ""
+                    dom = urlparse(url).netloc.replace("www.", "")
+                    if not dom or dom in own_domain or own_domain in dom:
+                        continue
+                    if any(n in dom for n in MARKETPLACE_NOISE):
+                        continue
+                    d = domains.setdefault(dom, {"domain": dom, "hits": 0, "titles": [], "url": f"https://{dom}"})
+                    d["hits"] += 1
+                    if len(d["titles"]) < 3 and o.get("title"):
+                        d["titles"].append(o["title"][:90])
+            except Exception:
+                continue
+    return sorted(domains.values(), key=lambda x: -x["hits"])[:12]
+
+
 def fresh_scan_of(brand):
     """Return the cached scan if it's still fresh, else None."""
     scan_data = (brand.get("profile") or {}).get("trend_scan")
