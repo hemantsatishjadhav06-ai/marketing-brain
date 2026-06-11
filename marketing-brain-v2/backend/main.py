@@ -798,7 +798,7 @@ def voiceover(bid: str, cid: str, user=Depends(current_user)):
         audio = ai_engine.generate_voiceover(vo_text)
     except Exception as e:
         raise HTTPException(502, f"Voiceover failed: {e}")
-    rel = f"{c['channel']}/assets/{cid}-vo.mp3"
+    rel = f"{c['channel']}/assets/{cid}-vo.wav"
     ws.write_bytes(_wslug(b), rel, audio)
     payload = c["payload"]
     payload["vo_asset"] = rel

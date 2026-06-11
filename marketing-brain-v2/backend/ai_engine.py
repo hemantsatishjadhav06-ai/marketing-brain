@@ -355,26 +355,42 @@ AUDIO_MODEL = os.environ.get("OPENROUTER_AUDIO_MODEL", "openai/gpt-audio-mini")
 
 
 def generate_voiceover(text, voice="alloy"):
-    """Generate spoken voiceover audio (mp3 bytes) via OpenRouter audio model."""
+    """Generate spoken voiceover audio (WAV bytes) via OpenRouter audio model.
+    Audio output must be streamed; PCM16 deltas are assembled into a WAV."""
+    import struct
     payload = {
         "model": AUDIO_MODEL,
         "modalities": ["text", "audio"],
-        "audio": {"voice": voice, "format": "mp3"},
+        "audio": {"voice": voice, "format": "pcm16"},
+        "stream": True,
         "messages": [{"role": "user", "content":
             f"Read the following voiceover script aloud, naturally and energetically, exactly as written, "
             f"with no additions or commentary:\n\n{text[:1500]}"}],
     }
     headers = {"Authorization": f"Bearer {_key()}", "X-Title": "Marketing Brain v2"}
-    with httpx.Client(timeout=120) as cli:
-        r = cli.post(OPENROUTER_URL, json=payload, headers=headers)
+    pcm = b""
+    with httpx.stream("POST", OPENROUTER_URL, json=payload, headers=headers, timeout=150) as r:
         r.raise_for_status()
-        data = r.json()
-    msg = data["choices"][0]["message"]
-    audio = msg.get("audio") or {}
-    b64 = audio.get("data")
-    if not b64:
+        for line in r.iter_lines():
+            if not line.startswith("data: "):
+                continue
+            data = line[6:]
+            if data == "[DONE]":
+                break
+            try:
+                chunk = json.loads(data)
+            except Exception:
+                continue
+            d = (chunk.get("choices") or [{}])[0].get("delta") or {}
+            a = d.get("audio") or {}
+            if a.get("data"):
+                pcm += base64.b64decode(a["data"])
+    if not pcm:
         raise RuntimeError("Audio model returned no audio")
-    return base64.b64decode(b64)
+    sr = 24000
+    return (b"RIFF" + struct.pack("<I", 36 + len(pcm)) + b"WAVEfmt " +
+            struct.pack("<IHHIIHH", 16, 1, 1, sr, sr * 2, 2, 16) +
+            b"data" + struct.pack("<I", len(pcm)) + pcm)
 
 
 # ---------------------------------------------------------------- growth engine
