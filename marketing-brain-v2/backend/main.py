@@ -22,7 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import ai_engine, auth, connectors, database as db, scraper, trend_scanner, workspace as ws
+from . import ai_engine, auth, connectors, database as db, scraper, storage, trend_scanner, workspace as ws
 
 app = FastAPI(title="Marketing Brain v2", version="3.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -358,6 +358,13 @@ def _logo_path(b):
     return path if os.path.exists(path) else None
 
 
+def _save_asset(b, rel, blob):
+    """Persist an asset: Supabase Storage (public URL) with local-disk fallback."""
+    ws.write_bytes(_wslug(b), rel, blob)  # keep local copy for same-instance serving
+    url = storage.save_asset(f"{_wslug(b)}/{rel}", blob)
+    return url or rel
+
+
 # ------------------------------------------------------------- ideas
 
 @app.post("/api/brands/{bid}/ideas")
@@ -496,9 +503,9 @@ def _generate_image(b, creative_id, prompt_override=None):
         raise HTTPException(502, "Image generation failed (model returned no image). Retry, or use the visual direction text with any image tool.")
     blob = _composite_logo(b, blob)
     rel = f"{c['channel']}/assets/{creative_id}.png"
-    ws.write_bytes(_wslug(b), rel, blob)
-    db.update_doc("creatives", creative_id, asset_path=rel)
-    return {"ok": True, "asset_url": f"/workspaces/{_wslug(b)}/{rel}"}
+    ref = _save_asset(b, rel, blob)
+    db.update_doc("creatives", creative_id, asset_path=ref)
+    return {"ok": True, "asset_url": ref if ref.startswith("http") else f"/workspaces/{_wslug(b)}/{ref}"}
 
 
 def _composite_logo(b, image_bytes):
@@ -841,9 +848,9 @@ def _run_reel_studio(job_id, bid, source, cfg: ReelStudioIn):
             if blob:
                 blob = _composite_logo(b, blob)
                 rel = f"instagram/assets/{cid}-scene{s.get('n')}.png"
-                ws.write_bytes(_wslug(b), rel, blob)
-                scene_assets.append(rel)
-                s["asset"] = rel
+                ref = _save_asset(b, rel, blob)
+                scene_assets.append(ref)
+                s["asset"] = ref
             else:
                 _rs_log(job_id, f"  scene {s.get('n')} image failed — will reuse neighbors")
         vo_text = " ".join(s.get("vo_line", "") for s in sb.get("scenes", []) if s.get("vo_line"))
@@ -851,8 +858,7 @@ def _run_reel_studio(job_id, bid, source, cfg: ReelStudioIn):
         try:
             audio = ai_engine.generate_voiceover(vo_text, cfg.voice)
             rel = f"instagram/assets/{cid}-vo.wav"
-            ws.write_bytes(_wslug(b), rel, audio)
-            payload["vo_asset"] = rel
+            payload["vo_asset"] = _save_asset(b, rel, audio)
             payload["vo_text"] = vo_text[:500]
         except Exception as e:
             _rs_log(job_id, f"voiceover failed: {e}")
@@ -891,14 +897,13 @@ def slides(bid: str, cid: str, user=Depends(current_user)):
             continue
         blob = _composite_logo(b, blob)
         rel = f"{c['channel']}/assets/{cid}-slide{sl.get('n')}.png"
-        ws.write_bytes(_wslug(b), rel, blob)
-        assets.append(rel)
+        assets.append(_save_asset(b, rel, blob))
     if not assets:
         raise HTTPException(502, "Slide generation failed: " + ", ".join(errors))
     payload = c["payload"]
     payload["slide_assets"] = assets
     db.update_doc("creatives", cid, payload=payload, asset_path=assets[0])
-    return {"ok": True, "slides": [f"/workspaces/{_wslug(b)}/{a}" for a in assets], "failed": errors}
+    return {"ok": True, "slides": [a if a.startswith("http") else f"/workspaces/{_wslug(b)}/{a}" for a in assets], "failed": errors}
 
 
 @app.post("/api/brands/{bid}/creatives/{cid}/voiceover")
@@ -918,12 +923,12 @@ def voiceover(bid: str, cid: str, user=Depends(current_user)):
     except Exception as e:
         raise HTTPException(502, f"Voiceover failed: {e}")
     rel = f"{c['channel']}/assets/{cid}-vo.wav"
-    ws.write_bytes(_wslug(b), rel, audio)
+    ref = _save_asset(b, rel, audio)
     payload = c["payload"]
-    payload["vo_asset"] = rel
+    payload["vo_asset"] = ref
     payload["vo_text"] = vo_text[:500]
     db.update_doc("creatives", cid, payload=payload)
-    return {"ok": True, "vo_url": f"/workspaces/{_wslug(b)}/{rel}", "vo_text": vo_text[:300]}
+    return {"ok": True, "vo_url": ref if ref.startswith("http") else f"/workspaces/{_wslug(b)}/{ref}", "vo_text": vo_text[:300]}
 
 
 @app.post("/api/brands/{bid}/creatives/{cid}/algo-audit")
