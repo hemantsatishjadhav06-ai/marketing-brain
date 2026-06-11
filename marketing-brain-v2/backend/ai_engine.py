@@ -353,6 +353,56 @@ def generate_image(prompt, brand_name="", colors=None):
 
 AUDIO_MODEL = os.environ.get("OPENROUTER_AUDIO_MODEL", "openai/gpt-audio-mini")
 
+VOICES = ["alloy", "ash", "ballad", "coral", "echo", "sage", "shimmer", "verse"]
+
+# OpusClip-inspired visual style presets for Reel Studio scene generation
+STYLE_PRESETS = {
+    "studio-product": "premium studio product photography, softbox lighting, seamless backdrop, shallow depth of field, commercial grade",
+    "cinematic": "cinematic film still, anamorphic lens, dramatic golden-hour lighting, film grain, shallow focus",
+    "ugc-phone": "authentic handheld smartphone photo, natural daylight, candid real-person energy, slightly imperfect framing",
+    "motion-graphics": "flat vector motion-graphics style frame, bold geometric shapes, clean modern illustration, solid color background",
+    "watercolor": "soft watercolor painting, visible paper texture, loose expressive brushstrokes, gentle color washes",
+    "claymation": "claymation stop-motion style, handcrafted plasticine characters and props, miniature set, soft studio light",
+    "pixel-art": "retro VGA pixel-art scene, 16-bit videogame aesthetic, dithered shading, vibrant limited palette",
+    "halftone": "vintage halftone print style, bold comic dots, two-tone ink, screenprint texture",
+    "3d-render": "polished 3D render, soft global illumination, smooth materials, isometric-friendly composition, octane style",
+    "line-art": "elegant 2D line art illustration, single-weight ink lines, minimal accent color, generous whitespace",
+    "collage": "mixed-media collage, torn paper edges, halftone photo cutouts, bold typography shapes, playful composition",
+    "vintage-editorial": "vintage editorial magazine photography, muted retro color grade, classic composition, grain",
+}
+
+
+def reel_storyboard(brand, source_text, style="cinematic", scene_count=4):
+    """Turn an idea/script/article into a scene-by-scene reel storyboard.
+    Scene image prompts are CLEAN (no burned-in text) — captions overlay later."""
+    style_desc = STYLE_PRESETS.get(style, style)
+    system = (
+        "You are a short-form video director. Build a scene-by-scene storyboard for a vertical reel. "
+        "Scenes must flow as one story: hook scene → value scenes → payoff/CTA scene. "
+        "Each scene's image_prompt must describe ONLY the visual (subject, composition, lighting, mood) "
+        "in the given art style — ABSOLUTELY NO text, words, letters, logos or UI in the image prompt, "
+        "because captions are overlaid separately.\n" + IG_ALGO_2026
+    )
+    user = f"""Brand context: {_brand_context(brand)}
+Art style for every scene: {style_desc}
+Source material: {source_text[:4000]}
+
+Return JSON:
+{{
+ "title": "...",
+ "hook": "spoken + on-screen hook, max 9 words",
+ "scenes": [{{
+   "n": 1,
+   "vo_line": "one natural spoken sentence (the voiceover for this scene)",
+   "on_screen_text": "max 6 punchy words shown as caption",
+   "image_prompt": "rich visual-only description in the art style, vertical 9:16 composition, NO TEXT"
+ }}] ({scene_count} scenes),
+ "cta_text": "end-card line, max 7 words",
+ "caption": "publish-ready IG caption with keywords",
+ "hashtags": ["..."] (8-12)
+}}"""
+    return _json_chat(system, user, max_tokens=3000)
+
 
 def generate_voiceover(text, voice="alloy"):
     """Generate spoken voiceover audio (WAV bytes) via OpenRouter audio model.

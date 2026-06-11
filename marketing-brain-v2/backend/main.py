@@ -750,6 +750,113 @@ def del_competitor(bid: str, cid: str, user=Depends(current_user)):
     return {"ok": True}
 
 
+# ------------------------------------------------------------- reel studio
+
+REEL_JOBS = {}  # job_id -> {state, log, creative_id}
+
+
+class ReelStudioIn(BaseModel):
+    prompt: str = ""           # describe the video idea (Idea-to-Video)
+    creative_id: str = ""      # or start from an existing reel creative (Script-to-Video)
+    style: str = "cinematic"
+    voice: str = "alloy"
+    scenes: int = 4
+
+
+@app.get("/api/reel-studio/options")
+def reel_options(user=Depends(current_user)):
+    return {"styles": list(ai_engine.STYLE_PRESETS.keys()), "voices": ai_engine.VOICES}
+
+
+@app.post("/api/brands/{bid}/reel-studio")
+def reel_studio(bid: str, body: ReelStudioIn, user=Depends(current_user)):
+    b = _brand_or_404(bid, user)
+    source = body.prompt.strip()
+    if body.creative_id:
+        c = db.get_doc("creatives", body.creative_id)
+        if not c:
+            raise HTTPException(404, "Creative not found")
+        source = json.dumps({k: c["payload"].get(k) for k in ("title", "script", "caption")}, ensure_ascii=False)
+    if len(source) < 10:
+        raise HTTPException(400, "Describe the video idea, or pick an existing reel creative")
+    job_id = db.new_id()
+    REEL_JOBS[job_id] = {"state": "running", "log": [], "creative_id": None, "brand_id": bid}
+    threading.Thread(target=_run_reel_studio, args=(job_id, bid, source, body), daemon=True).start()
+    return {"job_id": job_id}
+
+
+@app.get("/api/reel-studio/jobs/{job_id}")
+def reel_job(job_id: str, user=Depends(current_user)):
+    j = REEL_JOBS.get(job_id)
+    if not j:
+        raise HTTPException(404, "Job not found")
+    if user["role"] != "admin" and user.get("brand_id") != j.get("brand_id"):
+        raise HTTPException(403, "Not your job")
+    return j
+
+
+def _rs_log(job_id, msg):
+    REEL_JOBS[job_id]["log"].append(f"{time.strftime('%H:%M:%S')} {msg}")
+
+
+def _run_reel_studio(job_id, bid, source, cfg: ReelStudioIn):
+    import json as _json
+    try:
+        b = db.get_brand(bid)
+        _rs_log(job_id, f"Directing storyboard ({cfg.scenes} scenes, {cfg.style} style)…")
+        sb = ai_engine.reel_storyboard(b, source, cfg.style, max(3, min(6, cfg.scenes)))
+        payload = {
+            "title": sb.get("title", "Reel"), "format": "reel",
+            "caption": sb.get("caption", ""), "hashtags": {"all": sb.get("hashtags", [])},
+            "cta": sb.get("cta_text", ""),
+            "script": {"duration_seconds": len(sb.get("scenes", [])) * 3 + 5,
+                       "hook_options": [sb.get("hook", "")],
+                       "shots": [{"t": f"scene {s.get('n')}", "action": s.get("image_prompt", "")[:120],
+                                  "dialogue_or_vo": s.get("vo_line", ""),
+                                  "on_screen_text": s.get("on_screen_text", "")} for s in sb.get("scenes", [])]},
+            "reel_studio": {"style": cfg.style, "voice": cfg.voice, "hook": sb.get("hook", ""),
+                            "cta_text": sb.get("cta_text", ""), "scenes": sb.get("scenes", [])},
+        }
+        cid = db.insert_doc("creatives", bid, payload, channel="instagram", format="reel")
+        REEL_JOBS[job_id]["creative_id"] = cid
+        _rs_log(job_id, f"Storyboard ready: {payload['title']}")
+
+        palette = ai_engine.brand_palette(b)
+        scene_assets = []
+        for s in sb.get("scenes", []):
+            _rs_log(job_id, f"Painting scene {s.get('n')} ({cfg.style})…")
+            prompt = (f"{s.get('image_prompt','')} . Vertical 9:16 composition. "
+                      f"Strictly no text, no letters, no words, no watermarks anywhere in the image.")
+            blob = ai_engine.generate_image(prompt, b["name"], palette)
+            if blob:
+                blob = _composite_logo(b, blob)
+                rel = f"instagram/assets/{cid}-scene{s.get('n')}.png"
+                ws.write_bytes(_wslug(b), rel, blob)
+                scene_assets.append(rel)
+                s["asset"] = rel
+            else:
+                _rs_log(job_id, f"  scene {s.get('n')} image failed — will reuse neighbors")
+        vo_text = " ".join(s.get("vo_line", "") for s in sb.get("scenes", []) if s.get("vo_line"))
+        _rs_log(job_id, f"Recording voiceover ({cfg.voice})…")
+        try:
+            audio = ai_engine.generate_voiceover(vo_text, cfg.voice)
+            rel = f"instagram/assets/{cid}-vo.wav"
+            ws.write_bytes(_wslug(b), rel, audio)
+            payload["vo_asset"] = rel
+            payload["vo_text"] = vo_text[:500]
+        except Exception as e:
+            _rs_log(job_id, f"voiceover failed: {e}")
+        payload["scene_assets"] = scene_assets
+        payload["reel_studio"]["scenes"] = sb.get("scenes", [])
+        db.update_doc("creatives", cid, payload=payload,
+                      asset_path=scene_assets[0] if scene_assets else None)
+        _rs_log(job_id, f"Done — {len(scene_assets)} scenes + voiceover. Open Creatives → Build video.")
+        REEL_JOBS[job_id]["state"] = "done"
+    except Exception as e:
+        _rs_log(job_id, f"Failed: {e}")
+        REEL_JOBS[job_id]["state"] = "failed"
+
+
 @app.post("/api/brands/{bid}/creatives/{cid}/slides")
 def slides(bid: str, cid: str, user=Depends(current_user)):
     """Generate one branded image per carousel slide (logo composited)."""
@@ -763,9 +870,11 @@ def slides(bid: str, cid: str, user=Depends(current_user)):
     palette = ai_engine.brand_palette(b)
     assets, errors = [], []
     for sl in slide_specs[:6]:
-        prompt = (f"Social media carousel slide {sl.get('n')}: headline '{sl.get('headline','')}'. "
-                  f"{sl.get('visual_direction','')}. {sl.get('design_notes','')} "
-                  f"Vertical 4:5 layout, bold readable headline text ON the image.")
+        headline = (sl.get("headline") or "")[:40]
+        prompt = (f"Premium social media carousel slide design. Visual: {sl.get('visual_direction','')}. "
+                  f"{sl.get('design_notes','')} Vertical 4:5, clean modern layout, generous negative space. "
+                  f"The ONLY text in the image: \"{headline}\" in large bold clean sans-serif lettering, "
+                  f"spelled exactly like that. No other words, no paragraphs, no fine print.")
         blob = ai_engine.generate_image(prompt, b["name"], palette)
         if not blob:
             errors.append(f"slide {sl.get('n')}")

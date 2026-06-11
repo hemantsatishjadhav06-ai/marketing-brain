@@ -360,7 +360,7 @@ function kitOf(b){ return ((b.profile||{}).brand_kit)||{}; }
 function logoUrl(b){ const k=kitOf(b); return k.logo?`/workspaces/${b.grp?b.grp+"/":""}${b.slug}/${k.logo}`:null; }
 function renderBrand(){
   const b=state.brand, k=kitOf(b);
-  const tabs=["overview","brand kit","ideas","growth","campaigns","calendar","creatives","publish","analytics","competitors","coach","connectors"];
+  const tabs=["overview","brand kit","ideas","growth","campaigns","reel studio","calendar","creatives","publish","analytics","competitors","coach","connectors"];
   $("main").innerHTML=`
     <div class="row" style="margin-bottom:4px">
       ${logoUrl(b)?`<img class="brandlogo" src="${logoUrl(b)}">`:""}
@@ -372,7 +372,7 @@ function renderBrand(){
     <p class="sub">${esc(b.website||"")} ${b.grp?` · 📁 ${esc(b.grp)}`:""} · ${(b.setup?.channels||[]).join(" · ")}</p>
     <div class="tabs">${tabs.map(t=>`<div class="tab ${state.tab===t?'on':''}" onclick="state.tab='${t}';renderBrand()">${t[0].toUpperCase()+t.slice(1)}</div>`).join("")}</div>
     <div id="tabBody"><span class="spinner"></span></div>`;
-  ({"overview":tabOverview,"brand kit":tabKit,"ideas":tabIdeas,"growth":tabGrowth,"campaigns":tabCampaigns,"calendar":tabCalendar,"creatives":tabCreatives,"publish":tabPublish,"analytics":tabAnalytics,"competitors":tabCompetitors,"coach":tabCoach,"connectors":tabConnectors})[state.tab]();
+  ({"overview":tabOverview,"brand kit":tabKit,"ideas":tabIdeas,"growth":tabGrowth,"campaigns":tabCampaigns,"reel studio":tabReelStudio,"calendar":tabCalendar,"creatives":tabCreatives,"publish":tabPublish,"analytics":tabAnalytics,"competitors":tabCompetitors,"coach":tabCoach,"connectors":tabConnectors})[state.tab]();
 }
 async function runAutopilot(btn){
   busy(btn,true,"Engaging…");
@@ -620,6 +620,51 @@ async function addCompetitor(btn){
 }
 async function delCompetitor(cid){ await api(`/brands/${state.brand.id}/competitors/${cid}`,"DELETE"); tabCompetitors(); }
 
+let RS_TIMER=null;
+async function tabReelStudio(){
+  const b=state.brand;
+  const [opts,crs]=await Promise.all([api("/reel-studio/options"),api(`/brands/${b.id}/creatives`)]);
+  const reels=crs.filter(c=>c.format==="reel");
+  const styleIcons={"studio-product":"\ud83d\udcf8","cinematic":"\ud83c\udfac","ugc-phone":"\ud83e\udd33","motion-graphics":"\ud83d\udd37","watercolor":"\ud83c\udfa8","claymation":"\ud83e\uddf1","pixel-art":"\ud83d\udc7e","halftone":"\ud83d\udfe3","3d-render":"\ud83e\uddca","line-art":"\u270f\ufe0f","collage":"\ud83d\uddc2","vintage-editorial":"\ud83d\udcf0"};
+  $("tabBody").innerHTML=`
+    <div class="card"><h2>\ud83c\udfac Reel Studio</h2>
+      <p class="sub">Describe a video idea — the Brain directs a scene-by-scene storyboard, paints every scene in your chosen style (brand colors + logo), records the voiceover, and hands you a buildable reel.</p>
+      <label>Describe your video idea (or pick an existing reel below)</label>
+      <textarea id="rsPrompt" rows="3" placeholder="e.g. 30s ad: why every beginner buys the wrong racket — myth vs reality, ends with our fitting service"></textarea>
+      <div class="row">
+        <div style="flex:1"><label>…or start from an existing reel script</label>
+          <select id="rsCreative"><option value="">— none, use my idea above —</option>${reels.map(r=>`<option value="${r.id}">${esc(r.payload.title)}</option>`).join("")}</select></div>
+        <div style="width:140px"><label>Voiceover voice</label>
+          <select id="rsVoice">${opts.voices.map(v=>`<option>${v}</option>`).join("")}</select></div>
+        <div style="width:110px"><label>Scenes</label>
+          <select id="rsScenes"><option>3</option><option selected>4</option><option>5</option><option>6</option></select></div>
+      </div>
+      <label>Visual style</label>
+      <div class="chooser" id="rsStyle">${opts.styles.map((s,i)=>`<div class="choice ${i===1?'on':''}" data-s="${s}" onclick="[...this.parentNode.children].forEach(x=>x.classList.remove('on'));this.classList.add('on')">${styleIcons[s]||""} ${s.replace(/-/g," ")}</div>`).join("")}</div>
+      <button onclick="runReelStudio(this)">\ud83c\udfac Generate reel (scenes + voiceover)</button>
+      <div id="rsOut"></div></div>`;
+}
+async function runReelStudio(btn){
+  const body={prompt:$("rsPrompt").value.trim(),creative_id:$("rsCreative").value,
+    style:(document.querySelector("#rsStyle .choice.on")||{}).dataset?.s||"cinematic",
+    voice:$("rsVoice").value,scenes:parseInt($("rsScenes").value)};
+  if(!body.prompt&&!body.creative_id) return toast("Describe an idea or pick a reel",true);
+  busy(btn,true,"Director at work\u2026");
+  try{
+    const r=await api(`/brands/${state.brand.id}/reel-studio`,"POST",body);
+    pollReelJob(r.job_id,btn);
+  }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+async function pollReelJob(jid,btn){
+  clearTimeout(RS_TIMER);
+  try{
+    const j=await api(`/reel-studio/jobs/${jid}`);
+    $("rsOut").innerHTML=`<div class="aplog" style="margin-top:12px">${(j.log||[]).map(esc).join("<br>")}</div>`+
+      (j.state==="done"&&j.creative_id?`<div class="row" style="margin-top:10px"><button class="grn" onclick="state.tab='creatives';renderBrand()">Open in Creatives \u2192 Build video</button></div>`:"");
+    if(j.state==="running"){ RS_TIMER=setTimeout(()=>pollReelJob(jid,btn),4000); }
+    else { busy(btn,false); if(j.state==="done") toast("Reel generated \u2014 scenes + voiceover ready"); }
+  }catch(e){ busy(btn,false); toast(e.message,true); }
+}
 async function tabCalendar(){
   const b=state.brand; const cal=await api(`/brands/${b.id}/calendar`);
   $("tabBody").innerHTML=`
@@ -668,6 +713,7 @@ async function tabCreatives(){
         <button class="sm ghost" onclick="approve('${c.id}','changes_requested',this)">✎ Request changes</button>
       </div>
       ${p.slide_assets?`<div class="row" style="margin-top:8px;overflow-x:auto;flex-wrap:nowrap">${p.slide_assets.map(a=>`<img src="/workspaces/${b.grp?b.grp+"/":""}${b.slug}/${a}?t=${Date.now()}" style="width:130px;border-radius:10px;border:1px solid var(--line)">`).join("")}</div>`:""}
+      ${p.scene_assets?`<p class="sub" style="margin:8px 0 4px">Storyboard (${esc((p.reel_studio||{}).style||"")} style):</p><div class="row" style="overflow-x:auto;flex-wrap:nowrap">${p.scene_assets.map(a=>`<img src="/workspaces/${b.grp?b.grp+"/":""}${b.slug}/${a}?t=${Date.now()}" style="width:110px;border-radius:10px;border:1px solid var(--line)">`).join("")}</div>`:""}
       ${p.vo_asset?`<div class="row" style="margin-top:8px"><audio controls src="/workspaces/${b.grp?b.grp+"/":""}${b.slug}/${p.vo_asset}" style="height:32px"></audio><span class="sub" style="margin:0">voiceover — mixed into Build video</span></div>`:""}
       ${p.algo_audit?renderAudit(p.algo_audit):""}
       <div id="vout_${c.id}"></div></div>`;}).join("") : '<div class="card"><p class="sub">No creatives yet — produce one from Ideas or run autopilot.</p></div>';
@@ -729,9 +775,11 @@ async function buildVideo(cid,btn){
     const b=state.brand;
     const c=(await api(`/brands/${b.id}/creatives`)).find(x=>x.id===cid);
     const p=c.payload, s=p.script||{};
-    const img=new Image(); img.crossOrigin="anonymous";
-    img.src=`/workspaces/${b.grp?b.grp+"/":""}${b.slug}/${c.asset_path}?t=${Date.now()}`;
-    await new Promise((res,rej)=>{img.onload=res;img.onerror=()=>rej(new Error("couldn't load visual"));});
+    const base=`/workspaces/${b.grp?b.grp+"/":""}${b.slug}/`;
+    const loadImg=u=>new Promise((res,rej)=>{const im=new Image();im.crossOrigin="anonymous";im.onload=()=>res(im);im.onerror=()=>rej(new Error("couldn't load visual"));im.src=base+u+"?t="+Date.now();});
+    let sceneImgs=[];
+    if(p.scene_assets&&p.scene_assets.length){ sceneImgs=await Promise.all(p.scene_assets.map(loadImg)); }
+    const img=sceneImgs[0]||await loadImg(c.asset_path);
     const cv=document.createElement("canvas"); cv.width=540; cv.height=960;
     const ctx=cv.getContext("2d");
     const stream=cv.captureStream(30);
@@ -752,7 +800,8 @@ async function buildVideo(cid,btn){
     if(voEl){ try{ await voEl.play(); }catch{} }
     const colors=(((b.profile||{}).brand_kit||{}).colors)||["#6366f1"];
     const hook=(s.hook_options||[p.title])[0]||p.title;
-    const texts=(s.shots||[]).map(sh=>sh.on_screen_text).filter(Boolean).slice(0,4);
+    const rsScenes=(p.reel_studio||{}).scenes||[];
+    const texts=(rsScenes.length?rsScenes.map(x=>x.on_screen_text):(s.shots||[]).map(sh=>sh.on_screen_text)).filter(Boolean).slice(0,6);
     if(!texts.length) texts.push(p.cta||"Follow for more");
     function wrap(t,x,y,maxW,lh){
       const words=String(t).split(" "); let line="", yy=y;
@@ -773,8 +822,9 @@ async function buildVideo(cid,btn){
         const i=Math.floor((t-hookSec)/perText);
         const zt=((t-hookSec)%perText)/perText;
         const z=1.05+zt*0.08;
-        const iw=540*z, ih=iw*img.height/img.width;
-        ctx.drawImage(img,(540-iw)/2,(960-ih)/2,iw,ih);
+        const cur=sceneImgs.length?(sceneImgs[Math.min(i,sceneImgs.length-1)]):img;
+        const iw=540*z, ih=iw*cur.height/cur.width;
+        ctx.drawImage(cur,(540-iw)/2,(960-ih)/2,iw,ih);
         ctx.fillStyle="rgba(0,0,0,.45)"; ctx.fillRect(0,700,540,260);
         ctx.fillStyle="#fff"; ctx.font="700 34px Inter,Arial"; ctx.textAlign="center";
         wrap(texts[i]||"",270,790,470,44);
