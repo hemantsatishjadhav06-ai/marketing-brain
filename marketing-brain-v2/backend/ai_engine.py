@@ -326,8 +326,8 @@ def generate_image(prompt, brand_name="", colors=None):
         "model": IMAGE_MODEL,
         "messages": [{"role": "user", "content": (
             f"Generate an image: {prompt}.{color_note} Style: premium social media creative for brand "
-            f"'{brand_name}'. Leave clean negative space in the bottom-right corner for a logo overlay. "
-            f"No text artifacts, no watermarks.")}],
+            f"'{brand_name}'. Keep the composition natural and full-bleed; avoid placing the key subject "
+            f"in the extreme bottom-right corner. No text artifacts, no watermarks, no empty panels.")}],
         "modalities": ["image", "text"],
     }
     headers = {"Authorization": f"Bearer {_key()}", "X-Title": "Marketing Brain v2"}

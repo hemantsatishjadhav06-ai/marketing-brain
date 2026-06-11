@@ -328,23 +328,33 @@ async def upload_logo(bid: str, file: UploadFile = File(...), user=Depends(curre
     blob = await file.read()
     if len(blob) > 4_000_000:
         raise HTTPException(400, "Logo too large (max 4MB)")
+    import base64 as _b64
     ext = "png" if "png" in (file.content_type or "") else "jpg"
     rel = f"brand-profile/logo.{ext}"
     ws.write_bytes(_wslug(b), rel, blob)
     profile = b.get("profile") or {}
     kit = profile.get("brand_kit") or {}
     kit["logo"] = rel
+    if len(blob) <= 400_000:  # persist small logos in the DB so they survive redeploys
+        kit["logo_b64"] = _b64.b64encode(blob).decode()
     profile["brand_kit"] = kit
     db.update_brand(bid, profile=profile)
     return {"ok": True, "logo_url": f"/workspaces/{_wslug(b)}/{rel}"}
 
 
 def _logo_path(b):
+    """Path to the brand logo; restores it from the DB copy if the ephemeral disk lost it."""
+    import base64 as _b64
     kit = (b.get("profile") or {}).get("brand_kit") or {}
     rel = kit.get("logo")
     if not rel:
         return None
     path = os.path.join(ws.brand_dir(_wslug(b)), rel)
+    if not os.path.exists(path) and kit.get("logo_b64"):
+        try:
+            ws.write_bytes(_wslug(b), rel, _b64.b64decode(kit["logo_b64"]))
+        except Exception:
+            return None
     return path if os.path.exists(path) else None
 
 
