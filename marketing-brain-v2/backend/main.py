@@ -750,6 +750,63 @@ def del_competitor(bid: str, cid: str, user=Depends(current_user)):
     return {"ok": True}
 
 
+@app.post("/api/brands/{bid}/creatives/{cid}/slides")
+def slides(bid: str, cid: str, user=Depends(current_user)):
+    """Generate one branded image per carousel slide (logo composited)."""
+    b = _brand_or_404(bid, user)
+    c = db.get_doc("creatives", cid)
+    if not c:
+        raise HTTPException(404, "Creative not found")
+    slide_specs = c["payload"].get("slides") or []
+    if not slide_specs:
+        raise HTTPException(400, "This creative has no slides (not a carousel)")
+    palette = ai_engine.brand_palette(b)
+    assets, errors = [], []
+    for sl in slide_specs[:6]:
+        prompt = (f"Social media carousel slide {sl.get('n')}: headline '{sl.get('headline','')}'. "
+                  f"{sl.get('visual_direction','')}. {sl.get('design_notes','')} "
+                  f"Vertical 4:5 layout, bold readable headline text ON the image.")
+        blob = ai_engine.generate_image(prompt, b["name"], palette)
+        if not blob:
+            errors.append(f"slide {sl.get('n')}")
+            continue
+        blob = _composite_logo(b, blob)
+        rel = f"{c['channel']}/assets/{cid}-slide{sl.get('n')}.png"
+        ws.write_bytes(_wslug(b), rel, blob)
+        assets.append(rel)
+    if not assets:
+        raise HTTPException(502, "Slide generation failed: " + ", ".join(errors))
+    payload = c["payload"]
+    payload["slide_assets"] = assets
+    db.update_doc("creatives", cid, payload=payload, asset_path=assets[0])
+    return {"ok": True, "slides": [f"/workspaces/{_wslug(b)}/{a}" for a in assets], "failed": errors}
+
+
+@app.post("/api/brands/{bid}/creatives/{cid}/voiceover")
+def voiceover(bid: str, cid: str, user=Depends(current_user)):
+    """Generate spoken voiceover audio for a reel script."""
+    b = _brand_or_404(bid, user)
+    c = db.get_doc("creatives", cid)
+    if not c:
+        raise HTTPException(404, "Creative not found")
+    s = c["payload"].get("script") or {}
+    lines = [sh.get("dialogue_or_vo") for sh in (s.get("shots") or []) if sh.get("dialogue_or_vo")]
+    vo_text = " ".join(lines) or c["payload"].get("caption", "")[:400]
+    if not vo_text.strip():
+        raise HTTPException(400, "No voiceover lines found in this creative")
+    try:
+        audio = ai_engine.generate_voiceover(vo_text)
+    except Exception as e:
+        raise HTTPException(502, f"Voiceover failed: {e}")
+    rel = f"{c['channel']}/assets/{cid}-vo.mp3"
+    ws.write_bytes(_wslug(b), rel, audio)
+    payload = c["payload"]
+    payload["vo_asset"] = rel
+    payload["vo_text"] = vo_text[:500]
+    db.update_doc("creatives", cid, payload=payload)
+    return {"ok": True, "vo_url": f"/workspaces/{_wslug(b)}/{rel}", "vo_text": vo_text[:300]}
+
+
 @app.post("/api/brands/{bid}/creatives/{cid}/algo-audit")
 def algo_audit(bid: str, cid: str, user=Depends(current_user)):
     """Audit a creative against Instagram's confirmed ranking signals."""

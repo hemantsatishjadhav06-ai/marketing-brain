@@ -351,6 +351,32 @@ def generate_image(prompt, brand_name="", colors=None):
     return None
 
 
+AUDIO_MODEL = os.environ.get("OPENROUTER_AUDIO_MODEL", "openai/gpt-audio-mini")
+
+
+def generate_voiceover(text, voice="alloy"):
+    """Generate spoken voiceover audio (mp3 bytes) via OpenRouter audio model."""
+    payload = {
+        "model": AUDIO_MODEL,
+        "modalities": ["text", "audio"],
+        "audio": {"voice": voice, "format": "mp3"},
+        "messages": [{"role": "user", "content":
+            f"Read the following voiceover script aloud, naturally and energetically, exactly as written, "
+            f"with no additions or commentary:\n\n{text[:1500]}"}],
+    }
+    headers = {"Authorization": f"Bearer {_key()}", "X-Title": "Marketing Brain v2"}
+    with httpx.Client(timeout=120) as cli:
+        r = cli.post(OPENROUTER_URL, json=payload, headers=headers)
+        r.raise_for_status()
+        data = r.json()
+    msg = data["choices"][0]["message"]
+    audio = msg.get("audio") or {}
+    b64 = audio.get("data")
+    if not b64:
+        raise RuntimeError("Audio model returned no audio")
+    return base64.b64decode(b64)
+
+
 # ---------------------------------------------------------------- growth engine
 # (inspired by the best of OpusClip + vidIQ, adapted to this stack)
 
