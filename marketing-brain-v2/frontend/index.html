@@ -148,6 +148,9 @@ a.skip-link:focus{left:8px}
     <label>Password</label><input id="liPw" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin(this)">
     <button style="width:100%;margin-top:6px" onclick="doLogin(this)">Sign in</button>
     <p class="sub" id="liErr" style="color:var(--err);margin-top:10px"></p>
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line);display:flex;align-items:center;gap:8px;color:var(--mut);font-size:11.5px">
+      <span class="dot" style="width:20px;height:20px;font-size:11px">🐾</span> Powered by <b style="color:var(--yelD)">Marketing Dog</b> — brand-adaptive &amp; accessible by design.
+    </div>
   </div>
 </div>
 
@@ -339,6 +342,7 @@ function renderWizard(){
       <h3>${esc(s.meta?.title||w.name)}</h3>
       <p class="sub">${esc(s.meta?.description||s.meta?.og_description||"No description found.")}</p>
       ${(s.colors||[]).map(c=>`<span class="swatch" style="background:${c}" title="${c}"></span>`).join("")}
+      ${(s.colors&&s.colors.length)?`<div style="margin-top:10px"><button class="sm ghost" onclick="mdPreview('${s.colors[0]}')">🎨 Preview this brand's theme</button> <button class="sm ghost" onclick="mdPreviewReset()">Reset</button><span class="sub" style="margin-left:8px">See the whole app wear ${esc(w.name||"this brand")}'s colours before you build.</span></div>`:""}
       <h3>Discovered socials</h3>
       <p>${Object.entries(s.socials||{}).map(([k,v])=>`<span class="tag g">${k}: ${esc(v)}</span>`).join("")||'<span class="sub">none found</span>'}</p>
       <div class="row" style="margin-top:10px">
@@ -1142,7 +1146,7 @@ boot();
     if(!isHex(primary))primary=DOG; primary=norm(primary);
     const t=buildTheme(primary)[MODE], R=document.documentElement.style, S=(k,v)=>R.setProperty(k,v);
     S('--bg',t.bg);S('--bg2',t.bg2);S('--panel',t.panel);S('--panel2',t.panel2);S('--line',t.line);
-    S('--txt',t.ink);S('--mut',t.mute);S('--yel',t.accent);S('--yelInk',t.accentInk);
+    S('--txt',t.ink);S('--mut',ensure(t.mute,MODE==='dark'?t.panel:t.bg,4.5));S('--yel',t.accent);S('--yelInk',t.accentInk);
     const yelBg=withL(t.accent,MODE==='dark'?0.27:0.93,0.7);S('--yelBg',yelBg);S('--yelD',ensure(t.accent,yelBg,4.5));
     S('--grn',t.good);S('--grnBg',withL(t.good,MODE==='dark'?0.27:0.93,0.6));S('--grnInk',ensure(bestFg(t.good),t.good,4.5));
     S('--warn',t.warn);S('--err',t.danger);
@@ -1156,9 +1160,12 @@ boot();
   function updateIdentity(){const el=document.querySelector('#shell aside .logo');if(!el)return;let b=null;try{b=(typeof state!=='undefined'&&state)?state.brand:null;}catch(e){}
     if(b&&b.name){const lg=brandLogo();el.innerHTML=(lg?'<img src="'+lg+'" alt="" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'" style="width:26px;height:26px;border-radius:7px;object-fit:contain;background:var(--panel);border:1px solid var(--line)">':'<span class="dot">🐕</span>')+' <span style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle">'+esc2(b.name)+'</span>';}
     else{el.innerHTML='<span class="dot">🐕</span> Marketing Dog';}}
-  function reskin(){apply(OVERRIDE||brandPrimary()||DOG);updateIdentity();}
+  let PREVIEW=null, LASTBRAND='__init__';
+  function reskin(){apply(PREVIEW||OVERRIDE||brandPrimary()||DOG);updateIdentity();}
   window.mdReskin=reskin;
-  setInterval(function(){let b=null;try{b=(typeof state!=='undefined'&&state)?state.brand:null;}catch(e){}const p=brandPrimary();const key=(OVERRIDE||'')+'|'+MODE+'|'+(b?b.id:'dash')+'|'+(p||'dog');if(key!==LASTKEY){LASTKEY=key;reskin();}},500);
+  window.mdPreview=function(h){PREVIEW=h||null;LASTKEY='';reskin();};
+  window.mdPreviewReset=function(){PREVIEW=null;LASTKEY='';reskin();};
+  setInterval(function(){let b=null;try{b=(typeof state!=='undefined'&&state)?state.brand:null;}catch(e){}var bid=b?b.id:'dash';if(bid!==LASTBRAND){LASTBRAND=bid;PREVIEW=null;}const p=brandPrimary();const key=(PREVIEW||'')+'|'+(OVERRIDE||'')+'|'+MODE+'|'+bid+'|'+(p||'dog');if(key!==LASTKEY){LASTKEY=key;reskin();}},500);
 
   function segState(){document.querySelectorAll('#mdAppear .seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.m===MODE));}
   function mount(){
