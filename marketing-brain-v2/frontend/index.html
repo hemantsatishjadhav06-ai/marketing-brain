@@ -112,6 +112,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--yel);box-shadow:0 0 0
 .spinner{border-color:color-mix(in srgb,var(--mut) 35%,transparent);border-top-color:var(--yel)}
 #login{background:radial-gradient(95% 70% at 50% -10%,color-mix(in srgb,var(--yel) 16%,transparent),transparent 70%),var(--bg)}
 pre,.aplog{color:var(--txt);background:var(--panel2)}
+.phone{border-top:3px solid var(--yel)}
+.phone .ph-h img{border:2px solid var(--yel)!important}
+.phone .ph-h span,.phone .ph-c b{color:var(--yelD)}
+.idea{border-left:3px solid var(--yel)}
+.kpi{border-top:2px solid var(--yelBg)}
 .checklist li,.phone .ph-c,.phone .ph-a,.markdown td,.markdown th{color:var(--txt)}
 .sub,label{color:var(--mut)}
 /* accessibility */
@@ -1146,9 +1151,14 @@ boot();
     if(aa){const ok=contrast(t.ink,t.bg)>=4.5&&contrast(t.accentInk,t.accent)>=4.5;aa.textContent=ok?'WCAG AA ✓':'check';aa.style.background=ok?'var(--grn)':'var(--err)';aa.style.color=ok?'var(--grnInk)':'#fff';}
     const ci=document.getElementById('mdColor');if(ci&&isHex(primary))ci.value=primary;
   }
-  function reskin(){apply(OVERRIDE||brandPrimary()||DOG);}
+  function esc2(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+  function brandLogo(){try{const b=(typeof state!=='undefined'&&state)?state.brand:null;if(!b)return null;const k=(b.profile&&b.profile.brand_kit)||{};if(k.logo)return '/workspaces/'+(b.grp?b.grp+'/':'')+b.slug+'/'+k.logo;if(b.scrape&&b.scrape.logo)return b.scrape.logo;return null;}catch(e){return null;}}
+  function updateIdentity(){const el=document.querySelector('#shell aside .logo');if(!el)return;let b=null;try{b=(typeof state!=='undefined'&&state)?state.brand:null;}catch(e){}
+    if(b&&b.name){const lg=brandLogo();el.innerHTML=(lg?'<img src="'+lg+'" alt="" referrerpolicy="no-referrer" onerror="this.style.display=\'none\'" style="width:26px;height:26px;border-radius:7px;object-fit:contain;background:var(--panel);border:1px solid var(--line)">':'<span class="dot">🐕</span>')+' <span style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle">'+esc2(b.name)+'</span>';}
+    else{el.innerHTML='<span class="dot">🐕</span> Marketing Dog';}}
+  function reskin(){apply(OVERRIDE||brandPrimary()||DOG);updateIdentity();}
   window.mdReskin=reskin;
-  setInterval(function(){const p=brandPrimary();const key=(OVERRIDE||'')+'|'+MODE+'|'+(p||'dog');if(key!==LASTKEY){LASTKEY=key;reskin();}},500);
+  setInterval(function(){let b=null;try{b=(typeof state!=='undefined'&&state)?state.brand:null;}catch(e){}const p=brandPrimary();const key=(OVERRIDE||'')+'|'+MODE+'|'+(b?b.id:'dash')+'|'+(p||'dog');if(key!==LASTKEY){LASTKEY=key;reskin();}},500);
 
   function segState(){document.querySelectorAll('#mdAppear .seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.m===MODE));}
   function mount(){
