@@ -18,7 +18,7 @@ h1,h2,h3,h4{font-weight:700;letter-spacing:-.01em}
 #shell.on{display:flex}
 aside{width:240px;min-width:240px;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
 .logo{display:flex;align-items:center;gap:9px;padding:20px 18px 14px;font-size:16px;font-weight:800}
-.logo .dot{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,#6366f1,#a855f7);display:grid;place-items:center;font-size:14px}
+.logo .dot{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,var(--yel),var(--grn));display:grid;place-items:center;font-size:14px}
 nav{flex:1;overflow-y:auto;padding:6px 10px}
 .navsec{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--mut);padding:14px 10px 5px}
 .navitem{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:9px;cursor:pointer;color:var(--txt);font-weight:500;margin:1px 0}
@@ -408,7 +408,7 @@ function renderBrand(){
   const tabs=["overview","brand kit","ideas","growth","campaigns","reel studio","calendar","creatives","publish","analytics","competitors","coach","connectors"];
   $("main").innerHTML=`
     <div class="row" style="margin-bottom:4px">
-      ${logoUrl(b)?`<img class="brandlogo" src="${logoUrl(b)}">`:""}
+      ${logoUrl(b)?`<img class="brandlogo" alt="${esc(b.name)} logo" src="${logoUrl(b)}">`:""}
       <h1 style="font-size:21px">${esc(b.name)}</h1>
       ${(k.colors||[]).slice(0,4).map(c=>`<span class="swatch" style="width:18px;height:18px;background:${c}" title="${c}"></span>`).join("")}
       <span class="sp" style="flex:1"></span>
@@ -457,7 +457,7 @@ async function tabKit(){
       <textarea id="kitStyle" rows="2">${esc(k.style||"")}</textarea>
       <button onclick="saveKit(this)">Save brand kit</button>
       <h3 style="margin-top:20px">Logo</h3>
-      ${logoUrl(state.brand)?`<img class="brandlogo" style="width:84px;height:84px" src="${logoUrl(state.brand)}">`:'<p class="sub">No logo uploaded yet.</p>'}
+      ${logoUrl(state.brand)?`<img class="brandlogo" alt="${esc(state.brand.name)} logo" style="width:84px;height:84px" src="${logoUrl(state.brand)}">`:'<p class="sub">No logo uploaded yet.</p>'}
       <label style="display:block;margin-top:8px">Upload logo (PNG with transparency works best)</label>
       <input type="file" id="logoFile" accept="image/*" style="padding:7px">
       <button class="ghost" onclick="uploadLogo(this)">Upload logo</button>
@@ -740,8 +740,8 @@ async function tabCreatives(){
       <div class="row"><h2>${esc(p.title)}</h2><span class="tag y">${c.channel}</span><span class="tag">${esc(p.format)}</span>${apBadge(p)}</div>
       ${renderPackage(p)}
       ${c.asset_path?`<div class="row" style="align-items:flex-start;margin-top:10px">
-        <div class="phone"><div class="ph-h">${logoUrl(b)?`<img src="${logoUrl(b)}">`:""}<span>${esc(b.name)}</span></div>
-          <img class="ph-img" src="${assetUrl(b,c.asset_path)}${c.asset_path.startsWith("http")?"":"?t="+Date.now()}">
+        <div class="phone"><div class="ph-h">${logoUrl(b)?`<img alt="" src="${logoUrl(b)}">`:""}<span>${esc(b.name)}</span></div>
+          <img class="ph-img" alt="${esc(p.title||b.name)} — branded visual" loading="lazy" src="${assetUrl(b,c.asset_path)}${c.asset_path.startsWith("http")?"":"?t="+Date.now()}">
           <div class="ph-a"><span>❤️</span><span>💬</span><span>➤</span></div>
           <div class="ph-c"><b>${esc(b.name.toLowerCase().replace(/\s/g,""))}</b> ${esc((p.caption||"").slice(0,120))}</div></div>
         </div>`:""}
@@ -757,8 +757,8 @@ async function tabCreatives(){
         <button class="sm grn" onclick="approve('${c.id}','approved',this)">✓ Approve</button>
         <button class="sm ghost" onclick="approve('${c.id}','changes_requested',this)">✎ Request changes</button>
       </div>
-      ${p.slide_assets?`<div class="row" style="margin-top:8px;overflow-x:auto;flex-wrap:nowrap">${p.slide_assets.map(a=>`<img src="${assetUrl(b,a)}" style="width:130px;border-radius:10px;border:1px solid var(--line)">`).join("")}</div>`:""}
-      ${p.scene_assets?`<p class="sub" style="margin:8px 0 4px">Storyboard (${esc((p.reel_studio||{}).style||"")} style):</p><div class="row" style="overflow-x:auto;flex-wrap:nowrap">${p.scene_assets.map(a=>`<img src="${assetUrl(b,a)}" style="width:110px;border-radius:10px;border:1px solid var(--line)">`).join("")}</div>`:""}
+      ${p.slide_assets?`<div class="row" style="margin-top:8px;overflow-x:auto;flex-wrap:nowrap">${p.slide_assets.map((a,i)=>`<img alt="Slide ${i+1}" loading="lazy" src="${assetUrl(b,a)}" style="width:130px;border-radius:10px;border:1px solid var(--line)">`).join("")}</div>`:""}
+      ${p.scene_assets?`<p class="sub" style="margin:8px 0 4px">Storyboard (${esc((p.reel_studio||{}).style||"")} style):</p><div class="row" style="overflow-x:auto;flex-wrap:nowrap">${p.scene_assets.map((a,i)=>`<img alt="Storyboard scene ${i+1}" loading="lazy" src="${assetUrl(b,a)}" style="width:110px;border-radius:10px;border:1px solid var(--line)">`).join("")}</div>`:""}
       ${p.vo_asset?`<div class="row" style="margin-top:8px"><audio controls src="${assetUrl(b,p.vo_asset)}" style="height:32px"></audio><span class="sub" style="margin:0">voiceover — mixed into Build video</span></div>`:""}
       ${p.algo_audit?renderAudit(p.algo_audit):""}
       <div id="vout_${c.id}"></div></div>`;}).join("") : '<div class="card"><p class="sub">No creatives yet — produce one from Ideas or run autopilot.</p></div>';

@@ -10,8 +10,9 @@ from datetime import date, timedelta
 import httpx
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+OPENROUTER_IMAGE_URL = "https://openrouter.ai/api/v1/images"
 MODEL = os.environ.get("OPENROUTER_MODEL", "openai/gpt-4o-mini")
-IMAGE_MODEL = os.environ.get("OPENROUTER_IMAGE_MODEL", "google/gemini-2.5-flash-image")
+IMAGE_MODEL = os.environ.get("OPENROUTER_IMAGE_MODEL", "openai/gpt-image-1")
 
 
 def _key():
@@ -319,36 +320,85 @@ Return JSON:
 
 # ---------------------------------------------------------------- images
 
-def generate_image(prompt, brand_name="", colors=None):
-    """Generate an image via OpenRouter (Gemini image model). Returns bytes or None."""
-    color_note = f" STRICT BRAND PALETTE: use these exact hex colors as the dominant scheme: {', '.join(colors)}." if colors else ""
+def _art_direct(prompt, brand_name="", colors=None):
+    """Wrap a raw idea in a designer-grade brief so the model behaves like the
+    brand's in-house art director. The logo is composited on afterwards, so we
+    explicitly forbid any text/logo in the generated pixels."""
+    palette = ""
+    if colors:
+        palette = " Use ONLY this brand palette as the dominant colours: " + ", ".join(colors) + "."
+    return (
+        f"Premium social-media marketing visual for the brand '{brand_name}'. "
+        f"Subject: {prompt}.{palette} "
+        "Art direction: cinematic, aspirational, editorial magazine quality; clean balanced "
+        "composition with generous negative space; natural realistic lighting, high dynamic range, "
+        "crisp detail; full-bleed and uncluttered. ABSOLUTELY NO text, words, letters, numbers, "
+        "logos, watermarks or UI in the image (branding is added afterwards). Keep the extreme "
+        "bottom-right corner clean for a logo."
+    )
+
+
+def _img_from_images_api(model, prompt, timeout=180):
+    """Primary path: OpenRouter's dedicated Images API (/api/v1/images). Correct for
+    dedicated image models such as openai/gpt-image-1, seedream, flux, recraft and the
+    gemini image models. Returns raw image bytes or None."""
+    payload = {"model": model, "prompt": prompt, "aspect_ratio": "1:1", "resolution": "2K"}
+    headers = {
+        "Authorization": f"Bearer {_key()}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://marketing-brain.app",
+        "X-Title": "Marketing Brain v2",
+    }
+    with httpx.Client(timeout=timeout) as cli:
+        r = cli.post(OPENROUTER_IMAGE_URL, json=payload, headers=headers)
+        r.raise_for_status()
+        data = r.json()
+    items = data.get("data") or []
+    if items and items[0].get("b64_json"):
+        return base64.b64decode(items[0]["b64_json"])
+    return None
+
+
+def _img_from_chat_api(model, prompt, timeout=180):
+    """Fallback path: chat-completions with image modalities (older gemini-style models
+    that return images inside message.images). Returns raw image bytes or None."""
     payload = {
-        "model": IMAGE_MODEL,
-        "messages": [{"role": "user", "content": (
-            f"Generate an image: {prompt}.{color_note} Style: premium social media creative for brand "
-            f"'{brand_name}'. Keep the composition natural and full-bleed; avoid placing the key subject "
-            f"in the extreme bottom-right corner. No text artifacts, no watermarks, no empty panels.")}],
+        "model": model,
+        "messages": [{"role": "user", "content": f"Generate an image: {prompt}"}],
         "modalities": ["image", "text"],
     }
     headers = {"Authorization": f"Bearer {_key()}", "X-Title": "Marketing Brain v2"}
+    with httpx.Client(timeout=timeout) as cli:
+        r = cli.post(OPENROUTER_URL, json=payload, headers=headers)
+        r.raise_for_status()
+        data = r.json()
+    msg = data["choices"][0]["message"]
+    for im in (msg.get("images") or []):
+        url = im.get("image_url", {}).get("url", "")
+        if url.startswith("data:image"):
+            return base64.b64decode(url.split(",", 1)[1])
+        if url.startswith("http"):
+            with httpx.Client(timeout=60) as cli2:
+                return cli2.get(url).content
+    return None
+
+
+def generate_image(prompt, brand_name="", colors=None, model=None):
+    """Generate a branded social image via OpenRouter. Tries the dedicated Images API
+    first (correct for GPT Image 1 and other image models), then falls back to the
+    chat-image path for gemini-style models. Returns PNG/JPEG bytes or None."""
+    model = model or IMAGE_MODEL
+    brief = _art_direct(prompt, brand_name, colors)
     try:
-        with httpx.Client(timeout=180) as cli:
-            r = cli.post(OPENROUTER_URL, json=payload, headers=headers)
-            r.raise_for_status()
-            data = r.json()
-        msg = data["choices"][0]["message"]
-        images = msg.get("images") or []
-        if images:
-            url = images[0].get("image_url", {}).get("url", "")
-            if url.startswith("data:image"):
-                b64 = url.split(",", 1)[1]
-                return base64.b64decode(b64)
-            if url.startswith("http"):
-                with httpx.Client(timeout=60) as cli:
-                    return cli.get(url).content
+        blob = _img_from_images_api(model, brief)
+        if blob:
+            return blob
+    except Exception:
+        pass
+    try:
+        return _img_from_chat_api(model, brief)
     except Exception:
         return None
-    return None
 
 
 AUDIO_MODEL = os.environ.get("OPENROUTER_AUDIO_MODEL", "openai/gpt-audio-mini")
