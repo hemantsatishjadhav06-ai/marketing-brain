@@ -36,3 +36,14 @@ and is now fixed, so the autopilot image step works too. Other agents were left 
 ## Reminders
 - Rotate the OpenRouter key and the GitHub token that were shared in chat.
 - Set the repo back to **private** once you've pushed.
+
+## Update 2 — All projects in the chatbot, voice & a master directory
+- `backend/projects.py`: structured directory of every MoreSpace project — Neopolis (Kokapet),
+  Rajendra Nagar, Manchirevula/Narsingi, and Soul of Earth (Kukatpally) — each with area,
+  corridor, configs, sizes, price, highlights and its morespace.ai link. morespace.ai is set
+  as the MASTER website for all projects.
+- AI coach chatbot (`/api/brands/{id}/chat`) now answers property/area/budget questions with the
+  exact project link + in-depth details, combining corridor + developer info, and never invents prices.
+- Voice/reel scripts and every generator (ideas, calendar, creatives) are project-aware via a short
+  pointer injected into the shared brand context — so spoken/voiceover content references real projects.
+- New public endpoint `GET /api/projects` and a "Projects" tab in the app = the master directory with links.

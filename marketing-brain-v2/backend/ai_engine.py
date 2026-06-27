@@ -9,6 +9,8 @@ from datetime import date, timedelta
 
 import httpx
 
+from . import projects
+
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_IMAGE_URL = "https://openrouter.ai/api/v1/images"
 MODEL = os.environ.get("OPENROUTER_MODEL", "openai/gpt-4o-mini")
@@ -92,7 +94,7 @@ def _brand_context(brand):
         "brand_colors_hex": colors,
         "visual_style": kit.get("style"),
     }
-    return json.dumps({k: v for k, v in ctx.items() if v}, ensure_ascii=False)
+    return json.dumps({k: v for k, v in ctx.items() if v}, ensure_ascii=False) + projects.pointer(brand.get("name", ""))
 
 
 def brand_palette(brand):
@@ -770,6 +772,7 @@ def coach_chat(brand, workspace_digest, history, message):
         "can do (generate ideas, build calendar, produce creatives, score, SEO research, trends, "
         "competitor analysis), do your best in chat AND point them to the right tab/button.\n\n"
         f"BRAND CONTEXT: {_brand_context(brand)}\n\n"
+        f"{projects.context_block(brand.get('name', ''))}\n\n"
         f"WORKSPACE DATA: {json.dumps(workspace_digest, ensure_ascii=False)[:6000]}"
     )
     msgs = [{"role": "system", "content": system}]

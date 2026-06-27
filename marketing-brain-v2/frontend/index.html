@@ -405,7 +405,7 @@ function kitOf(b){ return ((b.profile||{}).brand_kit)||{}; }
 function logoUrl(b){ const k=kitOf(b); return k.logo?`/workspaces/${b.grp?b.grp+"/":""}${b.slug}/${k.logo}`:null; }
 function renderBrand(){
   const b=state.brand, k=kitOf(b);
-  const tabs=["overview","brand kit","ideas","growth","campaigns","reel studio","calendar","creatives","publish","analytics","competitors","coach","connectors"];
+  const tabs=["overview","brand kit","ideas","growth","campaigns","reel studio","calendar","creatives","publish","analytics","competitors","coach","projects","connectors"];
   $("main").innerHTML=`
     <div class="row" style="margin-bottom:4px">
       ${logoUrl(b)?`<img class="brandlogo" alt="${esc(b.name)} logo" src="${logoUrl(b)}">`:""}
@@ -417,7 +417,7 @@ function renderBrand(){
     <p class="sub">${esc(b.website||"")} ${b.grp?` · 📁 ${esc(b.grp)}`:""} · ${(b.setup?.channels||[]).join(" · ")}</p>
     <div class="tabs">${tabs.map(t=>`<div class="tab ${state.tab===t?'on':''}" onclick="state.tab='${t}';renderBrand()">${t[0].toUpperCase()+t.slice(1)}</div>`).join("")}</div>
     <div id="tabBody"><span class="spinner"></span></div>`;
-  ({"overview":tabOverview,"brand kit":tabKit,"ideas":tabIdeas,"growth":tabGrowth,"campaigns":tabCampaigns,"reel studio":tabReelStudio,"calendar":tabCalendar,"creatives":tabCreatives,"publish":tabPublish,"analytics":tabAnalytics,"competitors":tabCompetitors,"coach":tabCoach,"connectors":tabConnectors})[state.tab]();
+  ({"overview":tabOverview,"brand kit":tabKit,"ideas":tabIdeas,"growth":tabGrowth,"campaigns":tabCampaigns,"reel studio":tabReelStudio,"calendar":tabCalendar,"creatives":tabCreatives,"publish":tabPublish,"analytics":tabAnalytics,"competitors":tabCompetitors,"coach":tabCoach,"projects":tabProjects,"connectors":tabConnectors})[state.tab]();
 }
 async function runAutopilot(btn){
   busy(btn,true,"Engaging…");
@@ -966,6 +966,22 @@ async function genInsights(btn){
       <p class="sub">🧪 ${esc(ins.experiment_to_run||"")}</p>`;
     busy(btn,false);
   }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+
+async function tabProjects(){
+  const el=$("tabBody"); el.innerHTML='<span class="spinner"></span>';
+  let d; try{ d=await api("/projects"); }catch(e){ el.innerHTML='<p class="sub">Could not load projects.</p>'; return; }
+  el.innerHTML=`<div class="card">
+    <div class="row"><h2>MoreSpace projects</h2><span class="tag y">master directory</span></div>
+    <p class="sub" style="margin-bottom:10px">Master site: <a href="${d.master_site}" target="_blank" rel="noopener">${esc(d.master_site)}</a> &middot; ${esc(d.contact.phone)} &middot; ${esc(d.contact.email)}</p>
+    ${d.projects.map(p=>`<div class="idea" style="margin:10px 0">
+      <div class="row"><b>${esc(p.name)}</b><span class="tag">${esc(p.status)}</span></div>
+      <p class="sub" style="margin:4px 0">${esc(p.area)} &middot; corridor: ${esc(p.corridor)}</p>
+      <p style="margin:4px 0">${esc(p.configs)} &middot; ${esc(p.sizes)} &middot; <b>${esc(p.price)}</b></p>
+      <ul style="margin:6px 0 8px 18px">${(p.highlights||[]).map(h=>`<li>${esc(h)}</li>`).join("")}</ul>
+      <a href="${p.url}" target="_blank" rel="noopener">View project &rarr;</a>
+    </div>`).join("")}
+  </div>`;
 }
 
 /* ---------- AI coach ---------- */

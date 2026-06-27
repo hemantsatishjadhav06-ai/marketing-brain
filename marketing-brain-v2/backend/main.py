@@ -22,7 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import ai_engine, auth, connectors, database as db, scraper, storage, trend_scanner, workspace as ws
+from . import ai_engine, auth, connectors, database as db, projects, scraper, storage, trend_scanner, workspace as ws
 
 app = FastAPI(title="Marketing Brain v2", version="3.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -1268,6 +1268,12 @@ def _latest_insights(bid):
 
 ws_root = os.path.abspath(ws.WORKSPACES_ROOT)
 os.makedirs(ws_root, exist_ok=True)
+@app.get("/api/projects")
+def list_projects():
+    """Public master directory of all MoreSpace projects."""
+    return projects.directory()
+
+
 app.mount("/workspaces", StaticFiles(directory=ws_root), name="workspaces")
 
 frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend"))
