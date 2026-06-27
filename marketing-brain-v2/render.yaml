@@ -11,7 +11,7 @@ services:
       - key: OPENROUTER_MODEL
         value: openai/gpt-4o-mini
       - key: OPENROUTER_IMAGE_MODEL
-        value: google/gemini-2.5-flash-image
+        value: openai/gpt-image-1
       - key: DB_PATH
         value: /var/data/marketing_brain.db
       - key: WORKSPACES_ROOT
