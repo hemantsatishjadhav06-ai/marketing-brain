@@ -1305,6 +1305,83 @@ def list_projects():
     return projects.directory()
 
 
+# ------------------------------------------------------------- v3 Studio (guided wizard)
+class StudioMoodIn(BaseModel):
+    topic: str = ""
+    format: str = "post"
+
+
+class StudioImageIn(BaseModel):
+    prompt: str
+    reference: str | None = None
+
+
+class StudioCarouselIn(BaseModel):
+    prompts: list = []
+
+
+class StudioSaveIn(BaseModel):
+    title: str = "Untitled post"
+    caption: str = ""
+    asset_path: str | None = None
+    format: str = "post"
+
+
+@app.post("/api/brands/{bid}/studio/moodboard")
+def studio_moodboard(bid: str, body: StudioMoodIn, user=Depends(current_user)):
+    """Art director: topic -> creative direction + ready image prompt + caption (+ slide prompts)."""
+    b = _brand_or_404(bid, user)
+    try:
+        return ai_engine.studio_moodboard(b, body.topic, body.format)
+    except Exception as e:
+        raise HTTPException(502, f"Moodboard failed: {e}")
+
+
+@app.post("/api/brands/{bid}/studio/image")
+def studio_image(bid: str, body: StudioImageIn, user=Depends(current_user)):
+    """Generate one image (optional paste reference) with the brand logo composited on."""
+    b = _brand_or_404(bid, user)
+    refs = [body.reference] if body.reference else None
+    blob = ai_engine.generate_image(body.prompt, b["name"], ai_engine.brand_palette(b), references=refs)
+    if not blob:
+        raise HTTPException(502, "Image generation failed (model returned no image). Try again.")
+    blob = _composite_logo(b, blob)
+    rel = f"studio/assets/{int(time.time()*1000)}.png"
+    ref = _save_asset(b, rel, blob)
+    url = ref if ref.startswith("http") else f"/workspaces/{_wslug(b)}/{ref}"
+    return {"asset_path": ref, "asset_url": url}
+
+
+@app.post("/api/brands/{bid}/studio/carousel")
+def studio_carousel(bid: str, body: StudioCarouselIn, user=Depends(current_user)):
+    """Generate carousel slides, logo composited on EVERY slide."""
+    b = _brand_or_404(bid, user)
+    out = []
+    for i, pr in enumerate((body.prompts or [])[:6]):
+        blob = ai_engine.generate_image(pr, b["name"], ai_engine.brand_palette(b))
+        if not blob:
+            continue
+        blob = _composite_logo(b, blob)
+        rel = f"studio/assets/{int(time.time()*1000)}-{i}.png"
+        ref = _save_asset(b, rel, blob)
+        url = ref if ref.startswith("http") else f"/workspaces/{_wslug(b)}/{ref}"
+        out.append({"asset_path": ref, "asset_url": url})
+    if not out:
+        raise HTTPException(502, "Carousel generation failed.")
+    return {"slides": out}
+
+
+@app.post("/api/brands/{bid}/studio/save")
+def studio_save(bid: str, body: StudioSaveIn, user=Depends(current_user)):
+    """Save a finished post to the content board (creatives)."""
+    b = _brand_or_404(bid, user)
+    cid = db.insert_doc("creatives", bid, {"title": body.title, "caption": body.caption, "format": body.format},
+                        channel="instagram", format=body.format)
+    if body.asset_path:
+        db.update_doc("creatives", cid, asset_path=body.asset_path)
+    return {"ok": True, "creative_id": cid}
+
+
 app.mount("/workspaces", StaticFiles(directory=ws_root), name="workspaces")
 
 frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend"))

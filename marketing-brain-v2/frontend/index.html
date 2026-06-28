@@ -398,14 +398,17 @@ async function wizSetup(btn){
 
 /* ---------- brand workspace ---------- */
 async function openBrand(id){
-  state.brand=await api("/brands/"+id); state.view="brand"; state.tab="overview"; renderSidebar(); renderBrand();
+  state.brand=await api("/brands/"+id); state.view="brand"; state.tab="create"; state.create=null; renderSidebar(); renderBrand();
 }
 function assetUrl(b,a){ return a&&a.startsWith("http")?a:`/workspaces/${b.grp?b.grp+"/":""}${b.slug}/${a}`; }
 function kitOf(b){ return ((b.profile||{}).brand_kit)||{}; }
 function logoUrl(b){ const k=kitOf(b); return k.logo?`/workspaces/${b.grp?b.grp+"/":""}${b.slug}/${k.logo}`:null; }
 function renderBrand(){
   const b=state.brand, k=kitOf(b);
-  const tabs=["overview","brand kit","ideas","growth","campaigns","reel studio","calendar","creatives","publish","analytics","competitors","coach","projects","playbook","connectors"];
+  const LBL={create:"✨ New post",calendar:"🗓 Content board",projects:"🏙 Projects",coach:"💬 Coach"};
+  const core=["create","calendar","projects","coach"];
+  const extra=["overview","brand kit","ideas","growth","campaigns","reel studio","creatives","publish","analytics","competitors","playbook","connectors"];
+  const tabs=state.showAll?core.concat(extra):core;
   $("main").innerHTML=`
     <div class="row" style="margin-bottom:4px">
       ${logoUrl(b)?`<img class="brandlogo" alt="${esc(b.name)} logo" src="${logoUrl(b)}">`:""}
@@ -415,9 +418,9 @@ function renderBrand(){
       <button class="grn sm" onclick="runAutopilot(this)">🤖 Run autopilot</button>
     </div>
     <p class="sub">${esc(b.website||"")} ${b.grp?` · 📁 ${esc(b.grp)}`:""} · ${(b.setup?.channels||[]).join(" · ")}</p>
-    <div class="tabs">${tabs.map(t=>`<div class="tab ${state.tab===t?'on':''}" onclick="state.tab='${t}';renderBrand()">${t[0].toUpperCase()+t.slice(1)}</div>`).join("")}</div>
+    <div class="tabs">${tabs.map(t=>`<div class="tab ${state.tab===t?'on':''}" onclick="state.tab='${t}';renderBrand()">${LBL[t]||(t[0].toUpperCase()+t.slice(1))}</div>`).join("")}<div class="tab" style="margin-left:auto;opacity:.85" onclick="state.showAll=!state.showAll;renderBrand()">${state.showAll?'Less ▲':'More ▼'}</div></div>
     <div id="tabBody"><span class="spinner"></span></div>`;
-  ({"overview":tabOverview,"brand kit":tabKit,"ideas":tabIdeas,"growth":tabGrowth,"campaigns":tabCampaigns,"reel studio":tabReelStudio,"calendar":tabCalendar,"creatives":tabCreatives,"publish":tabPublish,"analytics":tabAnalytics,"competitors":tabCompetitors,"coach":tabCoach,"projects":tabProjects,"playbook":tabPlaybook,"connectors":tabConnectors})[state.tab]();
+  ({"create":tabCreate,"overview":tabOverview,"brand kit":tabKit,"ideas":tabIdeas,"growth":tabGrowth,"campaigns":tabCampaigns,"reel studio":tabReelStudio,"calendar":tabCalendar,"creatives":tabCreatives,"publish":tabPublish,"analytics":tabAnalytics,"competitors":tabCompetitors,"coach":tabCoach,"projects":tabProjects,"playbook":tabPlaybook,"connectors":tabConnectors})[state.tab]();
 }
 async function runAutopilot(btn){
   busy(btn,true,"Engaging…");
@@ -1016,6 +1019,65 @@ async function runPlaybook(sys,prompt,btn){
     }
   }catch(e){ busy(btn,false); toast(e.message,true); }
 }
+
+function _cstate(){ if(!state.create) state.create={step:1,topic:"",fmt:"post",mood:null,prompt:"",reference:null,refName:"",imageUrl:null,assetPath:null,slides:[],caption:"",busy:false}; return state.create; }
+function cReset(){ state.create=null; tabCreate(); }
+function cFmt(f){ const t=$("cTopic"); if(t) state.create.topic=t.value; state.create.fmt=f; tabCreate(); }
+function tabCreate(){
+  const c=_cstate(); const el=$("tabBody"); if(!el) return;
+  const dot=(n,label)=>`<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:${c.step>=n?'var(--yelD)':'var(--mut)'}"><span style="width:20px;height:20px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:11px;background:${c.step>=n?'var(--yel)':'var(--mut)'}">${c.step>n?'✓':n}</span>${label}</span>`;
+  const steps=`<div class="row" style="gap:16px;flex-wrap:wrap;margin-bottom:14px">${dot(1,'Brief')}${dot(2,'Moodboard')}${dot(3,'Image')}${dot(4,'Caption')}${dot(5,'Done')}</div>`;
+  let body="";
+  if(c.step===1){
+    body=`<div class="card"><h3>1 &middot; What's this post about?</h3>
+      <p class="sub">Tell me the goal or topic. The art-director agent turns it into a creative direction, an image prompt, and a caption &mdash; you don't fill anything else.</p>
+      <textarea id="cTopic" placeholder="e.g. Why Kokapet is Hyderabad's best investment corridor right now" style="width:100%;min-height:80px;margin:8px 0">${esc(c.topic)}</textarea>
+      <div class="row" style="gap:8px;margin:6px 0">
+        <button class="choice ${c.fmt==='post'?'on':''}" onclick="cFmt('post')">\u{1F5BC} Single post</button>
+        <button class="choice ${c.fmt==='carousel'?'on':''}" onclick="cFmt('carousel')">\u{1F3A0} Carousel</button>
+      </div>
+      <button class="grn" onclick="cMood(this)">Get creative direction →</button></div>`;
+  } else if(c.step===2){
+    body=`<div class="card"><h3>2 &middot; Creative direction (your moodboard)</h3>
+      <p style="white-space:pre-wrap;background:var(--panel2);padding:10px;border-radius:10px">${esc((c.mood&&c.mood.direction)||"")}</p>
+      <label style="font-weight:600;font-size:13px">Image prompt &mdash; edit if you like</label>
+      <textarea id="cPrompt" style="width:100%;min-height:90px;margin:6px 0">${esc(c.prompt)}</textarea>
+      <label style="font-weight:600;font-size:13px">Optional: paste/upload a reference image (a Pinterest screenshot, a look you like)</label>
+      <input type="file" accept="image/*" onchange="cRef(this)" style="display:block;margin:6px 0">
+      ${c.reference?`<img src="${c.reference}" style="height:64px;border-radius:8px;border:1px solid var(--line)"> <span class="sub">${esc(c.refName)}</span>`:''}
+      <div class="row" style="gap:8px;margin-top:10px"><button class="ghost sm" onclick="state.create.step=1;tabCreate()">← Back</button><button class="grn" onclick="cGenerate(this)">\u{1F3A8} Generate ${c.fmt==='carousel'?'carousel':'image'} →</button></div></div>`;
+  } else if(c.step===3){
+    if(c.busy){
+      body=`<div class="card" style="text-align:center;padding:42px"><span class="spinner"></span><p class="sub" style="margin-top:12px">\u{1F3A8} Painting your ${c.fmt} in MoreSpace colours… (GPT Image 1, ~15-30s)</p></div>`;
+    } else {
+      const imgs = c.fmt==='carousel'
+        ? `<div class="row" style="overflow-x:auto;flex-wrap:nowrap;gap:8px">${c.slides.map(u=>`<img src="${u}" alt="slide" loading="lazy" style="width:210px;border-radius:10px;border:1px solid var(--line)">`).join("")}</div>`
+        : `<img src="${c.imageUrl}" alt="generated post" style="max-width:360px;border-radius:12px;border:1px solid var(--line)">`;
+      body=`<div class="card"><h3>3 &middot; Your image &mdash; logo stamped on</h3>${imgs}
+        <div class="row" style="gap:8px;margin-top:12px"><button class="ghost sm" onclick="cGenerate(this)">↻ Regenerate</button><button class="ghost sm" onclick="state.create.step=2;tabCreate()">✎ Edit prompt</button><button class="grn" onclick="state.create.step=4;tabCreate()">Looks good → caption</button></div></div>`;
+    }
+  } else if(c.step===4){
+    body=`<div class="card"><h3>4 &middot; Caption</h3>
+      <textarea id="cCap" style="width:100%;min-height:150px;margin:6px 0">${esc(c.caption)}</textarea>
+      <div class="row" style="gap:8px"><button class="ghost sm" onclick="state.create.step=3;tabCreate()">← Back</button><button class="grn" onclick="cSave(this)">\u{1F4BE} Save to content board</button></div></div>`;
+  } else {
+    body=`<div class="card" style="text-align:center;padding:32px"><h3>\u{1F389} Saved to your content board</h3><p class="sub">It's in your Creatives / calendar &mdash; logo and all.</p><div class="row" style="justify-content:center;gap:8px;margin-top:12px"><button class="grn" onclick="cReset()">+ Create another</button><button class="ghost sm" onclick="state.tab='calendar';renderBrand()">Open content board</button></div></div>`;
+  }
+  el.innerHTML=steps+body;
+}
+async function cMood(btn){ const c=_cstate(); const t=$("cTopic"); if(t) c.topic=t.value.trim(); busy(btn,true,"Art-directing…");
+  try{ const m=await api(`/brands/${state.brand.id}/studio/moodboard`,"POST",{topic:c.topic,format:c.fmt}); c.mood=m; c.prompt=m.image_prompt||""; c.caption=m.caption||""; c.step=2; tabCreate(); }
+  catch(e){ busy(btn,false); toast(e.message,true); } }
+function cRef(input){ const f=input.files&&input.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>{ state.create.reference=r.result; state.create.refName=f.name; tabCreate(); }; r.readAsDataURL(f); }
+async function cGenerate(btn){ const c=_cstate(); const pe=$("cPrompt"); if(pe) c.prompt=pe.value.trim(); c.busy=true; c.step=3; tabCreate();
+  try{
+    if(c.fmt==='carousel'){ const r=await api(`/brands/${state.brand.id}/studio/carousel`,"POST",{prompts:((c.mood&&c.mood.slide_prompts)||[c.prompt])}); c.slides=r.slides.map(s=>s.asset_url); c.assetPath=(r.slides[0]||{}).asset_path; }
+    else { const r=await api(`/brands/${state.brand.id}/studio/image`,"POST",{prompt:c.prompt,reference:c.reference}); c.imageUrl=r.asset_url; c.assetPath=r.asset_path; }
+    c.busy=false; tabCreate();
+  }catch(e){ c.busy=false; c.step=2; tabCreate(); toast(e.message,true); } }
+async function cSave(btn){ const c=_cstate(); const ce=$("cCap"); if(ce) c.caption=ce.value; busy(btn,true,"Saving…");
+  try{ await api(`/brands/${state.brand.id}/studio/save`,"POST",{title:(c.topic||"New post").slice(0,80),caption:c.caption,asset_path:c.assetPath,format:c.fmt}); c.step=5; tabCreate(); }
+  catch(e){ busy(btn,false); toast(e.message,true); } }
 
 /* ---------- AI coach ---------- */
 let CHAT = {};

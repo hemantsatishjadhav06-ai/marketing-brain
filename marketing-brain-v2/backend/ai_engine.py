@@ -340,11 +340,13 @@ def _art_direct(prompt, brand_name="", colors=None):
     )
 
 
-def _img_from_images_api(model, prompt, timeout=180):
+def _img_from_images_api(model, prompt, references=None, timeout=180):
     """Primary path: OpenRouter's dedicated Images API (/api/v1/images). Correct for
     dedicated image models such as openai/gpt-image-1, seedream, flux, recraft and the
     gemini image models. Returns raw image bytes or None."""
     payload = {"model": model, "prompt": prompt, "aspect_ratio": "1:1", "resolution": "2K"}
+    if references:
+        payload["input_references"] = [{"type": "image_url", "image_url": {"url": u}} for u in references if u]
     headers = {
         "Authorization": f"Bearer {_key()}",
         "Content-Type": "application/json",
@@ -385,14 +387,14 @@ def _img_from_chat_api(model, prompt, timeout=180):
     return None
 
 
-def generate_image(prompt, brand_name="", colors=None, model=None):
+def generate_image(prompt, brand_name="", colors=None, model=None, references=None):
     """Generate a branded social image via OpenRouter. Tries the dedicated Images API
     first (correct for GPT Image 1 and other image models), then falls back to the
     chat-image path for gemini-style models. Returns PNG/JPEG bytes or None."""
     model = model or IMAGE_MODEL
     brief = _art_direct(prompt, brand_name, colors)
     try:
-        blob = _img_from_images_api(model, brief)
+        blob = _img_from_images_api(model, brief, references)
         if blob:
             return blob
     except Exception:
@@ -829,3 +831,27 @@ def run_playbook(brand, system_id, prompt_id, inputs=None):
     text = _chat([{"role": "system", "content": system}, {"role": "user", "content": prompt}],
                  max_tokens=1600, temperature=0.85)
     return {"kind": "text", "text": text, "prompt_used": prompt}
+
+
+# ---------------------------------------------------------------- v3 studio (art director)
+def studio_moodboard(brand, topic="", fmt="post"):
+    """Art director: turn a topic into a Pinterest-grade creative direction + a ready
+    text-to-image prompt + a ready caption (+ carousel slide prompts). Grounded in the
+    brand profile and the MoreSpace project directory. Returns a dict."""
+    system = (
+        "You are MoreSpace's art director and social copywriter. Respond with STRICT JSON only. "
+        "Produce a Pinterest-grade creative direction (moodboard) for a premium real-estate "
+        "social post, a ready text-to-image prompt (photoreal, cinematic, NO text/words/logos in "
+        "the image — branding is composited later), and a ready-to-post Instagram caption with "
+        "hashtags. Use Hyderabad / MoreSpace context. Never invent exact prices.\n"
+        f"BRAND: {_brand_context(brand)}\n{projects.context_block(brand.get('name',''))}"
+    )
+    user = (
+        f"Topic / goal: {topic or 'a strong on-brand MoreSpace post'}\nFormat: {fmt}\n\n"
+        "Return JSON exactly: {"
+        "\"direction\": \"3-4 sentence creative/moodboard direction (concept, mood, composition, palette)\", "
+        "\"image_prompt\": \"one hero image prompt, photoreal, no text or logos\", "
+        "\"caption\": \"ready Instagram caption with 8-10 Hyderabad hashtags\", "
+        "\"slide_prompts\": [\"6 carousel slide image prompts, photoreal, no text or logos\"]}"
+    )
+    return _json_chat(system, user, max_tokens=1600, temperature=0.85)
