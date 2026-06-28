@@ -405,7 +405,7 @@ function kitOf(b){ return ((b.profile||{}).brand_kit)||{}; }
 function logoUrl(b){ const k=kitOf(b); return k.logo?`/workspaces/${b.grp?b.grp+"/":""}${b.slug}/${k.logo}`:null; }
 function renderBrand(){
   const b=state.brand, k=kitOf(b);
-  const tabs=["overview","brand kit","ideas","growth","campaigns","reel studio","calendar","creatives","publish","analytics","competitors","coach","projects","connectors"];
+  const tabs=["overview","brand kit","ideas","growth","campaigns","reel studio","calendar","creatives","publish","analytics","competitors","coach","projects","playbook","connectors"];
   $("main").innerHTML=`
     <div class="row" style="margin-bottom:4px">
       ${logoUrl(b)?`<img class="brandlogo" alt="${esc(b.name)} logo" src="${logoUrl(b)}">`:""}
@@ -417,7 +417,7 @@ function renderBrand(){
     <p class="sub">${esc(b.website||"")} ${b.grp?` · 📁 ${esc(b.grp)}`:""} · ${(b.setup?.channels||[]).join(" · ")}</p>
     <div class="tabs">${tabs.map(t=>`<div class="tab ${state.tab===t?'on':''}" onclick="state.tab='${t}';renderBrand()">${t[0].toUpperCase()+t.slice(1)}</div>`).join("")}</div>
     <div id="tabBody"><span class="spinner"></span></div>`;
-  ({"overview":tabOverview,"brand kit":tabKit,"ideas":tabIdeas,"growth":tabGrowth,"campaigns":tabCampaigns,"reel studio":tabReelStudio,"calendar":tabCalendar,"creatives":tabCreatives,"publish":tabPublish,"analytics":tabAnalytics,"competitors":tabCompetitors,"coach":tabCoach,"projects":tabProjects,"connectors":tabConnectors})[state.tab]();
+  ({"overview":tabOverview,"brand kit":tabKit,"ideas":tabIdeas,"growth":tabGrowth,"campaigns":tabCampaigns,"reel studio":tabReelStudio,"calendar":tabCalendar,"creatives":tabCreatives,"publish":tabPublish,"analytics":tabAnalytics,"competitors":tabCompetitors,"coach":tabCoach,"projects":tabProjects,"playbook":tabPlaybook,"connectors":tabConnectors})[state.tab]();
 }
 async function runAutopilot(btn){
   busy(btn,true,"Engaging…");
@@ -982,6 +982,39 @@ async function tabProjects(){
       <a href="${p.url}" target="_blank" rel="noopener">View project &rarr;</a>
     </div>`).join("")}
   </div>`;
+}
+
+async function tabPlaybook(){
+  const el=$("tabBody"); el.innerHTML='<span class="spinner"></span>';
+  let d; try{ d=await api("/playbook"); }catch(e){ el.innerHTML='<p class="sub">Could not load the playbook.</p>'; return; }
+  const total=d.systems.reduce((n,s)=>n+s.prompts.length,0);
+  el.innerHTML=`<div class="card">
+    <div class="row"><h2>AI Playbook</h2><span class="tag y">${d.systems.length} agents</span><span class="tag">${total} prompts</span></div>
+    <p class="sub" style="margin-bottom:6px">${esc(d.source)}.</p>
+    <p class="sub">Every prompt auto-fills from your brand voice + the MoreSpace project directory &mdash; just press Generate. Renders use GPT Image 1.</p>
+    ${d.systems.map(s=>`<div class="idea" style="margin:12px 0">
+      <div class="row"><b>${s.n}. ${esc(s.title)}</b></div>
+      <p class="sub" style="margin:4px 0 8px">${esc(s.goal)}</p>
+      <div class="row" style="flex-wrap:wrap;gap:6px">
+        ${s.prompts.map(p=>`<button class="sm ghost" onclick="runPlaybook('${s.id}','${p.id}',this)">${p.kind==='image'?'\u{1F3A8} ':'✍️ '}${esc(p.title)}</button>`).join("")}
+      </div>
+      <div id="pb_${s.id}"></div>
+    </div>`).join("")}
+  </div>`;
+}
+async function runPlaybook(sys,prompt,btn){
+  busy(btn,true,"Generating…");
+  const out=$("pb_"+sys);
+  try{
+    const r=await api(`/brands/${state.brand.id}/playbook/run`,"POST",{system:sys,prompt:prompt});
+    busy(btn,false);
+    if(r.kind==="image"){
+      const u=r.asset_url+(r.asset_url.startsWith("http")?"":"?t="+Date.now());
+      out.innerHTML=`<div class="card" style="margin-top:8px"><img src="${u}" alt="Generated render" loading="lazy" style="max-width:340px;border-radius:10px;border:1px solid var(--line)"></div>`;
+    } else {
+      out.innerHTML=`<div class="card" style="margin-top:8px;white-space:pre-wrap">${esc(r.text||"")}</div>`;
+    }
+  }catch(e){ busy(btn,false); toast(e.message,true); }
 }
 
 /* ---------- AI coach ---------- */

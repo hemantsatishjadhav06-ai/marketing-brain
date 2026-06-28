@@ -22,7 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import ai_engine, auth, connectors, database as db, projects, scraper, storage, trend_scanner, workspace as ws
+from . import ai_engine, auth, connectors, database as db, playbook, projects, scraper, storage, trend_scanner, workspace as ws
 
 app = FastAPI(title="Marketing Brain v2", version="3.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -1268,6 +1268,37 @@ def _latest_insights(bid):
 
 ws_root = os.path.abspath(ws.WORKSPACES_ROOT)
 os.makedirs(ws_root, exist_ok=True)
+class PlaybookRunIn(BaseModel):
+    system: str
+    prompt: str
+    inputs: dict | None = None
+
+
+@app.get("/api/playbook")
+def playbook_catalog():
+    """Public ShadowFox playbook catalog (5 systems / 29 prompts)."""
+    return playbook.catalog()
+
+
+@app.post("/api/brands/{bid}/playbook/run")
+def playbook_run(bid: str, body: PlaybookRunIn, user=Depends(current_user)):
+    b = _brand_or_404(bid, user)
+    try:
+        res = ai_engine.run_playbook(b, body.system, body.prompt, body.inputs)
+    except Exception as e:
+        raise HTTPException(502, f"Playbook failed: {e}")
+    if res.get("kind") == "image":
+        blob = ai_engine.generate_image(res["image_prompt"], b["name"], ai_engine.brand_palette(b))
+        if not blob:
+            raise HTTPException(502, "Image generation failed (model returned no image).")
+        blob = _composite_logo(b, blob)
+        rel = f"playbook/assets/{body.system}-{body.prompt}-{int(time.time())}.png"
+        ref = _save_asset(b, rel, blob)
+        db_url = ref if ref.startswith("http") else f"/workspaces/{_wslug(b)}/{ref}"
+        return {"kind": "image", "asset_url": db_url}
+    return res
+
+
 @app.get("/api/projects")
 def list_projects():
     """Public master directory of all MoreSpace projects."""

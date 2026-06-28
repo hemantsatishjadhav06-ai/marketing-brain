@@ -9,7 +9,7 @@ from datetime import date, timedelta
 
 import httpx
 
-from . import projects
+from . import projects, playbook
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_IMAGE_URL = "https://openrouter.ai/api/v1/images"
@@ -803,3 +803,29 @@ Return JSON:
  "experiment_to_run": "one A/B test to run next"
 }}"""
     return _json_chat(system, user, max_tokens=3000, temperature=0.4)
+
+
+# ---------------------------------------------------------------- ShadowFox playbook
+def run_playbook(brand, system_id, prompt_id, inputs=None):
+    """Run one ShadowFox playbook prompt. Auto-fills every {bracket} from the brand
+    profile + MoreSpace project directory (the AI gathers the inputs, not the human).
+    Returns {kind:'text', text} or {kind:'image', image_prompt} for render prompts."""
+    spec = playbook.find(system_id, prompt_id)
+    if not spec:
+        raise ValueError(f"Unknown playbook prompt: {system_id}/{prompt_id}")
+    vals = playbook.autofill(brand)
+    if inputs:
+        vals.update({k: v for k, v in inputs.items() if v not in (None, "")})
+    prompt = playbook.render(spec["template"], vals)
+    if spec.get("kind") == "image":
+        return {"kind": "image", "image_prompt": prompt}
+    system = (
+        "You are MoreSpace's senior real-estate marketing copywriter. Write ONLY the requested "
+        "deliverable, finished and ready to publish — no preamble, no meta notes. Use Indian "
+        "context (Rupees, Hyderabad). Never invent exact prices or statistics; speak in ranges or "
+        "direction. Stay in the brand voice.\n"
+        f"BRAND: {_brand_context(brand)}\n{projects.context_block(brand.get('name',''))}"
+    )
+    text = _chat([{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+                 max_tokens=1600, temperature=0.85)
+    return {"kind": "text", "text": text, "prompt_used": prompt}
