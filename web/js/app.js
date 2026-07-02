@@ -236,9 +236,9 @@ function logoUrl(b){ const k=kitOf(b); return k.logo?`/workspaces/${b.grp?b.grp+
 function renderBrand(){
   const b=state.brand, k=kitOf(b);
   const SEC=[["create","✨ Create"],["content","🗂 Content"],["plan","🗓 Plan"],["grow","📈 Grow"],["settings","⚙ Settings"]];
-  const SUBS={create:[["create","Create"]],content:[["board","Board"],["reel studio","Reel studio"],["publish","Published"]],plan:[["ideas","Ideas"],["calendar","Calendar"],["campaigns","Campaigns"]],grow:[["growth","Growth"],["competitors","Competitors"],["analytics","Analytics"],["playbook","Playbook"]],settings:[["brand kit","Brand kit"],["connectors","Connectors"],["overview","Overview"]]};
+  const SUBS={create:[["create","Create"],["brief","✦ Master brief"]],content:[["board","Board"],["reel studio","Reel studio"],["publish","Published"]],plan:[["ideas","Ideas"],["calendar","Calendar"],["campaigns","Campaigns"]],grow:[["growth","Growth"],["competitors","Competitors"],["analytics","Analytics"],["playbook","Playbook"]],settings:[["brand kit","Brand kit"],["connectors","Connectors"],["overview","Overview"]]};
   const S2S={}; Object.entries(SUBS).forEach(([sec,arr])=>arr.forEach(([t])=>S2S[t]=sec));
-  const TABFN={create:tabCreate,board:tabBoard,"reel studio":tabReelStudio,publish:tabPublish,ideas:tabIdeas,calendar:tabCalendar,campaigns:tabCampaigns,growth:tabGrowth,competitors:tabCompetitors,analytics:tabAnalytics,playbook:tabPlaybook,"brand kit":tabKit,connectors:tabConnectors,overview:tabOverview,coach:tabCoach,creatives:tabCreatives};
+  const TABFN={create:tabCreate,brief:tabBrief,board:tabBoard,"reel studio":tabReelStudio,publish:tabPublish,ideas:tabIdeas,calendar:tabCalendar,campaigns:tabCampaigns,growth:tabGrowth,competitors:tabCompetitors,analytics:tabAnalytics,playbook:tabPlaybook,"brand kit":tabKit,connectors:tabConnectors,overview:tabOverview,coach:tabCoach,creatives:tabCreatives};
   if(!TABFN[state.tab]) state.tab="create";
   const sec = state.tab==="coach" ? "" : (S2S[state.tab]||"content");
   const subnav = sec ? `<div class="subnav">${SUBS[sec].map(([t,l])=>`<button class="${state.tab===t?'on':''}" onclick="state.tab='${t}';renderBrand()">${esc(l)}</button>`).join("")}</div>` : "";
@@ -601,7 +601,7 @@ async function tabCreatives(){
       ${p.scene_assets?`<p class="sub" style="margin:8px 0 4px">Storyboard (${esc((p.reel_studio||{}).style||"")} style):</p><div class="row" style="overflow-x:auto;flex-wrap:nowrap">${p.scene_assets.map((a,i)=>`<img alt="Storyboard scene ${i+1}" loading="lazy" src="${assetUrl(b,a)}" style="width:110px;border-radius:10px;border:1px solid var(--line)">`).join("")}</div>`:""}
       ${p.vo_asset?`<div class="row" style="margin-top:8px"><audio controls src="${assetUrl(b,p.vo_asset)}" style="height:32px"></audio><span class="sub" style="margin:0">voiceover — mixed into Build video</span></div>`:""}
       ${p.algo_audit?renderAudit(p.algo_audit):""}
-      <div id="vout_${c.id}"></div></div>`;}).join("") : '<div class="card"><p class="sub">No creatives yet — produce one from Ideas or run autopilot.</p></div>';
+      ${p.video_url?`<p class="sub" style="margin:12px 0 4px">Generated video</p><video src="${p.video_url}" controls playsinline style="width:100%;border-radius:10px;border:1px solid var(--line)"></video>`:""}${p.vo_url?`<div class="row" style="margin-top:10px"><audio controls src="${p.vo_url}" style="width:100%"></audio></div>`:""}<div id="vout_${c.id}"></div></div>`;}).join("") : '<div class="card"><p class="sub">No creatives yet — produce one from Ideas or run autopilot.</p></div>';
 }
 function copyBtn(txt){ return `<button class="cpy" data-t="${esc(txt||"")}" onclick="navigator.clipboard.writeText(this.dataset.t);toast('Copied')">Copy</button>`; }
 function kvBlock(o){ if(o==null) return ""; if(typeof o!=="object") return `<p>${esc(String(o))}</p>`;
@@ -609,6 +609,7 @@ function kvBlock(o){ if(o==null) return ""; if(typeof o!=="object") return `<p>$
   return `<div class="kv">${Object.entries(o).map(([k,v])=>`<div><span class="k">${esc(k.replace(/_/g," "))}:</span> ${typeof v==="object"?kvBlock(v):`<span class="v">${esc(String(v))}</span>`}</div>`).join("")}</div>`; }
 function renderPackage(p){
   const S=[];
+  if(p&&p.blueprint) return renderBlueprint(p.blueprint);
   if(p.format==="blog"&&p.body_markdown){
     S.push(`<div class="pkg"><h3>Article</h3><p class="sub">${esc(p.meta_description||"")}</p><div class="prose">${esc(p.body_markdown).replace(/\n/g,"<br>")}</div></div>`);
     if(p.faq) S.push(`<div class="pkg"><h3>FAQ</h3>${p.faq.map(f=>`<p><b>${esc(f.q)}</b><br><span class="sub">${esc(f.a)}</span></p>`).join("")}</div>`);
@@ -1130,7 +1131,7 @@ function renderCreativeDetail(c){
   const b=state.brand, p=c.payload||{};
   const note=(p.approval&&p.approval.state==="changes_requested"&&p.approval.comment)?`<div class="revnote">✎ Change requested: ${esc(p.approval.comment)}</div>`:"";
   const phone=c.asset_path?`<div class="phone"><div class="ph-h">${logoUrl(b)?`<img alt="" src="${logoUrl(b)}">`:""}<span>${esc(b.name)}</span></div><img class="ph-img" alt="" loading="lazy" src="${assetUrl(b,c.asset_path)}${c.asset_path.startsWith("http")?"":"?t="+Date.now()}"><div class="ph-a"><span>❤️</span><span>💬</span><span>➤</span></div><div class="ph-c"><b>${esc(b.name.toLowerCase().replace(/\s/g,""))}</b> ${esc((p.caption||"").slice(0,120))}</div></div>`:`<div class="pkg" style="text-align:center;color:var(--mut)">No visual yet — generate one ↓</div>`;
-  const acts=`<div class="rvactions">
+  const acts=`<div class="rvactions">${p.blueprint?`<button class="grn" onclick="proceed('${c.id}',this)">▶ Proceed — generate all assets</button><div class="sub" id="genst_${c.id}" style="margin:4px 0">${esc(p.gen_status||"")}</div>`:""}
     <button class="sm" onclick="genImage('${c.id}',this)">🎨 Generate branded visual</button>
     ${p.slides?`<button class="sm" onclick="genSlides('${c.id}',this)">🖼 Generate ${p.slides.length} slides</button>`:""}
     ${(p.format==="reel"||p.script)?`<button class="sm" onclick="genVO('${c.id}',this)">🎙 Voiceover</button>`:""}
@@ -1176,3 +1177,53 @@ async function reviewApprove(cid,stateVal){
   }catch(e){ toast(e.message,true); }
 }
 document.addEventListener("keydown",e=>{ if(e.key==="Escape" && $("drawer") && $("drawer").classList.contains("open")) closeDrawer(); });
+
+/* ---------- v5: Master Prompt Brain ---------- */
+function tabBrief(){
+  const el=$("tabBody"); const bs=state.brief||(state.brief={topic:"",perspective:"",style:"Post"});
+  el.innerHTML=`<div class="card" style="max-width:740px">
+    <h2 style="margin:0 0 4px">✦ Master Prompt Brain</h2>
+    <p class="sub">Give a topic, a perspective and a style. The brain writes ONE full production blueprint — analysis, master image prompt, scene script and voiceover — for you to review &amp; approve before anything is generated.</p>
+    <label>Topic</label><input id="brTopic" placeholder="e.g. Babolat Pure Strike Team racket" value="${esc(bs.topic)}">
+    <label>Perspective / angle</label><input id="brPersp" placeholder="e.g. detailed know-how for intermediate players" value="${esc(bs.perspective)}">
+    <label>Style</label>
+    <select id="brStyle">${["Post","Carousel","Reel","Video","Story","Text & Image"].map(x=>`<option ${bs.style===x?"selected":""}>${x}</option>`).join("")}</select>
+    <div class="row" style="margin-top:14px"><button class="grn" onclick="genBlueprint(this)">✦ Generate master blueprint →</button></div>
+  </div>`;
+}
+async function genBlueprint(btn){
+  const topic=$("brTopic").value.trim(); if(!topic) return toast("Enter a topic",true);
+  state.brief={topic,perspective:$("brPersp").value.trim(),style:$("brStyle").value};
+  busy(btn,true,"Brain thinking…");
+  try{ const r=await api(`/brands/${state.brand.id}/blueprint`,"POST",state.brief);
+    busy(btn,false); toast("Blueprint ready — review & approve"); if(state.tab==="board")tabBoard(); openReview(r.creative_id);
+  }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+function renderBlueprint(bp){
+  const S=[];
+  S.push(`<div class="pkg"><h3>✦ Master blueprint${bp._style?" · "+esc(bp._style):""}</h3><p class="cap"><b>${esc(bp.core_idea||"")}</b></p>${bp.analysis?`<p class="sub" style="margin-top:6px">${esc(bp.analysis)}</p>`:""}</div>`);
+  if(bp.post_caption) S.push(`<div class="pkg"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Caption</h3>${copyBtn(bp.post_caption)}</div><p class="cap" style="margin-top:6px">${esc(bp.post_caption)}</p>${(bp.hashtags||[]).length?`<div class="tags" style="margin-top:8px">${bp.hashtags.map(t=>`<span class="tag">#${esc(String(t).replace(/^#/,""))}</span>`).join("")}</div>`:""}</div>`);
+  if(bp.static_image_prompt) S.push(`<div class="pkg"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Master image prompt</h3>${copyBtn(bp.static_image_prompt)}</div><p class="cap" style="margin-top:6px">${esc(bp.static_image_prompt)}</p></div>`);
+  if(bp.video_prompt) S.push(`<div class="pkg"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Video / motion prompt</h3>${copyBtn(bp.video_prompt)}</div><p class="cap" style="margin-top:6px">${esc(bp.video_prompt)}</p></div>`);
+  if(bp.audio_script) S.push(`<div class="pkg"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Voiceover script</h3>${copyBtn(bp.audio_script)}</div><p class="cap" style="margin-top:6px">${esc(bp.audio_script)}</p></div>`);
+  if((bp.scenes||[]).length) S.push(`<div class="pkg"><h3>Scene-by-scene</h3><table class="scr"><thead><tr><th>#</th><th>Visual</th><th>VO</th><th>On-screen</th></tr></thead><tbody>${bp.scenes.map(sc=>`<tr><td>${esc(sc.scene_number||"")}</td><td>${esc(sc.visual_description||"")}</td><td>${esc(sc.audio_script||"")}</td><td>${esc(sc.on_screen_text||"")}</td></tr>`).join("")}</tbody></table></div>`);
+  if(bp.brand_continuity) S.push(`<div class="pkg"><h3>Brand continuity</h3><p class="sub">${esc(bp.brand_continuity)}</p></div>`);
+  if(bp.best_time_hint||(bp.kpis_to_watch||[]).length) S.push(`<div class="pkg"><p class="meta">${bp.best_time_hint?`⏰ ${esc(bp.best_time_hint)}`:""}${(bp.kpis_to_watch||[]).length?` · 🎯 ${esc((bp.kpis_to_watch||[]).join(", "))}`:""}</p></div>`);
+  return S.join("");
+}
+async function proceed(cid,btn){
+  busy(btn,true,"Generating…");
+  try{ await api(`/brands/${state.brand.id}/creatives/${cid}/proceed`,"POST",{});
+    toast("Generation started — assets appear here as they finish"); busy(btn,false);
+    const t0=Date.now();
+    (async function poll(){
+      while(Date.now()-t0<12*60*1000){
+        await new Promise(r=>setTimeout(r,6000));
+        let crs; try{crs=await api(`/brands/${state.brand.id}/creatives`);}catch(e){continue;}
+        const c=crs.find(x=>x.id===cid); const gs=(((c||{}).payload)||{}).gen_status||"";
+        if(REVIEW_CID===cid) await openReview(cid);
+        if(gs.indexOf("done")===0||gs.indexOf("error")===0) break;
+      }
+    })();
+  }catch(e){ toast(e.message,true); busy(btn,false); }
+}

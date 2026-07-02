@@ -11,9 +11,9 @@ from fastapi.staticfiles import StaticFiles
 
 from .core import database as db
 from .routes import _shared
-from .routes import auth, autopilot, brands, competitors, growth, misc, pipeline, publishing, studio
+from .routes import auth, autopilot, brain, brands, competitors, growth, misc, pipeline, publishing, studio
 
-ROUTERS = [auth, autopilot, brands, competitors, growth, misc, pipeline, publishing, studio]
+ROUTERS = [auth, autopilot, brain, brands, competitors, growth, misc, pipeline, publishing, studio]
 
 
 def create_app() -> FastAPI:
