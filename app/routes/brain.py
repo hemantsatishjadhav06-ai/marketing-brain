@@ -62,16 +62,18 @@ def proceed(bid: str, cid: str, user=Depends(current_user)):
         raise HTTPException(400, "The blueprint is still being written — wait for the agents to finish.")
     if (p.get("approval") or {}).get("state") != "approved":
         raise HTTPException(400, "Approve the blueprint first, then Proceed.")
-    threading.Thread(target=_run_proceed, args=(cid,), daemon=True).start()
+    threading.Thread(target=_run_proceed, args=(cid, bid), daemon=True).start()
     return {"started": True}
 
 
-def _run_proceed(cid):
+def _run_proceed(cid, bid=None):
     try:
         c = db.get_doc("creatives", cid)
         bp = (c.get("payload") or {}).get("blueprint") or {}
+        brand = db.get_doc("brands", bid) if bid else None
+        logo_url = brain.brand_logo_url(brand) if brand else None
         _patch(cid, gen_status="Rendering image…")
-        img = brain.fal_image(bp.get("static_image_prompt") or bp.get("core_idea") or "")
+        img = brain.fal_image(bp.get("static_image_prompt") or bp.get("core_idea") or "", logo_url=logo_url)
         _patch(cid, asset_path=img, gen_status="Rendering video…")
         video = None
         if bp.get("video_prompt") or bp.get("scenes"):

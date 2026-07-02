@@ -73,6 +73,38 @@ STYLE_REFS = {
     "cinematic": os.environ.get("STYLE_REF_CINEMATIC", "https://v3b.fal.media/files/b/0aa0a01e/GjhnPtXVj1zLoL9jiA3Dv_3b69f54a9a.jpg"),
 }
 
+# Brand logos on the fal CDN. Passed to the image model as an EXACT-reproduce
+# reference (LOGO_GUARD). NOTE: nano-banana-pro still tends to reinterpret a logo,
+# so for guaranteed fidelity the caller composites the real logo file over the
+# reserved top-left tile afterwards.
+BRAND_LOGOS = {
+    "morespace": os.environ.get("LOGO_MORESPACE", "https://v3b.fal.media/files/b/0aa0a181/mdPf3YDV4p9zTwyD7GpE3_morespace_T.png"),
+    "neopolis":  os.environ.get("LOGO_NEOPOLIS",  "https://v3b.fal.media/files/b/0aa0a181/1hOsd69mADuryOEnwwRk6__neo_logo.png"),
+}
+
+
+def brand_logo_url(brand):
+    """Best-effort hosted logo URL for a brand (accepts a dict or a name)."""
+    if isinstance(brand, dict):
+        if brand.get("logo_url"):
+            return brand["logo_url"]
+        name = brand.get("name") or ""
+    else:
+        name = str(brand or "")
+    n = name.lower()
+    for key, url in BRAND_LOGOS.items():
+        if key in n:
+            return url
+    return None
+
+
+LOGO_GUARD = (
+    "The BRAND LOGO is attached as reference image {n}. Reproduce it EXACTLY and unaltered "
+    "(identical colours and wordmark; do not redraw, restyle, recolour, crop or add/remove text), "
+    "placed inside a clean rounded WHITE tile in the TOP-LEFT corner, perfectly legible. "
+    "Do NOT invent any other logo anywhere.\n\n"
+)
+
 REF_GUARD = (
     "Use the attached reference image ONLY as loose inspiration for premium layout, composition, "
     "typographic hierarchy and finish quality. Do NOT copy its exact buildings, text, numbers, badges "
@@ -109,6 +141,7 @@ def master_blueprint(brand, topic, perspective="", style="Post"):
         "Return STRICT JSON with EXACTLY these keys: "
         "analysis (2-3 sentence insight or product pros/cons), "
         "core_idea (one line), "
+        "developer (the project builder/developer name; if the brand itself is the builder use the brand name), "
         "post_caption (ready-to-post caption, no markdown; MUST include real specifics: config/BHK, sizes "
         "in sq.ft, price in INR Cr/Lakh, locality+city, possession, key amenities/USPs, RERA, a clear CTA "
         "and a +91 contact), "
@@ -134,6 +167,7 @@ def master_blueprint(brand, topic, perspective="", style="Post"):
     bp = engine._json_chat(system, user, max_tokens=4000)
     bp.setdefault("scenes", [])
     bp.setdefault("hashtags", [])
+    bp.setdefault("developer", "")
     bp["_style"] = style
     return bp
 
@@ -193,20 +227,32 @@ def _first_url(result, *keys):
     return None
 
 
-def fal_image(prompt, image_urls=None, aspect_ratio=None, use_style_ref=True):
-    """Generate a 4:5 creative. When the caller passes no image_urls, a matching
-    folder STYLE_REF is auto-attached as a loose style anchor (with REF_GUARD so
-    the model never copies it). Caller-supplied image_urls are used verbatim."""
+def fal_image(prompt, image_urls=None, logo_url=None, aspect_ratio=None, use_style_ref=True):
+    """Generate a 4:5 creative.
+    - No caller image_urls: a matching folder STYLE_REF is auto-attached as a loose
+      style anchor (never copied).
+    - logo_url is attached as an EXACT-reproduce reference (LOGO_GUARD) so the brand
+      logo lands in the top-left tile. The model may still reinterpret it, so the
+      caller should composite the real logo file over that tile for guaranteed fidelity.
+    Caller-supplied image_urls are used verbatim (logo, if any, is appended)."""
     aspect_ratio = aspect_ratio or IMAGE_ASPECT
+    refs, preamble = [], ""
     caller_refs = [u for u in (image_urls or []) if u]
     if caller_refs:
-        payload = {"prompt": prompt, "aspect_ratio": aspect_ratio, "num_images": 1, "image_urls": caller_refs}
-    else:
-        ref = pick_style_ref(prompt) if use_style_ref else None
-        if ref:
-            payload = {"prompt": REF_GUARD + prompt, "aspect_ratio": aspect_ratio, "num_images": 1, "image_urls": [ref]}
-        else:
-            payload = {"prompt": prompt, "aspect_ratio": aspect_ratio, "num_images": 1}
+        refs.extend(caller_refs)
+    elif use_style_ref:
+        r = pick_style_ref(prompt)
+        if r:
+            refs.append(r)
+            preamble += ("Reference image %d is STYLE inspiration ONLY - match its premium layout, "
+                         "lighting and finish; do NOT copy its buildings, text or numbers.\n\n" % len(refs))
+    if logo_url:
+        refs.append(logo_url)
+        preamble += LOGO_GUARD.replace("{n}", str(len(refs)))
+    payload = {"prompt": (preamble + prompt) if preamble else prompt,
+               "aspect_ratio": aspect_ratio, "num_images": 1}
+    if refs:
+        payload["image_urls"] = refs
     res = _fal_wait(_fal_submit(FAL_IMAGE_MODEL, payload))
     return _first_url(res, "images", "image")
 
@@ -226,11 +272,13 @@ def fal_voice(text):
     return _first_url(res, "audio")
 
 
-def produce_from_blueprint(bp, want_video=True, want_voice=True):
-    """Generate assets from an approved blueprint. Returns partial dict as it goes."""
+def produce_from_blueprint(bp, want_video=True, want_voice=True, logo_url=None):
+    """Generate assets from an approved blueprint. Returns partial dict as it goes.
+    Pass logo_url (e.g. brand_logo_url(brand)) to attach the brand logo as an
+    exact-reproduce reference; composite the real logo afterwards for fidelity."""
     out = {}
     img_prompt = bp.get("static_image_prompt") or bp.get("core_idea") or ""
-    out["image_url"] = fal_image(img_prompt)  # auto style-anchored to a folder ref
+    out["image_url"] = fal_image(img_prompt, logo_url=logo_url)  # style-anchored + exact-logo reference
     if want_video and (bp.get("video_prompt") or bp.get("scenes")):
         vp = bp.get("video_prompt") or (bp.get("scenes") or [{}])[0].get("visual_description", "")
         out["video_url"] = fal_video(vp, image_url=out.get("image_url"))
@@ -270,7 +318,8 @@ ART_DIRECTOR_BRIEF = (
     "(5) the brand-colour BACKGROUND field and accent colours as HEX; "
     "(6) DEPTH & FINISH - soft cast shadows, bokeh/particles, subtle grain, realistic lighting, ultra-"
     "detailed 8K, crisp perfectly-legible text, WCAG-AA contrast; "
-    "(7) a clean EMPTY ~180x180px top-left corner reserved for the brand logo. "
+    "(7) a clean EMPTY ~180x180px top-left corner reserved for the brand logo (if a logo image is supplied to the renderer, reproduce it there exactly). "
+    "(8) a small DEVELOPER CREDIT under the project name, e.g. by {developer} or Developed by {developer}. "
     + INDIA_BRIEF + " "
     "STRICTLY AVOID: a plain photo with text on top, clip-art, clutter, watermarks, gibberish/lorem text, "
     "copying any reference verbatim, more than ~25 words of body copy. "
@@ -282,12 +331,12 @@ FINALIZE_BRIEF = (
     "You are the lead creative editor and QA for an INDIAN real-estate brand. Review every prior agent "
     "output, raise it to award-winning agency quality, and OUTPUT THE FINAL PRODUCTION BLUEPRINT as STRICT "
     "JSON with EXACTLY these keys: "
-    "analysis, core_idea, post_caption, hashtags (array, no #), static_image_prompt, video_prompt, audio_script, "
+    "analysis, core_idea, developer, post_caption, hashtags (array, no #), static_image_prompt, video_prompt, audio_script, "
     "scenes (array of {scene_number, visual_description, audio_script, on_screen_text}; use [] for a static post), "
     "brand_continuity, best_time_hint, kpis_to_watch (array). "
     "post_caption MUST be information-rich and India-market ready: a strong hook, then 2-4 lines of real "
     "specifics (config/BHK, sizes in sq.ft, price in INR Cr/Lakh, locality+city, possession, key "
-    "amenities/USPs, RERA), a clear CTA and a +91 contact; human voice, no markdown. "
+    "amenities/USPs, RERA), a clear CTA and a +91 contact; human voice, no markdown. Name the DEVELOPER/builder (the developer field) and place a small by {developer} credit near the project name on the image. "
     "static_image_prompt MUST be the Art Director's expert, art-directed prompt (verbatim or improved): a "
     "NAMED concept, bold typographic hierarchy, brand colour field, an on-image INFO BLOCK with real "
     "specifics, price badge(s), CTA, footer, depth and cinematic lighting, 4:5 vertical, and a reserved "
@@ -298,7 +347,7 @@ FINALIZE_BRIEF = (
 AGENT_LIB = {
     "brainstorm": ("1 · Brainstorm", "You are a creative brainstorm agent for an Indian real-estate brand. Produce FOUR distinct, specific content concepts/angles (mix launch, offer, investment/ROI, lifestyle, festive). For each give: a short title, the hook idea, and one line on why it works for Indian buyers/NRIs. Be concrete and on-brand; no fluff."),
     "strategist": ("2 · Strategist", "You are a content strategist. From the brainstormed concepts pick the single strongest one. State: the chosen angle, the target viewer (end-user / investor / NRI), the funnel stage, and the ONE key message. Tight and decisive."),
-    "copywriter": ("Copywriter", "You are a senior real-estate copywriter for the Indian market. Write the final on-platform copy for the chosen angle: a scroll-stopping hook, then an information-rich caption with real specifics (config/BHK, sizes in sq.ft, price in INR Cr/Lakh, locality+city, possession, key amenities/USPs, RERA), a clear CTA and a +91 contact, and 4-6 specific hashtags. Human voice, no markdown."),
+    "copywriter": ("Copywriter", "You are a senior real-estate copywriter for the Indian market. Write the final on-platform copy for the chosen angle: a scroll-stopping hook, then an information-rich caption with real specifics (config/BHK, sizes in sq.ft, price in INR Cr/Lakh, locality+city, possession, key amenities/USPs, RERA, the developer/builder name), a clear CTA and a +91 contact, and 4-6 specific hashtags. Human voice, no markdown."),
     "narrative": ("Narrative architect", "You are a carousel narrative architect. Design a slide-by-slide structure (5-7 slides). For each slide: headline, one-line body, and visual direction. Include a hook slide, spec/price slides with real numbers, and a CTA slide."),
     "scriptwriter": ("Scriptwriter", "You are a short-form video scriptwriter. Write a 4-scene script (hook, two value scenes, CTA). For each scene: time, on-screen text, voiceover line, and camera/action. Punchy and paced; weave in real specifics (price, config, locality)."),
     "frames": ("Frame designer", "You are an Instagram Story designer. Design a 3-5 frame sequence. For each frame: the content, a sticker/interaction, and the on-frame text. Include a spec/price frame and a CTA frame."),
@@ -330,6 +379,7 @@ def run_agent_team(brand, topic, perspective="", style="Post", cb=None):
             bp = engine._json_chat(system, user, max_tokens=4000)
             bp.setdefault("scenes", [])
             bp.setdefault("hashtags", [])
+            bp.setdefault("developer", "")
             bp["_style"] = style
             agents.append({"role": title, "output": "Reviewed the team's work and assembled the final blueprint (below)."})
             if cb:
