@@ -1,0 +1,23 @@
+[project]
+name = "marketing-brain"
+version = "3.0.0"
+description = "AI marketing team in a box — scan a brand, plan a strategy, generate multi-channel content, publish, and learn."
+requires-python = ">=3.10"
+readme = "README.md"
+dependencies = [
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.27",
+  "httpx>=0.25",
+  "beautifulsoup4>=4.12",
+  "python-dotenv>=1.0",
+  "python-multipart>=0.0.9",
+  "pillow>=10.0",
+]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"

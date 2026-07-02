@@ -1,38 +1,10 @@
-# env
-.env
-.env.local
-.env.*.local
-
-# python
 __pycache__/
 *.pyc
-*.pyo
 .venv/
 venv/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-
-# node
+.env
+data/
+workspaces/
+*.db
 node_modules/
-.next/
-.turbo/
-.eslintcache
-*.tsbuildinfo
-out/
-
-# os
 .DS_Store
-Thumbs.db
-
-# logs
-*.log
-logs/
-
-# editors
-.vscode/
-.idea/
-
-# storage
-apps/api/storage/
-storage/
