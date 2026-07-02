@@ -153,3 +153,64 @@ def produce_from_blueprint(bp, want_video=True, want_voice=True):
     if want_voice and bp.get("audio_script"):
         out["vo_url"] = fal_voice(bp["audio_script"])
     return out
+
+
+# ----------------------------------------------------------------- agent teams
+def _style_key(style):
+    s = (style or "post").strip().lower()
+    if "carousel" in s: return "carousel"
+    if "reel" in s: return "reel"
+    if "video" in s or "avatar" in s: return "video"
+    if "story" in s: return "story"
+    return "post"
+
+# role -> (display title, system instruction). Non-final agents return prose;
+# the "finalize" agent returns the strict-JSON blueprint.
+AGENT_LIB = {
+    "brainstorm": ("1 · Brainstorm", "You are a creative brainstorm agent. Produce FOUR distinct, specific content concepts/angles. For each give: a short title, the hook idea, and one line on why it works. Be concrete and on-brand; no fluff."),
+    "strategist": ("2 · Strategist", "You are a content strategist. From the brainstormed concepts pick the single strongest one. State: the chosen angle, the target viewer, the funnel stage, and the ONE key message. Tight and decisive."),
+    "copywriter": ("Copywriter", "You are a senior copywriter. Write the final on-platform copy for the chosen angle: a scroll-stopping hook, the caption/body at platform-appropriate length, a clear CTA, and 4-6 specific hashtags. Human voice, no markdown."),
+    "narrative": ("Narrative architect", "You are a carousel narrative architect. Design a slide-by-slide structure (5-7 slides). For each slide: headline, one-line body, and visual direction. Include a hook slide and a CTA slide."),
+    "scriptwriter": ("Scriptwriter", "You are a short-form video scriptwriter. Write a 4-scene script (hook, two value scenes, CTA). For each scene: time, on-screen text, voiceover line, and camera/action. Punchy and paced."),
+    "frames": ("Frame designer", "You are an Instagram Story designer. Design a 3-5 frame sequence. For each frame: the content, a sticker/interaction, and the on-frame text. Include a CTA frame."),
+    "art_director": ("Art Director", "You are a senior brand art director. Write ONE detailed master image prompt for an AI image model (nano-banana-pro): layout, subject, exact on-image text and its placement, brand colors as hex, typography feel, lighting and mood. Premium, clean, mobile-first. Then one line of brand-continuity rules."),
+    "video_director": ("Video Director", "You are a video director. For EACH scene write a cinematic AI-video prompt (camera, motion, lighting) for Seedance 2.0, keeping continuity with the master image and brand. End with a single overall motion prompt."),
+    "finalize": ("Lead editor · blueprint", "You are the lead editor and QA. Review every prior agent output, fix weaknesses, and OUTPUT THE FINAL PRODUCTION BLUEPRINT as STRICT JSON with EXACTLY these keys: analysis, core_idea, post_caption, hashtags (array, no #), static_image_prompt, video_prompt, audio_script, scenes (array of {scene_number, visual_description, audio_script, on_screen_text}; use [] for a static post), brand_continuity, best_time_hint, kpis_to_watch (array). JSON only, no commentary."),
+}
+
+TEAMS = {
+    "post":     ["brainstorm", "strategist", "copywriter", "art_director", "finalize"],
+    "carousel": ["brainstorm", "strategist", "narrative", "copywriter", "art_director", "finalize"],
+    "reel":     ["brainstorm", "strategist", "scriptwriter", "art_director", "video_director", "finalize"],
+    "video":    ["brainstorm", "strategist", "scriptwriter", "art_director", "video_director", "finalize"],
+    "story":    ["brainstorm", "strategist", "frames", "copywriter", "art_director", "finalize"],
+}
+
+
+def run_agent_team(brand, topic, perspective="", style="Post", cb=None):
+    """Run the per-task agent team. cb(agents_list, blueprint_or_None, status) after each step."""
+    roles = TEAMS.get(_style_key(style), TEAMS["post"])
+    ctx = engine._brand_context(brand)
+    agents = []
+    for role in roles:
+        title, instr = AGENT_LIB[role]
+        prior = "\n\n".join(f"[{a['role']}]\n{a['output']}" for a in agents) or "(you are first)"
+        system = f"{instr}\nContent style: {style}. Stay strictly on-brand.\n\nBRAND CONTEXT:\n{ctx}"
+        user = f"Topic: {topic}\nPerspective: {perspective}\n\nPrevious agents said:\n{prior}\n\nDo your part now."
+        if role == "finalize":
+            bp = engine._json_chat(system, user, max_tokens=4000)
+            bp.setdefault("scenes", [])
+            bp.setdefault("hashtags", [])
+            bp["_style"] = style
+            agents.append({"role": title, "output": "Reviewed the team's work and assembled the final blueprint (below)."})
+            if cb:
+                cb(agents, bp, "done ✓")
+            return {"agents": agents, "blueprint": bp}
+        out = engine._chat(
+            [{"role": "system", "content": system}, {"role": "user", "content": user}],
+            max_tokens=1200, temperature=0.85,
+        ).strip()
+        agents.append({"role": title, "output": out})
+        if cb:
+            cb(agents, None, f"{title} ✓ — next…")
+    return {"agents": agents, "blueprint": None}

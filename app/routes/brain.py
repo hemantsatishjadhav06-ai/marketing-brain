@@ -1,4 +1,4 @@
-"""Master Prompt Brain routes: blueprint generation + approve-then-proceed."""
+"""Master Prompt Brain routes: per-task agent team → blueprint → approve → proceed."""
 from fastapi import APIRouter
 from ._shared import *  # noqa: F401,F403
 from ..ai import brain
@@ -15,23 +15,40 @@ class BlueprintIn(BaseModel):
     style: str = "Post"
 
 
+def _patch(cid, **fields):
+    c = db.get_doc("creatives", cid) or {}
+    p = c.get("payload") or {}
+    p.update(fields)
+    db.update_doc("creatives", cid, payload=p)
+
+
+def _run_brain(cid, b, topic, perspective, style):
+    def cb(agents, bp, status):
+        f = {"agents": agents, "brain_status": status}
+        if bp:
+            f["blueprint"] = bp
+            f["caption"] = bp.get("post_caption", "")
+            f["hashtags"] = {"all": bp.get("hashtags", [])}
+        _patch(cid, **f)
+    try:
+        brain.run_agent_team(b, topic, perspective, style, cb=cb)
+    except Exception as e:
+        _patch(cid, brain_status=f"error: {e}")
+
+
 @router.post("/api/brands/{bid}/blueprint")
 def make_blueprint(bid: str, body: BlueprintIn, user=Depends(current_user)):
     b = _brand_or_404(bid, user)
-    bp = brain.master_blueprint(b, body.topic, body.perspective, body.style)
     fmt = _STYLE_FMT.get((body.style or "post").strip().lower(), "post")
-    payload = {
-        "title": (body.topic or "Untitled").strip()[:90],
-        "format": fmt,
-        "caption": bp.get("post_caption", ""),
-        "hashtags": {"all": bp.get("hashtags", [])},
-        "blueprint": bp,
-        "is_blueprint": True,
-        "gen_status": "",
-    }
-    cid = db.insert_doc("creatives", bid, payload, channel=(b.get("setup") or {}).get("channels", ["instagram"])[0]
-                        if (b.get("setup") or {}).get("channels") else "instagram", format=fmt)
-    return {"creative_id": cid, "blueprint": bp}
+    ch = ((b.get("setup") or {}).get("channels") or ["instagram"])[0]
+    cid = db.insert_doc("creatives", bid, {
+        "title": (body.topic or "Untitled").strip()[:90], "format": fmt,
+        "is_blueprint": True, "brain_status": "Assembling the agent team…",
+        "agents": [], "blueprint": None,
+    }, channel=ch, format=fmt)
+    threading.Thread(target=_run_brain, args=(cid, dict(b), body.topic, body.perspective, body.style),
+                     daemon=True).start()
+    return {"creative_id": cid}
 
 
 @router.post("/api/brands/{bid}/creatives/{cid}/proceed")
@@ -42,19 +59,11 @@ def proceed(bid: str, cid: str, user=Depends(current_user)):
         raise HTTPException(404, "Creative not found")
     p = c.get("payload") or {}
     if not p.get("blueprint"):
-        raise HTTPException(400, "This item has no blueprint to generate from.")
-    ap = p.get("approval") or {}
-    if ap.get("state") != "approved":
+        raise HTTPException(400, "The blueprint is still being written — wait for the agents to finish.")
+    if (p.get("approval") or {}).get("state") != "approved":
         raise HTTPException(400, "Approve the blueprint first, then Proceed.")
     threading.Thread(target=_run_proceed, args=(cid,), daemon=True).start()
     return {"started": True}
-
-
-def _patch(cid, **fields):
-    c = db.get_doc("creatives", cid) or {}
-    p = c.get("payload") or {}
-    p.update(fields)
-    db.update_doc("creatives", cid, payload=p)
 
 
 def _run_proceed(cid):

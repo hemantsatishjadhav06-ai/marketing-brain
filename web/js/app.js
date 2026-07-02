@@ -609,7 +609,7 @@ function kvBlock(o){ if(o==null) return ""; if(typeof o!=="object") return `<p>$
   return `<div class="kv">${Object.entries(o).map(([k,v])=>`<div><span class="k">${esc(k.replace(/_/g," "))}:</span> ${typeof v==="object"?kvBlock(v):`<span class="v">${esc(String(v))}</span>`}</div>`).join("")}</div>`; }
 function renderPackage(p){
   const S=[];
-  if(p&&p.blueprint) return renderBlueprint(p.blueprint);
+  if(p&&(p.is_blueprint||p.blueprint)) return renderBrainOutput(p);
   if(p.format==="blog"&&p.body_markdown){
     S.push(`<div class="pkg"><h3>Article</h3><p class="sub">${esc(p.meta_description||"")}</p><div class="prose">${esc(p.body_markdown).replace(/\n/g,"<br>")}</div></div>`);
     if(p.faq) S.push(`<div class="pkg"><h3>FAQ</h3>${p.faq.map(f=>`<p><b>${esc(f.q)}</b><br><span class="sub">${esc(f.a)}</span></p>`).join("")}</div>`);
@@ -1196,7 +1196,7 @@ async function genBlueprint(btn){
   state.brief={topic,perspective:$("brPersp").value.trim(),style:$("brStyle").value};
   busy(btn,true,"Brain thinking…");
   try{ const r=await api(`/brands/${state.brand.id}/blueprint`,"POST",state.brief);
-    busy(btn,false); toast("Blueprint ready — review & approve"); if(state.tab==="board")tabBoard(); openReview(r.creative_id);
+    busy(btn,false); toast("Agent team is working — watch it build"); if(state.tab==="board")tabBoard(); await openReview(r.creative_id); pollBrain(r.creative_id);
   }catch(e){ toast(e.message,true); busy(btn,false); }
 }
 function renderBlueprint(bp){
@@ -1226,4 +1226,22 @@ async function proceed(cid,btn){
       }
     })();
   }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+
+function renderBrainOutput(p){
+  let h=""; const st=p.brain_status||"";
+  if(!p.blueprint) h+=`<div class="pkg"><h3>Agent team</h3><p class="cap">${st.indexOf("error")===0?"⚠ "+esc(st):`<span class="spinner"></span> ${esc(st||"Thinking…")}`}</p></div>`;
+  (p.agents||[]).forEach((a,i)=>{ const open=(!p.blueprint && i===p.agents.length-1)?"open":""; h+=`<details class="pkg" ${open}><summary>${esc(a.role)}</summary><p class="cap" style="margin-top:6px">${esc(a.output)}</p></details>`; });
+  if(p.blueprint) h+=renderBlueprint(p.blueprint);
+  return h||`<div class="pkg"><span class="spinner"></span> Thinking…</div>`;
+}
+async function pollBrain(cid){
+  const t0=Date.now();
+  while(Date.now()-t0<10*60*1000){
+    await new Promise(r=>setTimeout(r,5000));
+    let crs; try{crs=await api(`/brands/${state.brand.id}/creatives`);}catch(e){continue;}
+    const c=crs.find(x=>x.id===cid); const st=(((c||{}).payload)||{}).brain_status||"";
+    if(REVIEW_CID===cid) await openReview(cid);
+    if(st.indexOf("done")===0||st.indexOf("error")===0) break;
+  }
 }
