@@ -1,0 +1,1111 @@
+let TOKEN = localStorage.getItem("mb_token") || "";
+let ME = JSON.parse(localStorage.getItem("mb_me") || "null");
+let state = { view:"dash", brand:null, tab:"overview", wizard:null };
+let BRANDS = [];
+
+async function api(path, method="GET", body=null, raw=false){
+  const opt = {method, headers:{}};
+  if(TOKEN) opt.headers["Authorization"] = "Bearer "+TOKEN;
+  if(body && !raw){ opt.headers["Content-Type"]="application/json"; opt.body = JSON.stringify(body); }
+  if(body && raw){ opt.body = body; }
+  const r = await fetch("/api"+path, opt);
+  if(r.status===401){ logout(); throw new Error("Session expired — sign in again"); }
+  if(!r.ok){ let d; try{d=await r.json()}catch{d={detail:r.statusText}}; throw new Error(typeof d.detail==="string"?d.detail:JSON.stringify(d.detail)); }
+  return r.json();
+}
+function toast(msg, err=false){
+  const t=document.createElement("div"); t.className="toast"+(err?" err":""); t.textContent=msg;
+  document.getElementById("toasts").appendChild(t); setTimeout(()=>t.remove(), err?7000:4000);
+}
+function esc(s){return (s??"").toString().replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+function busy(btn,on,label){ if(!btn)return; btn.disabled=on; if(on){btn.dataset.l=btn.innerHTML; btn.innerHTML='<span class="spinner"></span>'+(label||"Working…");} else if(btn.dataset.l) btn.innerHTML=btn.dataset.l; }
+const $=id=>document.getElementById(id);
+const isAdmin=()=>ME && ME.role==="admin";
+
+/* ---------- auth ---------- */
+async function doLogin(btn){
+  busy(btn,true,"Signing in…"); $("liErr").textContent="";
+  try{
+    const r = await api("/auth/login","POST",{email:$("liEmail").value.trim(),password:$("liPw").value});
+    TOKEN=r.token; ME=r; localStorage.setItem("mb_token",TOKEN); localStorage.setItem("mb_me",JSON.stringify(r));
+    boot();
+  }catch(e){ $("liErr").textContent=e.message; busy(btn,false); }
+}
+function logout(){ TOKEN=""; ME=null; localStorage.removeItem("mb_token"); localStorage.removeItem("mb_me"); showLogin(); }
+function showLogin(){ $("login").classList.add("on"); $("shell").classList.remove("on"); }
+
+/* ---------- boot & nav ---------- */
+async function boot(){
+  if(!TOKEN){ showLogin(); return; }
+  try{ await api("/auth/me"); }catch{ return; }
+  $("login").classList.remove("on"); $("shell").classList.add("on");
+  $("uEmail").textContent = ME.email||""; $("uRole").textContent = ME.role==="admin"?"Administrator":"Client";
+  await loadBrands();
+  if(!isAdmin() && BRANDS.length===1){ openBrand(BRANDS[0].id); } else nav("dash");
+}
+async function loadBrands(){ BRANDS = await api("/brands"); renderSidebar(); }
+function renderSidebar(){
+  let h="";
+  h+=`<div class="navitem ${state.view==='dash'?'on':''}" onclick="nav('dash')">📊 Dashboard</div>`;
+  if(isAdmin()) h+=`<div class="navitem" onclick="startWizard()">➕ New Brand</div>`;
+  const groups={};
+  BRANDS.forEach(b=>{ (groups[b.grp||""]=groups[b.grp||""]||[]).push(b); });
+  for(const [g,list] of Object.entries(groups)){
+    h+=`<div class="navsec">${g?("📁 "+esc(g)):"Brands"}</div>`;
+    list.forEach(b=>{
+      const col=(((b.profile||{}).brand_kit||{}).colors||[])[0]||"#6366f1";
+      h+=`<div class="navitem ${state.brand&&state.brand.id===b.id?'on':''}" onclick="openBrand('${b.id}')"><span class="bdot" style="background:${col}"></span>${esc(b.name)}</div>`;
+    });
+  }
+  $("sidenav").innerHTML=h;
+}
+function nav(view){ state.view=view; state.brand=null; renderSidebar(); if(view==="dash") renderDash(); }
+
+/* ---------- dashboard ---------- */
+async function renderDash(){
+  const m=$("main");
+  m.innerHTML=`<h1 style="font-size:21px;margin-bottom:4px">Dashboard</h1>
+  <p class="sub">${isAdmin()?"All client brands at a glance — and the autopilot that runs them.":"Your brand at a glance."}</p>
+  <div id="dashBody"><span class="spinner"></span></div>`;
+  const [feed, ap, dg] = await Promise.all([api("/activity"), api("/autopilot/status"), api("/digest")]);
+  let h="";
+  h+=`<div class="card" style="border-left:4px solid var(--yel);border-radius:0 14px 14px 0"><h2>\ud83d\udcc5 Due today (${dg.due_today.length})</h2>`+
+    (dg.due_today.length? dg.due_today.map(d=>`<div class="feeditem"><span class="when">${esc(d.time||"")}</span><span class="tag y" style="margin:0">${esc(d.brand)}</span><span class="tag" style="margin:0">${esc(d.channel||"")}</span><span>${esc(d.title||"")}</span></div>`).join("")
+    : '<p class="sub" style="margin:6px 0 0">Nothing scheduled for today.</p>')+`</div>`;
+  if(dg.needs_approval.length||dg.changes_requested.length){
+    h+=`<div class="card" style="border-left:4px solid var(--warn);border-radius:0 14px 14px 0"><h2>\u270b Needs review (${dg.needs_approval.length+dg.changes_requested.length})</h2>`+
+      dg.needs_approval.map(d=>`<div class="feeditem"><span class="tag y" style="margin:0">${esc(d.brand)}</span><span class="tag" style="margin:0">${esc(d.format||"")}</span><span>${esc(d.title||"")}</span><button class="sm ghost" onclick="openBrand('${d.brand_id}').then(()=>{state.tab='creatives';renderBrand()})">review</button></div>`).join("")+
+      dg.changes_requested.map(d=>`<div class="feeditem"><span class="tag" style="margin:0;color:var(--err);border-color:var(--err)">changes requested</span><span class="tag y" style="margin:0">${esc(d.brand)}</span><span>${esc(d.title||"")} \u2014 <i>${esc(d.comment||"")}</i></span></div>`).join("")+`</div>`;
+  }
+  h+=`<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));margin-bottom:16px">
+    <div class="kpi"><b>${BRANDS.length}</b><span>brands</span></div>
+    <div class="kpi"><b>${BRANDS.filter(b=>b.status==='ready').length}</b><span>fully set up</span></div>
+    <div class="kpi"><b>${feed.filter(f=>f.type==='creative').length}</b><span>recent creatives</span></div>
+    <div class="kpi"><b>${feed.filter(f=>f.type==='publish').length}</b><span>recent publishes</span></div>
+  </div>`;
+  if(isAdmin()){
+    h+=`<div class="card"><div class="row"><h2>🤖 Autopilot</h2>
+      <button onclick="runAutopilotAll(this)">▶ Run autopilot for ALL brands</button>
+      <span class="sub" style="margin:0">Generates ideas, builds calendars, and produces creatives for every ready brand — unattended.</span></div>
+      <div id="apStatus">${renderApStatus(ap)}</div></div>`;
+  } else {
+    h+=`<div class="card" id="apStatus">${renderApStatus(ap)}</div>`;
+  }
+  h+=`<div class="card"><h2>Latest updates across ${isAdmin()?"all brands":"your brand"}</h2><div style="margin-top:8px">`+
+    (feed.length? feed.map(f=>`<div class="feeditem">
+      <span class="when">${f.at?new Date(f.at*1000).toLocaleString([], {month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}):""}</span>
+      <span class="tag y" style="margin:0">${esc(f.brand)}</span>
+      <span class="tag" style="margin:0">${f.type}</span>
+      <span>${esc(f.title)}</span></div>`).join("") : '<p class="sub">No activity yet — run autopilot or generate ideas.</p>')+`</div></div>`;
+  if(isAdmin()) h+=await renderUsersCard();
+  $("dashBody").innerHTML=h;
+  pollAutopilot();
+}
+function renderApStatus(ap){
+  const entries=Object.entries(ap||{}).filter(([k,v])=>v);
+  if(!entries.length) return '<p class="sub" style="margin:8px 0 0">Autopilot idle. No runs this session.</p>';
+  return entries.map(([bid,s])=>{
+    const b=BRANDS.find(x=>x.id===bid);
+    const stateTag = s.state==="running"?'<span class="tag y">running</span>':s.state==="done"?'<span class="tag g">done</span>':'<span class="tag" style="color:var(--err)">failed</span>';
+    return `<div style="margin-top:10px"><b>${esc(b?b.name:bid)}</b> ${stateTag}
+      <div class="aplog">${(s.log||[]).map(esc).join("<br>")}</div></div>`;
+  }).join("");
+}
+let apTimer=null;
+async function pollAutopilot(){
+  clearTimeout(apTimer);
+  try{
+    const ap=await api("/autopilot/status");
+    const el=$("apStatus"); if(el) el.innerHTML=(isAdmin()?`<div class="row" style="margin-bottom:4px"></div>`:"")+renderApStatus(ap);
+    if(Object.values(ap||{}).some(s=>s&&s.state==="running")) apTimer=setTimeout(pollAutopilot,5000);
+  }catch{}
+}
+async function runAutopilotAll(btn){
+  busy(btn,true,"Engaging autopilot…");
+  try{ const r=await api("/autopilot/all","POST",{ideas_per_channel:4,creatives_per_channel:1,generate_images:true});
+    toast("Autopilot started for: "+r.started.join(", ")); busy(btn,false); pollAutopilot();
+  }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+async function renderUsersCard(){
+  let users=[]; try{ users=await api("/users"); }catch{}
+  return `<div class="card"><h2>Logins</h2><p class="sub">One login per client (locked to their brand) + admin logins (see everything).</p>
+    ${users.map(u=>`<div class="feeditem"><span class="tag ${u.role==='admin'?'y':'g'}" style="margin:0">${u.role}</span>
+      <b>${esc(u.email)}</b><span class="sub" style="margin:0">${u.brand_id?("→ "+esc((BRANDS.find(b=>b.id===u.brand_id)||{}).name||u.brand_id)):"all brands"}</span>
+      <button class="sm ghost" onclick="delUser('${u.id}')">remove</button></div>`).join("")}
+    <h3>Add login</h3>
+    <div class="row">
+      <input id="nuEmail" placeholder="email" style="flex:1;margin:0">
+      <input id="nuPw" placeholder="password" style="flex:1;margin:0">
+      <select id="nuRole" style="width:110px;margin:0" onchange="$('nuBrand').style.display=this.value==='client'?'':'none'"><option value="client">client</option><option value="admin">admin</option></select>
+      <select id="nuBrand" style="width:170px;margin:0">${BRANDS.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join("")}</select>
+      <button class="sm" onclick="addUser(this)">Create</button>
+    </div></div>`;
+}
+async function addUser(btn){
+  busy(btn,true);
+  try{ await api("/users","POST",{email:$("nuEmail").value.trim(),password:$("nuPw").value,role:$("nuRole").value,brand_id:$("nuRole").value==="client"?$("nuBrand").value:""});
+    toast("Login created"); renderDash(); }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+async function delUser(uid){ if(!confirm("Remove this login?"))return; await api("/users/"+uid,"DELETE"); renderDash(); }
+
+/* ---------- wizard (admin) ---------- */
+function startWizard(){ state.wizard={step:1}; renderWizard(); }
+function wizSteps(n){
+  const names=["1 · Company","2 · Scan presence","3 · Strategy","4 · Workspace"];
+  return `<div class="steps">${names.map((s,i)=>`<div class="step ${i+1<n?'done':i+1===n?'on':''}">${s}</div>`).join("")}</div>`;
+}
+function renderWizard(){
+  const w=state.wizard, m=$("main");
+  if(w.step===1){
+    m.innerHTML=wizSteps(1)+`<div class="card"><h2>Step 1 — Company</h2>
+      <p class="sub">Name + website. The Dog sniffs out everything else.</p>
+      <label>Brand name</label><input id="wName">
+      <label>Website</label><input id="wSite" placeholder="company.com">
+      <label>Social handles (optional, platform:handle, comma separated)</label><input id="wSoc">
+      <label>Portfolio group (optional)</label><input id="wGroup" placeholder="e.g. outlet-group">
+      <button onclick="wizCreate(this)">Scan online presence →</button></div>`;
+  } else if(w.step===2){
+    const s=w.scrape||{};
+    m.innerHTML=wizSteps(2)+`<div class="card"><h2>Step 2 — What the Dog fetched</h2>
+      <p class="sub">Scanned ${(s.pages_crawled||[]).length} page(s).</p>
+      ${s.ok?"":`<p class="sub" style="color:var(--err)">⚠️ ${esc((s.errors||[]).join("; "))}</p>`}
+      <h3>${esc(s.meta?.title||w.name)}</h3>
+      <p class="sub">${esc(s.meta?.description||s.meta?.og_description||"No description found.")}</p>
+      ${(s.colors||[]).map(c=>`<span class="swatch" style="background:${c}" title="${c}"></span>`).join("")}
+      ${(s.colors&&s.colors.length)?`<div style="margin-top:10px"><button class="sm ghost" onclick="mdPreview('${s.colors[0]}')">🎨 Preview this brand's theme</button> <button class="sm ghost" onclick="mdPreviewReset()">Reset</button><span class="sub" style="margin-left:8px">See the whole app wear ${esc(w.name||"this brand")}'s colours before you build.</span></div>`:""}
+      <h3>Discovered socials</h3>
+      <p>${Object.entries(s.socials||{}).map(([k,v])=>`<span class="tag g">${k}: ${esc(v)}</span>`).join("")||'<span class="sub">none found</span>'}</p>
+      <div class="row" style="margin-top:10px">
+        <button onclick="wizAnalyze(this)">Run AI strategy analysis →</button>
+        <button class="ghost" onclick="wizRescrape(this)">Re-scan</button></div></div>`;
+  } else if(w.step===3){
+    const p=w.profile||{}, recs=p.recommended_channels||[];
+    m.innerHTML=wizSteps(3)+`<div class="card"><h2>Step 3 — Strategy proposal</h2>
+      <p class="sub">${esc(p.summary||"")}</p>
+      <div class="grid">
+        <div class="idea"><h4>Voice</h4><p><b>${esc(p.brand_voice?.tone||"")}</b></p></div>
+        <div class="idea"><h4>Positioning</h4><p>${esc(p.positioning||"")}</p></div>
+        <div class="idea"><h4>Pillars</h4>${(p.content_pillars||[]).map(x=>`<p>• <b>${esc(x.name)}</b> (${x.share_pct||"?"}%)</p>`).join("")}</div>
+      </div>
+      <h3>Channels</h3>
+      <div class="chooser" id="chChooser">${["instagram","linkedin","twitter","youtube","tiktok","facebook","blog","email"].map(c=>{
+        const r=recs.find(x=>x.channel===c);
+        return `<div class="choice ${r&&r.priority==='high'?'on':''}" data-c="${c}" onclick="this.classList.toggle('on')">${c}${r?` (${r.priority})`:""}</div>`;}).join("")}</div>
+      <label>Goals</label><input id="wGoals" value="${esc((p.suggested_goals||[]).slice(0,3).join(", "))}">
+      <label>Cadence</label><input id="wCad" value="4 posts/week">
+      <button onclick="wizSetup(this)">Create workspace →</button></div>`;
+  } else {
+    m.innerHTML=wizSteps(4)+`<div class="card" style="text-align:center;padding:46px">
+      <h2>🎉 Workspace ready</h2><p class="sub">Run autopilot or generate ideas manually.</p>
+      <button onclick="openBrand('${w.brandId}')">Enter workspace →</button></div>`;
+  }
+}
+async function wizCreate(btn){
+  const name=$("wName").value.trim(), site=$("wSite").value.trim();
+  if(!name||!site) return toast("Name and website required",true);
+  const socials={};
+  $("wSoc").value.split(",").map(x=>x.trim()).filter(Boolean).forEach(x=>{const[k,...v]=x.split(":");if(v.length)socials[k.trim()]=v.join(":").trim();});
+  busy(btn,true,"Scanning…");
+  try{
+    const b=await api("/brands","POST",{name,website:site,socials,group:$("wGroup").value.trim()});
+    state.wizard={step:2,brandId:b.id,name};
+    state.wizard.scrape=await api(`/brands/${b.id}/scrape`,"POST");
+    await loadBrands(); renderWizard();
+  }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+async function wizRescrape(btn){ busy(btn,true); try{ state.wizard.scrape=await api(`/brands/${state.wizard.brandId}/scrape`,"POST"); renderWizard(); }catch(e){toast(e.message,true);busy(btn,false);} }
+async function wizAnalyze(btn){ busy(btn,true,"Strategist thinking…");
+  try{ state.wizard.profile=await api(`/brands/${state.wizard.brandId}/analyze`,"POST"); state.wizard.step=3; renderWizard(); }
+  catch(e){ toast(e.message,true); busy(btn,false); } }
+async function wizSetup(btn){
+  const channels=[...document.querySelectorAll("#chChooser .choice.on")].map(d=>d.dataset.c);
+  if(!channels.length) return toast("Pick at least one channel",true);
+  busy(btn,true,"Creating workspace…");
+  try{ await api(`/brands/${state.wizard.brandId}/setup`,"POST",{channels,goals:$("wGoals").value.split(",").map(x=>x.trim()).filter(Boolean),cadence:$("wCad").value});
+    state.wizard.step=4; await loadBrands(); renderWizard();
+  }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+
+/* ---------- brand workspace ---------- */
+async function openBrand(id){
+  state.brand=await api("/brands/"+id); state.view="brand"; state.tab="create"; state.create=null; renderSidebar(); renderBrand();
+}
+function assetUrl(b,a){ return a&&a.startsWith("http")?a:`/workspaces/${b.grp?b.grp+"/":""}${b.slug}/${a}`; }
+function kitOf(b){ return ((b.profile||{}).brand_kit)||{}; }
+function logoUrl(b){ const k=kitOf(b); return k.logo?`/workspaces/${b.grp?b.grp+"/":""}${b.slug}/${k.logo}`:null; }
+function renderBrand(){
+  const b=state.brand, k=kitOf(b);
+  const LBL={create:"✨ New post",board:"🗓 Content board",projects:"🏙 Projects",coach:"💬 Coach"};
+  const core=["create","board","projects","coach"];
+  const extra=["overview","brand kit","ideas","growth","campaigns","reel studio","calendar","creatives","publish","analytics","competitors","playbook","connectors"];
+  const tabs=state.showAll?core.concat(extra):core;
+  $("main").innerHTML=`
+    <div class="row" style="margin-bottom:4px">
+      ${logoUrl(b)?`<img class="brandlogo" alt="${esc(b.name)} logo" src="${logoUrl(b)}">`:""}
+      <h1 style="font-size:21px">${esc(b.name)}</h1>
+      ${(k.colors||[]).slice(0,4).map(c=>`<span class="swatch" style="width:18px;height:18px;background:${c}" title="${c}"></span>`).join("")}
+      <span class="sp" style="flex:1"></span>
+      <button class="grn sm" onclick="runAutopilot(this)">🤖 Run autopilot</button>
+    </div>
+    <p class="sub">${esc(b.website||"")} ${b.grp?` · 📁 ${esc(b.grp)}`:""} · ${(b.setup?.channels||[]).join(" · ")}</p>
+    <div class="tabs">${tabs.map(t=>`<div class="tab ${state.tab===t?'on':''}" onclick="state.tab='${t}';renderBrand()">${LBL[t]||(t[0].toUpperCase()+t.slice(1))}</div>`).join("")}<div class="tab" style="margin-left:auto;opacity:.85" onclick="state.showAll=!state.showAll;renderBrand()">${state.showAll?'Less ▲':'More ▼'}</div></div>
+    <div id="tabBody"><span class="spinner"></span></div>`;
+  ({"create":tabCreate,"board":tabBoard,"overview":tabOverview,"brand kit":tabKit,"ideas":tabIdeas,"growth":tabGrowth,"campaigns":tabCampaigns,"reel studio":tabReelStudio,"calendar":tabCalendar,"creatives":tabCreatives,"publish":tabPublish,"analytics":tabAnalytics,"competitors":tabCompetitors,"coach":tabCoach,"projects":tabProjects,"playbook":tabPlaybook,"connectors":tabConnectors})[state.tab]();
+}
+async function runAutopilot(btn){
+  busy(btn,true,"Engaging…");
+  try{ await api(`/brands/${state.brand.id}/autopilot`,"POST",{ideas_per_channel:4,creatives_per_channel:1,generate_images:true});
+    toast("Autopilot running — watch progress on the Dashboard"); busy(btn,false);
+  }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+
+async function tabOverview(){
+  const b=state.brand,p=b.profile||{};
+  const [ideas,cal,crs]=await Promise.all([api(`/brands/${b.id}/ideas`),api(`/brands/${b.id}/calendar`),api(`/brands/${b.id}/creatives`)]);
+  $("tabBody").innerHTML=`
+    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));margin-bottom:14px">
+      <div class="kpi"><b>${ideas.length}</b><span>ideas</span></div>
+      <div class="kpi"><b>${cal.length}</b><span>scheduled</span></div>
+      <div class="kpi"><b>${crs.length}</b><span>creatives</span></div>
+      <div class="kpi"><b>${(b.setup?.channels||[]).length}</b><span>channels</span></div>
+    </div>
+    <div class="card"><h2>Brand profile</h2><p class="sub">${esc(p.summary||"")}</p>
+      <h3>Voice</h3><p class="sub"><b>${esc(p.brand_voice?.tone||"")}</b> · use: ${(p.brand_voice?.words_we_use||[]).join(", ")} · avoid: ${(p.brand_voice?.words_we_avoid||[]).join(", ")}</p>
+      <h3>Pillars</h3><p>${(p.content_pillars||[]).map(x=>`<span class="tag y">${esc(x.name)} ${x.share_pct||""}%</span>`).join("")}</p>
+      <h3>Positioning</h3><p class="sub">${esc(p.positioning||"")}</p></div>`;
+}
+
+async function tabKit(){
+  const b=state.brand, k=kitOf(b);
+  const scraped=((b.scrape||{}).colors||[]);
+  $("tabBody").innerHTML=`
+    <div class="card"><h2>🎨 Brand kit</h2>
+      <p class="sub">These colors and this logo are injected into every AI prompt and composited onto generated visuals.</p>
+      <h3>Palette</h3>
+      <p>${(k.colors||[]).map(c=>`<span class="swatch" style="background:${c}" title="${c}"></span>`).join("")||'<span class="sub">no colors set</span>'}</p>
+      <label>Colors (hex, comma separated)</label>
+      <input id="kitColors" value="${esc((k.colors||scraped.slice(0,4)).join(", "))}">
+      ${scraped.length?`<p class="sub">Found on your website: ${scraped.map(c=>`<span class="swatch" style="width:16px;height:16px;background:${c}" title="${c}"></span>`).join("")} <button class="sm ghost" onclick="$('kitColors').value='${scraped.slice(0,4).join(", ")}'">use these</button></p>`:""}
+      <label>Visual style notes (optional — e.g. "minimal, airy, premium; flat illustration; no stock photos")</label>
+      <textarea id="kitStyle" rows="2">${esc(k.style||"")}</textarea>
+      <button onclick="saveKit(this)">Save brand kit</button>
+      <h3 style="margin-top:20px">Logo</h3>
+      ${logoUrl(state.brand)?`<img class="brandlogo" alt="${esc(state.brand.name)} logo" style="width:84px;height:84px" src="${logoUrl(state.brand)}">`:'<p class="sub">No logo uploaded yet.</p>'}
+      <label style="display:block;margin-top:8px">Upload logo (PNG with transparency works best)</label>
+      <input type="file" id="logoFile" accept="image/*" style="padding:7px">
+      <button class="ghost" onclick="uploadLogo(this)">Upload logo</button>
+    </div>`;
+}
+async function saveKit(btn){
+  busy(btn,true);
+  try{
+    const colors=$("kitColors").value.split(",").map(x=>x.trim()).filter(x=>/^#[0-9a-fA-F]{6}$/.test(x));
+    await api(`/brands/${state.brand.id}/kit`,"POST",{colors,style:$("kitStyle").value});
+    state.brand=await api("/brands/"+state.brand.id); toast("Brand kit saved — future creatives will use it"); renderBrand();
+  }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+async function uploadLogo(btn){
+  const f=$("logoFile").files[0]; if(!f) return toast("Choose a file first",true);
+  busy(btn,true,"Uploading…");
+  try{
+    const fd=new FormData(); fd.append("file",f);
+    await api(`/brands/${state.brand.id}/logo`,"POST",fd,true);
+    state.brand=await api("/brands/"+state.brand.id); toast("Logo saved — it will be stamped on generated visuals"); renderBrand();
+  }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+
+async function tabIdeas(){
+  const b=state.brand;
+  const ideas=await api(`/brands/${b.id}/ideas`);
+  $("tabBody").innerHTML=`
+    <div class="card"><div class="row">
+      <button onclick="genIdeas(this)">⚡ Generate ideas</button>
+      <select id="ideaCount" style="width:90px;margin:0"><option>4</option><option selected>6</option><option>8</option></select>
+      <span class="sub" style="margin:0">per channel · learns from your analytics · autopilot uses this same engine</span></div>
+      <details style="margin-top:10px"><summary>⚙️ Advanced customization (optional — for regular/manual use)</summary>
+        <div class="row" style="margin-top:10px">
+          <div style="flex:1;min-width:200px"><label>Only these formats</label>
+            <div class="chooser" id="fmtChooser">${["reel","carousel","post","story","thread","article","live"].map(f=>`<div class="choice" data-f="${f}" onclick="this.classList.toggle('on')">${f}</div>`).join("")}</div></div>
+          <div style="width:170px"><label>Funnel stage</label>
+            <select id="optFunnel"><option value="">any (mixed)</option><option>awareness</option><option>consideration</option><option>conversion</option></select></div>
+          <div style="width:200px"><label>Content pillar</label>
+            <select id="optPillar"><option value="">any</option>${(((state.brand.profile||{}).content_pillars)||[]).map(p=>`<option>${esc(p.name)}</option>`).join("")}</select></div>
+        </div>
+        <div class="row">
+          <div style="flex:1"><label>Topic / campaign (optional)</label><input id="optTopic" placeholder="e.g. monsoon sale, new launch"></div>
+          <div style="width:220px"><label>Tone override (optional)</label><input id="optTone" placeholder="e.g. humorous, premium, urgent"></div>
+        </div>
+        <label>Extra instructions for the AI (optional)</label>
+        <input id="optInstr" placeholder="e.g. feature customer testimonials; avoid discount talk">
+      </details></div>
+    <div class="grid">${ideas.map(i=>{const p=i.payload;return `
+      <div class="idea">
+        <p><span class="tag y">${i.channel}</span><span class="tag">${esc(p.format)}</span><span class="tag">${esc(p.funnel_stage||"")}</span><span class="tag ${i.state==='produced'?'g':''}">${i.state}</span>${p.virality?`<span class="tag" style="background:${p.virality.score>=75?'var(--grnBg)':'var(--yelBg)'};border-color:${p.virality.score>=75?'#bbf7d0':'var(--yel)'};color:${p.virality.score>=75?'var(--grn)':'var(--yelD)'}">🔥 ${p.virality.score}</span>`:""}</p>
+        <h4>${esc(p.title)}</h4>
+        <p class="hook">"${esc(p.hook||"")}"</p>
+        <p>${esc(p.concept||"")}</p>
+        <details><summary>Why it works</summary><p class="sub">${esc(p.why_it_works||"")}</p></details>
+        <div class="row" style="margin-top:9px">
+          ${i.state!=="produced"?`<button class="sm" onclick="makeCreative('${i.id}',this)">🎬 Produce</button>`:""}
+          <button class="sm ghost" onclick="ideaState('${i.id}','${i.state==='approved'?'proposed':'approved'}')">${i.state==='approved'?'Unapprove':'Approve'}</button>
+          ${!p.virality?`<button class="sm ghost" onclick="scoreIdea('${i.id}',this)">🔥 Score</button>`:""}
+        </div></div>`;}).join("")||'<p class="sub">No ideas yet — generate some or run autopilot.</p>'}</div>`;
+}
+async function genIdeas(btn){
+  busy(btn,true,"Brainstorming…");
+  const body={count:parseInt($("ideaCount").value)};
+  const fmts=[...document.querySelectorAll("#fmtChooser .choice.on")].map(d=>d.dataset.f);
+  if(fmts.length) body.formats=fmts;
+  if($("optFunnel")&&$("optFunnel").value) body.funnel_stage=$("optFunnel").value;
+  if($("optPillar")&&$("optPillar").value) body.pillar=$("optPillar").value;
+  if($("optTopic")&&$("optTopic").value.trim()) body.topic=$("optTopic").value.trim();
+  if($("optTone")&&$("optTone").value.trim()) body.tone=$("optTone").value.trim();
+  if($("optInstr")&&$("optInstr").value.trim()) body.instructions=$("optInstr").value.trim();
+  try{ const r=await api(`/brands/${state.brand.id}/ideas`,"POST",body);
+    toast(`${r.ideas.length} ideas generated`); tabIdeas(); }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+async function ideaState(id,s){ await api(`/brands/${state.brand.id}/ideas/${id}/state`,"POST",{state:s}); tabIdeas(); }
+
+async function scoreIdea(id,btn){
+  busy(btn,true,"Scoring…");
+  try{ const r=await api(`/brands/${state.brand.id}/score`,"POST",{kind:"idea",id});
+    toast(`🔥 ${r.score}/99 — ${r.verdict||""}`); tabIdeas(); }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+
+/* ---------- growth engine ---------- */
+async function tabGrowth(){
+  const b=state.brand;
+  $("tabBody").innerHTML=`
+    <div class="card"><h2>✂️ Clip-finder (repurpose long content)</h2>
+      <p class="sub">Paste a podcast/video transcript, blog post, or webinar notes. The Dog sniffs out the most viral-worthy moments and turns each into a scored, ready-to-shoot short. Clips land in your Ideas tab.</p>
+      <textarea id="rpSource" rows="6" placeholder="Paste transcript or article here (timestamps welcome)…"></textarea>
+      <div class="row">
+        <select id="rpPlatform" style="width:140px;margin:0">${(b.setup?.channels||["instagram"]).map(c=>`<option>${c}</option>`).join("")}</select>
+        <select id="rpCount" style="width:90px;margin:0"><option>3</option><option selected>5</option><option>8</option></select>
+        <button onclick="runRepurpose(this)">Find viral moments</button></div>
+      <div id="rpOut"></div></div>
+    <div class="card"><h2>🔎 Keyword & SEO research</h2>
+      <p class="sub">vidIQ-style metadata pack: keywords with intent + opportunity, titles, tags, description, thumbnail text. Volumes are AI estimates.</p>
+      <div class="row">
+        <input id="seoTopic" placeholder="topic, e.g. 'best tennis racket for beginners'" style="flex:1;margin:0">
+        <select id="seoPlatform" style="width:130px;margin:0"><option>youtube</option><option>instagram</option><option>blog</option><option>tiktok</option></select>
+        <button onclick="runSeo(this)">Research</button></div>
+      <div id="seoOut"></div></div>
+    <div class="card"><div class="row"><h2>📡 Trend radar</h2><button class="grn sm" onclick="runTrends(this)">Scan live trends</button></div>
+      <p class="sub">Scrapes REAL Google search signals for this niche (via Apify), then turns them into trends with an angle for this brand. Scans are cached for 7 days and automatically feed idea generation + autopilot. Leave keywords empty to auto-derive from the brand profile.</p>
+      <input id="trendKw" placeholder="optional keywords, comma separated — e.g. tennis racket india, tennis shoes">
+      <div id="trendOut"></div></div>`;
+}
+async function runRepurpose(btn){
+  const src=$("rpSource").value;
+  if(src.trim().length<200) return toast("Paste at least a few paragraphs",true);
+  busy(btn,true,"Clipping…");
+  try{
+    const r=await api(`/brands/${state.brand.id}/repurpose`,"POST",{source:src,count:parseInt($("rpCount").value),platform:$("rpPlatform").value});
+    $("rpOut").innerHTML=`<h3 style="margin-top:14px">${r.clips.length} clips found (saved to Ideas)</h3><div class="grid">`+r.clips.map(({clip:c})=>`
+      <div class="idea"><p><span class="tag g">🔥 ${c.virality?.score??"—"}</span><span class="tag">${esc(c.timestamp_or_section||"")}</span></p>
+        <h4>${esc(c.title)}</h4><p class="hook">"${esc(c.hook||"")}"</p>
+        <p style="white-space:pre-wrap">${esc(c.short_script||"")}</p>
+        <details><summary>Quote & caption</summary><p class="sub">"${esc(c.quote||"")}"</p><pre>${esc(c.caption||"")}</pre></details>
+      </div>`).join("")+`</div>`;
+    busy(btn,false);
+  }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+async function runSeo(btn){
+  const topic=$("seoTopic").value.trim();
+  if(!topic) return toast("Enter a topic",true);
+  busy(btn,true,"Researching…");
+  try{
+    const r=await api(`/brands/${state.brand.id}/seo`,"POST",{topic,platform:$("seoPlatform").value});
+    $("seoOut").innerHTML=`
+      <div class="markdown" style="margin-top:12px"><table><tr><th>Keyword</th><th>Intent</th><th>Vol*</th><th>Comp*</th><th>Opp</th></tr>
+      ${(r.keywords||[]).map(k=>`<tr><td><b>${esc(k.keyword)}</b></td><td>${esc(k.intent)}</td><td>${esc(k.est_volume)}</td><td>${esc(k.est_competition)}</td><td>${k.opportunity}/10</td></tr>`).join("")}</table>
+      <p class="sub">*AI estimates, not live data</p></div>
+      <h3>Title options</h3><ul class="checklist">${(r.title_options||[]).map(t=>`<li><b>${esc(t.title)}</b> <span class="tag">${esc(t.style)}</span></li>`).join("")}</ul>
+      <h3>Tags</h3><p>${(r.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</p>
+      <h3>Thumbnail text</h3><p>${(r.thumbnail_text_options||[]).map(t=>`<span class="tag y">${esc(t)}</span>`).join("")}</p>
+      <h3>Description template</h3><pre>${esc(r.description_template||"")}</pre>
+      <p class="sub">🕳 Content gap: ${esc(r.content_gap_note||"")} · ⏰ ${esc(r.best_posting_window||"")}</p>`;
+    busy(btn,false);
+  }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+async function runTrends(btn){
+  busy(btn,true,"Scraping Google + analyzing…");
+  const kws=$("trendKw").value.split(",").map(x=>x.trim()).filter(Boolean);
+  try{
+    const r=await api(`/brands/${state.brand.id}/trends`,"POST",{keywords:kws,live:true});
+    $("trendOut").innerHTML=`
+      <p style="margin-top:10px">${r.live_data
+        ?`<span class="tag g">✓ live Google data</span> <span class="sub">scanned: ${(r.scanned_keywords||[]).join(", ")}</span>`
+        :`<span class="tag">AI-inferred</span> <span class="sub">${esc(r.note)}</span>`}</p>
+      <div class="grid" style="margin-top:6px">`+(r.trends||[]).map(t=>`
+      <div class="idea"><p><span class="tag ${t.confidence==='high'?'g':'y'}">${esc(t.confidence)}</span><span class="tag">${esc(t.type)}</span><span class="tag">${esc(t.window||"")}</span></p>
+        <h4>${esc(t.trend)}</h4><p>${esc(t.angle_for_brand)}</p>
+        ${t.evidence&&t.evidence!=='inferred'?`<p class="sub">📊 ${esc(t.evidence)}</p>`:""}
+        <details><summary>Example post</summary><p class="hook">"${esc(t.example_post?.hook||"")}"</p><p class="sub">${esc(t.example_post?.concept||"")}</p></details>
+      </div>`).join("")+`</div>`;
+    busy(btn,false);
+  }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+
+/* ---------- competitors ---------- */
+async function tabCompetitors(){
+  const b=state.brand; const comps=await api(`/brands/${b.id}/competitors`);
+  $("tabBody").innerHTML=`
+    <div class="card"><div class="row"><h2>⚔️ Competitor tracker</h2>
+      <button class="grn" onclick="discoverComps(this)">🔍 Find competitors automatically</button></div>
+      <p class="sub">Auto-discovery scrapes Google for your niche keywords and shortlists who actually competes with you. Or add one manually below.</p>
+      <div id="discOut"></div>
+      <div class="row" style="margin-top:8px">
+        <input id="compUrl" placeholder="competitor website, e.g. racquetguys.com" style="flex:1;margin:0">
+        <input id="compName" placeholder="name (optional)" style="width:170px;margin:0">
+        <button onclick="addCompetitor(this)">Analyze</button></div></div>
+    ${comps.map(c=>{const p=c.payload;return `
+    <div class="card"><div class="row"><h2>${esc(c.name||"")}</h2>${p._scrape_ok?'<span class="tag g">site scraped</span>':'<span class="tag">AI knowledge only</span>'}
+      <button class="sm ghost" onclick="delCompetitor('${c.id}')">remove</button></div>
+      <p class="sub">${esc(p.positioning_summary||"")}</p>
+      <div class="grid">
+        <div class="idea"><h4 style="color:var(--err)">Their strengths</h4><ul class="checklist">${(p.their_strengths||[]).map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>
+        <div class="idea"><h4 style="color:var(--grn)">Their weaknesses</h4><ul class="checklist">${(p.their_weaknesses||[]).map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>
+      </div>
+      <h3>🕳 Gaps we can own</h3><ul class="checklist">${(p.gaps_we_can_own||[]).map(g=>`<li><b>${esc(g.gap)}</b> — ${esc(g.content_play)}</li>`).join("")}</ul>
+      <h3>🎯 One move this month</h3><p class="sub">${esc(p.one_move_this_month||"")}</p>
+      <details><summary>Channel-by-channel + what not to copy</summary>
+        <ul class="checklist">${(p.channel_comparison||[]).map(c2=>`<li><b>${esc(c2.channel)}</b>: them — ${esc(c2.them)}; us — ${esc(c2.us)}</li>`).join("")}</ul>
+        <p class="sub">🚫 ${esc(p.do_not_copy||"")}</p></details>
+    </div>`;}).join("")||""}`;
+}
+async function discoverComps(btn){
+  busy(btn,true,"Scanning Google for rivals…");
+  try{
+    const r=await api(`/brands/${state.brand.id}/competitors/discover`,"POST");
+    $("discOut").innerHTML=`<p class="sub" style="margin-top:10px">Scanned: ${(r.keywords_used||[]).join(", ")} · ${r.serp_domains_found} ranking domains found</p>
+      <div class="grid">`+(r.competitors||[]).map(c=>`
+      <div class="idea"><p><span class="tag ${c.threat==='high'?'':'y'}" style="${c.threat==='high'?'color:var(--err);border-color:var(--err)':''}">${esc(c.threat)} threat</span><span class="tag">${esc(c.type)}</span>${c.already_analyzed?'<span class="tag g">analyzed</span>':''}</p>
+        <h4>${esc(c.name)}</h4><p class="sub">${esc(c.url)}</p>
+        <p>${esc(c.evidence||"")}</p>
+        <p class="sub">👁 ${esc(c.watch_for||"")}</p>
+        ${!c.already_analyzed?`<button class="sm" style="margin-top:8px" onclick="$('compUrl').value='${esc(c.url)}';$('compName').value='${esc(c.name).replace(/'/g,"")}';addCompetitor(this)">⚔️ Build battlecard</button>`:""}
+      </div>`).join("")+`</div>`;
+    busy(btn,false);
+  }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+async function addCompetitor(btn){
+  const url=$("compUrl").value.trim(); if(!url) return toast("Enter a website",true);
+  busy(btn,true,"Scraping & analyzing…");
+  try{ await api(`/brands/${state.brand.id}/competitors`,"POST",{url,name:$("compName").value.trim()});
+    toast("Battlecard ready"); tabCompetitors(); }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+async function delCompetitor(cid){ await api(`/brands/${state.brand.id}/competitors/${cid}`,"DELETE"); tabCompetitors(); }
+
+let RS_TIMER=null;
+async function tabReelStudio(){
+  const b=state.brand;
+  const [opts,crs]=await Promise.all([api("/reel-studio/options"),api(`/brands/${b.id}/creatives`)]);
+  const reels=crs.filter(c=>c.format==="reel");
+  const styleIcons={"studio-product":"\ud83d\udcf8","cinematic":"\ud83c\udfac","ugc-phone":"\ud83e\udd33","motion-graphics":"\ud83d\udd37","watercolor":"\ud83c\udfa8","claymation":"\ud83e\uddf1","pixel-art":"\ud83d\udc7e","halftone":"\ud83d\udfe3","3d-render":"\ud83e\uddca","line-art":"\u270f\ufe0f","collage":"\ud83d\uddc2","vintage-editorial":"\ud83d\udcf0"};
+  $("tabBody").innerHTML=`
+    <div class="card"><h2>\ud83c\udfac Reel Studio</h2>
+      <p class="sub">Describe a video idea — the Dog directs a scene-by-scene storyboard, paints every scene in your chosen style (brand colors + logo), records the voiceover, and hands you a buildable reel.</p>
+      <label>Describe your video idea (or pick an existing reel below)</label>
+      <textarea id="rsPrompt" rows="3" placeholder="e.g. 30s ad: why every beginner buys the wrong racket — myth vs reality, ends with our fitting service"></textarea>
+      <div class="row">
+        <div style="flex:1"><label>…or start from an existing reel script</label>
+          <select id="rsCreative"><option value="">— none, use my idea above —</option>${reels.map(r=>`<option value="${r.id}">${esc(r.payload.title)}</option>`).join("")}</select></div>
+        <div style="width:140px"><label>Voiceover voice</label>
+          <select id="rsVoice">${opts.voices.map(v=>`<option>${v}</option>`).join("")}</select></div>
+        <div style="width:110px"><label>Scenes</label>
+          <select id="rsScenes"><option>3</option><option selected>4</option><option>5</option><option>6</option></select></div>
+      </div>
+      <label>Visual style</label>
+      <div class="chooser" id="rsStyle">${opts.styles.map((s,i)=>`<div class="choice ${i===1?'on':''}" data-s="${s}" onclick="[...this.parentNode.children].forEach(x=>x.classList.remove('on'));this.classList.add('on')">${styleIcons[s]||""} ${s.replace(/-/g," ")}</div>`).join("")}</div>
+      <button onclick="runReelStudio(this)">\ud83c\udfac Generate reel (scenes + voiceover)</button>
+      <div id="rsOut"></div></div>`;
+}
+async function runReelStudio(btn){
+  const body={prompt:$("rsPrompt").value.trim(),creative_id:$("rsCreative").value,
+    style:(document.querySelector("#rsStyle .choice.on")||{}).dataset?.s||"cinematic",
+    voice:$("rsVoice").value,scenes:parseInt($("rsScenes").value)};
+  if(!body.prompt&&!body.creative_id) return toast("Describe an idea or pick a reel",true);
+  busy(btn,true,"Director at work\u2026");
+  try{
+    const r=await api(`/brands/${state.brand.id}/reel-studio`,"POST",body);
+    pollReelJob(r.job_id,btn);
+  }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+async function pollReelJob(jid,btn){
+  clearTimeout(RS_TIMER);
+  try{
+    const j=await api(`/reel-studio/jobs/${jid}`);
+    $("rsOut").innerHTML=`<div class="aplog" style="margin-top:12px">${(j.log||[]).map(esc).join("<br>")}</div>`+
+      (j.state==="done"&&j.creative_id?`<div class="row" style="margin-top:10px"><button class="grn" onclick="state.tab='creatives';renderBrand()">Open in Creatives \u2192 Build video</button></div>`:"");
+    if(j.state==="running"){ RS_TIMER=setTimeout(()=>pollReelJob(jid,btn),4000); }
+    else { busy(btn,false); if(j.state==="done") toast("Reel generated \u2014 scenes + voiceover ready"); }
+  }catch(e){ busy(btn,false); toast(e.message,true); }
+}
+async function tabCalendar(){
+  const b=state.brand; const cal=await api(`/brands/${b.id}/calendar`);
+  $("tabBody").innerHTML=`
+    <div class="card"><div class="row"><button onclick="genCalendar(this)">📅 Build 30-day calendar</button>
+      <span class="sub" style="margin:0">Optimal times per platform; re-running replaces planned items.</span></div></div>
+    <div class="card" style="padding:0">${cal.map(c=>`
+      <div class="calrow"><b>${esc(c.date||"")}</b><span>${esc(c.time||"")}</span>
+        <span class="tag y" style="margin:0">${esc(c.channel||"")}</span>
+        <span><b>${esc(c.payload?.title||"")}</b> <span class="sub" style="margin:0">· ${esc(c.payload?.format||"")}</span></span>
+        <span class="tag">${c.status}</span></div>`).join("")||'<p class="sub" style="padding:16px">No calendar yet.</p>'}</div>`;
+}
+async function genCalendar(btn){
+  busy(btn,true,"Planning…");
+  try{ await api(`/brands/${state.brand.id}/calendar`,"POST",{days:30}); tabCalendar(); }
+  catch(e){ toast(e.message,true); busy(btn,false); }
+}
+
+async function makeCreative(ideaId,btn){
+  busy(btn,true,"Producing…");
+  try{ await api(`/brands/${state.brand.id}/creatives`,"POST",{idea_id:ideaId});
+    toast("Creative produced"); state.tab="creatives"; renderBrand(); }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+
+async function tabCreatives(){
+  const b=state.brand; const crs=await api(`/brands/${b.id}/creatives`);
+  $("tabBody").innerHTML = crs.length? crs.map(c=>{const p=c.payload;return `
+    <div class="card">
+      <div class="row"><h2>${esc(p.title)}</h2><span class="tag y">${c.channel}</span><span class="tag">${esc(p.format)}</span>${apBadge(p)}</div>
+      ${renderPackage(p)}
+      ${c.asset_path?`<div class="row" style="align-items:flex-start;margin-top:10px">
+        <div class="phone"><div class="ph-h">${logoUrl(b)?`<img alt="" src="${logoUrl(b)}">`:""}<span>${esc(b.name)}</span></div>
+          <img class="ph-img" alt="${esc(p.title||b.name)} — branded visual" loading="lazy" src="${assetUrl(b,c.asset_path)}${c.asset_path.startsWith("http")?"":"?t="+Date.now()}">
+          <div class="ph-a"><span>❤️</span><span>💬</span><span>➤</span></div>
+          <div class="ph-c"><b>${esc(b.name.toLowerCase().replace(/\s/g,""))}</b> ${esc((p.caption||"").slice(0,120))}</div></div>
+        </div>`:""}
+      <div class="row" style="margin-top:12px">
+        <button class="sm" onclick="genImage('${c.id}',this)">🎨 Generate branded visual</button>
+        ${c.channel==="instagram"?`<button class="sm ghost" onclick="algoAudit('${c.id}',this)">📈 IG algo audit</button>`:""}
+        ${p.slides?`<button class="sm" onclick="genSlides('${c.id}',this)">🖼 Generate ${p.slides.length} slide images</button>`:""}
+        ${(p.format==="reel"||p.script)?`<button class="sm" onclick="genVO('${c.id}',this)">🎙 Generate voiceover</button>`:""}
+        ${c.asset_path&&(p.format==="reel"||p.script)?`<button class="sm" onclick="buildVideo('${c.id}',this)">🎬 Build video</button>`:""}
+        <button class="sm grn" onclick="publishCreative('${c.id}','simulated',this)">📤 Publish (simulated)</button>
+        <button class="sm ghost" onclick="publishCreative('${c.id}','live',this)">🔴 Publish live</button>
+        <span style="flex:1"></span>
+        <button class="sm grn" onclick="approve('${c.id}','approved',this)">✓ Approve</button>
+        <button class="sm ghost" onclick="approve('${c.id}','changes_requested',this)">✎ Request changes</button>
+      </div>
+      ${p.slide_assets?`<div class="row" style="margin-top:8px;overflow-x:auto;flex-wrap:nowrap">${p.slide_assets.map((a,i)=>`<img alt="Slide ${i+1}" loading="lazy" src="${assetUrl(b,a)}" style="width:130px;border-radius:10px;border:1px solid var(--line)">`).join("")}</div>`:""}
+      ${p.scene_assets?`<p class="sub" style="margin:8px 0 4px">Storyboard (${esc((p.reel_studio||{}).style||"")} style):</p><div class="row" style="overflow-x:auto;flex-wrap:nowrap">${p.scene_assets.map((a,i)=>`<img alt="Storyboard scene ${i+1}" loading="lazy" src="${assetUrl(b,a)}" style="width:110px;border-radius:10px;border:1px solid var(--line)">`).join("")}</div>`:""}
+      ${p.vo_asset?`<div class="row" style="margin-top:8px"><audio controls src="${assetUrl(b,p.vo_asset)}" style="height:32px"></audio><span class="sub" style="margin:0">voiceover — mixed into Build video</span></div>`:""}
+      ${p.algo_audit?renderAudit(p.algo_audit):""}
+      <div id="vout_${c.id}"></div></div>`;}).join("") : '<div class="card"><p class="sub">No creatives yet — produce one from Ideas or run autopilot.</p></div>';
+}
+function renderPackage(p){
+  let h="";
+  if(p.format==="blog"&&p.body_markdown){
+    return `<p class="sub">${esc(p.meta_description||"")}</p><pre style="max-height:300px;overflow-y:auto">${esc(p.body_markdown)}</pre>
+      <h3>FAQ</h3><ul class="checklist">${(p.faq||[]).map(f=>`<li><b>${esc(f.q)}</b> — ${esc(f.a)}</li>`).join("")}</ul>`;
+  }
+  if(p.format==="email") return renderEmailPkg(p);
+  if(p.script){const s=p.script;
+    h+=`<h3>🎬 Script (~${s.duration_seconds}s)</h3><p class="sub">Hooks: ${(s.hook_options||[]).map(x=>`"${esc(x)}"`).join(" · ")}</p>
+    <div class="markdown"><table><tr><th>Time</th><th>Camera</th><th>Action</th><th>VO</th><th>Text</th></tr>
+    ${(s.shots||[]).map(sh=>`<tr><td>${esc(sh.t)}</td><td>${esc(sh.camera)}</td><td>${esc(sh.action)}</td><td>${esc(sh.dialogue_or_vo)}</td><td>${esc(sh.on_screen_text)}</td></tr>`).join("")}</table></div>
+    ${s.audio?`<p class="sub">🎵 ${esc(s.audio.style||"")}</p>`:""}`;
+    if(p.filming_guide) h+=`<details><summary>Filming & editing guide</summary><pre>${esc(JSON.stringify(p.filming_guide,null,2))}</pre></details>`;
+  }
+  if(p.slides) h+=`<h3>🖼 Slides</h3>`+p.slides.map(s=>`<div class="idea" style="margin:6px 0"><b>Slide ${s.n}: ${esc(s.headline)}</b><p>${esc(s.body||"")}</p><p class="sub">Visual: ${esc(s.visual_direction||"")}</p></div>`).join("");
+  if(p.copy_variants) h+=`<h3>✍️ Copy</h3>`+p.copy_variants.map(v=>`<div class="idea" style="margin:6px 0"><b>Variant ${esc(v.variant)}</b><p style="white-space:pre-wrap">${esc(v.text)}</p></div>`).join("");
+  if(p.frames) h+=`<h3>📱 Story frames</h3><ul class="checklist">`+p.frames.map(f=>`<li><b>${f.n}.</b> ${esc(f.content)} — <i>${esc(f.sticker_or_interaction||"")}</i></li>`).join("")+`</ul>`;
+  if(p.tweets) h+=`<h3>🧵 Thread</h3><ul class="checklist">`+p.tweets.map(t=>`<li>${esc(t.text)}</li>`).join("")+`</ul>`;
+  if(p.outline) h+=`<h3>📝 Outline</h3><ul class="checklist">`+p.outline.map(o=>`<li><b>${esc(o.h2)}</b></li>`).join("")+`</ul>`;
+  h+=`<h3>Caption</h3><pre>${esc(p.caption||"")}</pre>
+  <p>${Object.values(p.hashtags||{}).flat().map(t=>`<span class="tag">#${esc(t.replace(/^#/,""))}</span>`).join("")}</p>
+  <p class="sub">⏰ ${esc(p.best_time_hint||"")} · 🎯 ${(p.kpis_to_watch||[]).join(", ")}</p>`;
+  return h;
+}
+async function genImage(cid,btn){
+  busy(btn,true,"Painting in brand colors…");
+  try{ await api(`/brands/${state.brand.id}/images`,"POST",{creative_id:cid}); toast("Branded visual ready"); tabCreatives(); }
+  catch(e){ toast(e.message,true); busy(btn,false); }
+}
+async function publishCreative(cid,mode,btn){
+  busy(btn,true,mode==="live"?"Publishing…":"Rendering…");
+  try{ const r=await api(`/brands/${state.brand.id}/publish`,"POST",{creative_id:cid,mode});
+    toast(r.payload?.simulated?"Simulated publish queued — see Publish tab":"Published"); state.tab="publish"; renderBrand();
+  }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+
+function apBadge(p){
+  const a=p.approval;
+  if(!a) return `<span class="apbadge" style="background:var(--panel2);color:var(--mut)">pending review</span>`;
+  return a.state==="approved"
+    ? `<span class="apbadge" style="background:var(--grnBg);color:var(--grn)">✓ approved</span>`
+    : `<span class="apbadge" style="background:#fff1f2;color:var(--err)" title="${esc(a.comment||"")}">changes requested</span>`;
+}
+async function approve(cid,stateVal,btn){
+  let comment="";
+  if(stateVal==="changes_requested"){ comment=prompt("What should change?")||""; if(!comment) return; }
+  busy(btn,true);
+  try{ await api(`/brands/${state.brand.id}/creatives/${cid}/approval`,"POST",{state:stateVal,comment});
+    toast(stateVal==="approved"?"Approved — live publishing unlocked":"Changes requested"); tabCreatives();
+  }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+async function buildVideo(cid,btn){
+  busy(btn,true,"Rendering video…");
+  try{
+    const b=state.brand;
+    const c=(await api(`/brands/${b.id}/creatives`)).find(x=>x.id===cid);
+    const p=c.payload, s=p.script||{};
+    const loadImg=u=>new Promise((res,rej)=>{const im=new Image();im.crossOrigin="anonymous";im.onload=()=>res(im);im.onerror=()=>rej(new Error("couldn't load visual"));im.src=assetUrl(b,u)+(u.startsWith("http")?"":"?t="+Date.now());});
+    let sceneImgs=[];
+    if(p.scene_assets&&p.scene_assets.length){ sceneImgs=await Promise.all(p.scene_assets.map(loadImg)); }
+    const img=sceneImgs[0]||await loadImg(c.asset_path);
+    const cv=document.createElement("canvas"); cv.width=540; cv.height=960;
+    const ctx=cv.getContext("2d");
+    const stream=cv.captureStream(30);
+    let voEl=null;
+    if(p.vo_asset){
+      voEl=new Audio(assetUrl(b,p.vo_asset));
+      voEl.crossOrigin="anonymous";
+      const actx=new AudioContext();
+      const srcNode=actx.createMediaElementSource(voEl);
+      const dest=actx.createMediaStreamDestination();
+      srcNode.connect(dest);
+      dest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));
+    }
+    const rec=new MediaRecorder(stream,{mimeType:MediaRecorder.isTypeSupported("video/webm;codecs=vp9")?"video/webm;codecs=vp9":"video/webm"});
+    const chunks=[]; rec.ondataavailable=e=>chunks.push(e.data);
+    const done=new Promise(res=>{rec.onstop=res;});
+    rec.start();
+    if(voEl){ try{ await voEl.play(); }catch{} }
+    const colors=(((b.profile||{}).brand_kit||{}).colors)||["#6366f1"];
+    const hook=(s.hook_options||[p.title])[0]||p.title;
+    const rsScenes=(p.reel_studio||{}).scenes||[];
+    const texts=(rsScenes.length?rsScenes.map(x=>x.on_screen_text):(s.shots||[]).map(sh=>sh.on_screen_text)).filter(Boolean).slice(0,6);
+    if(!texts.length) texts.push(p.cta||"Follow for more");
+    function wrap(t,x,y,maxW,lh){
+      const words=String(t).split(" "); let line="", yy=y;
+      for(const w of words){ const test=line?line+" "+w:w;
+        if(ctx.measureText(test).width>maxW&&line){ ctx.fillText(line,x,yy); line=w; yy+=lh; } else line=test; }
+      ctx.fillText(line,x,yy);
+    }
+    const FPS=30, hookSec=2.2, perText=1.8, outroSec=2;
+    const total=Math.round(FPS*(hookSec+texts.length*perText+outroSec));
+    for(let f=0;f<total;f++){
+      const t=f/FPS;
+      ctx.fillStyle="#0c0e16"; ctx.fillRect(0,0,540,960);
+      if(t<hookSec){
+        ctx.fillStyle=colors[0]; ctx.fillRect(0,0,540,960);
+        ctx.fillStyle="#fff"; ctx.font="700 44px Inter,Arial"; ctx.textAlign="center";
+        wrap(hook,270,420,460,54);
+      } else if(t<hookSec+texts.length*perText){
+        const i=Math.floor((t-hookSec)/perText);
+        const zt=((t-hookSec)%perText)/perText;
+        const z=1.05+zt*0.08;
+        const cur=sceneImgs.length?(sceneImgs[Math.min(i,sceneImgs.length-1)]):img;
+        const iw=540*z, ih=iw*cur.height/cur.width;
+        ctx.drawImage(cur,(540-iw)/2,(960-ih)/2,iw,ih);
+        ctx.fillStyle="rgba(0,0,0,.45)"; ctx.fillRect(0,700,540,260);
+        ctx.fillStyle="#fff"; ctx.font="700 34px Inter,Arial"; ctx.textAlign="center";
+        wrap(texts[i]||"",270,790,470,44);
+      } else {
+        ctx.fillStyle=colors[0]; ctx.fillRect(0,0,540,960);
+        ctx.fillStyle="#fff"; ctx.font="700 40px Inter,Arial"; ctx.textAlign="center";
+        wrap(p.cta||"Follow "+b.name,270,440,460,50);
+        ctx.font="400 24px Inter,Arial"; ctx.fillText(b.website||"",270,560);
+      }
+      await new Promise(r=>setTimeout(r,1000/FPS));
+    }
+    if(voEl) voEl.pause();
+    rec.stop(); await done;
+    const blob=new Blob(chunks,{type:"video/webm"});
+    const url=URL.createObjectURL(blob);
+    $("vout_"+cid).innerHTML=`<div class="row" style="margin-top:10px"><video src="${url}" controls style="width:240px;border-radius:12px;border:1px solid var(--line)"></video>
+      <a href="${url}" download="${esc(b.slug)}-reel.webm"><button class="sm">⬇ Download video</button></a>
+      <span class="sub" style="margin:0">Draft animatic — hook → visual with captions → CTA. Use as a base or post as-is.</span></div>`;
+    busy(btn,false); toast("Video ready below the creative");
+  }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+function renderAudit(a){
+  const bar=s=>`<div style="display:flex;align-items:center;gap:8px;margin:3px 0"><span style="width:120px;font-size:11.5px;color:var(--mut)">${esc(s.signal.replace(/_/g," "))}</span>
+    <div style="flex:1;height:7px;background:var(--panel2);border-radius:4px"><div style="width:${s.score*10}%;height:7px;border-radius:4px;background:${s.score>=7?'var(--grn)':s.score>=4?'var(--yel)':'var(--err)'}"></div></div>
+    <b style="width:24px;font-size:11.5px">${s.score}</b></div>`;
+  return `<details style="margin-top:10px" open><summary>\ud83d\udcc8 Algorithm audit — ${a.algo_score}/99</summary>
+    <p class="sub">${esc(a.verdict||"")}</p>
+    ${(a.signals||[]).map(bar).join("")}
+    <div style="margin-top:8px">
+      ${(a.signals||[]).filter(s=>s.score<7).slice(0,4).map(s=>`<p class="sub" style="margin:4px 0">\ud83d\udd27 <b>${esc(s.signal.replace(/_/g," "))}</b>: ${esc(s.fix||"")}</p>`).join("")}
+      <p class="sub">\u26a1 Optimized hook: <i>"${esc(a.optimized_hook||"")}"</i></p>
+      <p class="sub">\ud83d\udd0e Caption opening: <i>${esc(a.optimized_caption_opening||"")}</i></p>
+      <p class="sub">\ud83d\udce8 Send trigger: <i>${esc(a.send_trigger_line||"")}</i> \u00b7 \ud83d\udd16 Save reason: <i>${esc(a.save_reason_addition||"")}</i></p>
+    </div></details>`;
+}
+async function algoAudit(cid,btn){
+  busy(btn,true,"Auditing against IG signals\u2026");
+  try{ const a=await api(`/brands/${state.brand.id}/creatives/${cid}/algo-audit`,"POST");
+    toast(`Algo score ${a.algo_score}/99 \u2014 audit shown on the card`); tabCreatives();
+  }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+async function genSlides(cid,btn){
+  busy(btn,true,"Painting slides\u2026 (takes a minute)");
+  try{ const r=await api(`/brands/${state.brand.id}/creatives/${cid}/slides`,"POST");
+    toast(`${r.slides.length} slide images ready`+(r.failed.length?` (${r.failed.length} failed)`:"")); tabCreatives();
+  }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+async function genVO(cid,btn){
+  busy(btn,true,"Recording voiceover\u2026");
+  try{ await api(`/brands/${state.brand.id}/creatives/${cid}/voiceover`,"POST");
+    toast("Voiceover ready \u2014 it will be mixed into the video"); tabCreatives();
+  }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+async function tabPublish(){
+  const b=state.brand; const log=await api(`/brands/${b.id}/publish`);
+  $("tabBody").innerHTML = log.length? log.map(l=>`
+    <div class="card"><div class="row"><span class="tag y">${l.channel}</span><span class="tag">${l.mode}</span><span class="tag ${l.status==='published'?'g':''}">${l.status}</span></div>
+      ${l.payload?.rendered_caption?`<h3>Rendered post</h3><pre>${esc(l.payload.rendered_caption)}</pre>`:""}
+      ${l.payload?.manual_checklist?`<h3>Manual publish checklist</h3><ol class="checklist">${l.payload.manual_checklist.map(s=>`<li>${esc(s)}</li>`).join("")}</ol>`:""}
+      ${l.payload?.platform_response?`<pre>${esc(JSON.stringify(l.payload.platform_response,null,2))}</pre>`:""}
+      ${l.payload?.error?`<pre style="color:var(--err)">⚠️ ${esc(l.payload.error)}</pre>`:""}
+    </div>`).join("") : '<div class="card"><p class="sub">Nothing published yet.</p></div>';
+}
+
+async function tabAnalytics(){
+  const b=state.brand; const rows=await api(`/brands/${b.id}/metrics`);
+  $("tabBody").innerHTML=`
+    <div class="card"><h2>Log performance</h2><p class="sub">Real numbers feed the Dog — next ideas double down on what worked.</p>
+      <div class="row">
+        <select id="mCh" style="width:140px;margin:0">${(b.setup?.channels||["instagram"]).map(c=>`<option>${c}</option>`).join("")}</select>
+        <input id="mRef" placeholder="post link / creative id" style="flex:1;margin:0"></div>
+      <div class="row" style="margin-top:9px">
+        ${["views","likes","comments","shares","saves"].map(k=>`<input id="m_${k}" type="number" placeholder="${k}" style="width:100px;margin:0">`).join("")}
+        <button class="sm" onclick="logMetrics(this)">Log</button></div></div>
+    <div class="card"><div class="row"><h2>Insights</h2><button class="sm grn" onclick="genInsights(this)">🐕 Analyze</button></div>
+      <div id="insightsBox"><p class="sub">${rows.length} data points logged.</p></div></div>
+    <div class="card" style="padding:0">${rows.map(r=>`<div class="calrow" style="grid-template-columns:100px 1fr auto">
+      <span class="tag y" style="margin:0">${r.channel}</span><span>${esc(r.post_ref||"")}</span>
+      <span class="sub" style="margin:0">${Object.entries(r.payload||{}).map(([k,v])=>`${k}:${v}`).join(" · ")}</span></div>`).join("")}</div>`;
+}
+async function logMetrics(btn){
+  const metrics={};
+  ["views","likes","comments","shares","saves"].forEach(k=>{const v=$("m_"+k).value; if(v)metrics[k]=+v;});
+  if(!Object.keys(metrics).length) return toast("Enter at least one number",true);
+  await api(`/brands/${state.brand.id}/metrics`,"POST",{channel:$("mCh").value,post_ref:$("mRef").value,metrics});
+  toast("Logged"); tabAnalytics();
+}
+async function genInsights(btn){
+  busy(btn,true,"Crunching…");
+  try{ const ins=await api(`/brands/${state.brand.id}/insights`,"POST");
+    $("insightsBox").innerHTML=`<h3>${esc(ins.headline||"")}</h3>
+      <h3 style="color:var(--grn)">✅ Do more</h3><ul class="checklist">${(ins.what_works||[]).map(w=>`<li><b>${esc(w.pattern)}</b> — ${esc(w.action)}</li>`).join("")}</ul>
+      <h3 style="color:var(--err)">🛑 Stop</h3><ul class="checklist">${(ins.what_fails||[]).map(w=>`<li><b>${esc(w.pattern)}</b> — ${esc(w.action)}</li>`).join("")}</ul>
+      <p>${(ins.channel_grades||[]).map(g=>`<span class="tag">${g.channel}: ${g.grade}</span>`).join("")}</p>
+      <p class="sub">🧪 ${esc(ins.experiment_to_run||"")}</p>`;
+    busy(btn,false);
+  }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+
+async function tabProjects(){
+  const el=$("tabBody"); el.innerHTML='<span class="spinner"></span>';
+  let d; try{ d=await api("/projects"); }catch(e){ el.innerHTML='<p class="sub">Could not load projects.</p>'; return; }
+  el.innerHTML=`<div class="card">
+    <div class="row"><h2>MoreSpace projects</h2><span class="tag y">master directory</span></div>
+    <p class="sub" style="margin-bottom:10px">Master site: <a href="${d.master_site}" target="_blank" rel="noopener">${esc(d.master_site)}</a> &middot; ${esc(d.contact.phone)} &middot; ${esc(d.contact.email)}</p>
+    ${d.projects.map(p=>`<div class="idea" style="margin:10px 0">
+      <div class="row"><b>${esc(p.name)}</b><span class="tag">${esc(p.status)}</span></div>
+      <p class="sub" style="margin:4px 0">${esc(p.area)} &middot; corridor: ${esc(p.corridor)}</p>
+      <p style="margin:4px 0">${esc(p.configs)} &middot; ${esc(p.sizes)} &middot; <b>${esc(p.price)}</b></p>
+      <ul style="margin:6px 0 8px 18px">${(p.highlights||[]).map(h=>`<li>${esc(h)}</li>`).join("")}</ul>
+      <a href="${p.url}" target="_blank" rel="noopener">View project &rarr;</a>
+    </div>`).join("")}
+  </div>`;
+}
+
+async function tabPlaybook(){
+  const el=$("tabBody"); el.innerHTML='<span class="spinner"></span>';
+  let d; try{ d=await api("/playbook"); }catch(e){ el.innerHTML='<p class="sub">Could not load the playbook.</p>'; return; }
+  const total=d.systems.reduce((n,s)=>n+s.prompts.length,0);
+  el.innerHTML=`<div class="card">
+    <div class="row"><h2>AI Playbook</h2><span class="tag y">${d.systems.length} agents</span><span class="tag">${total} prompts</span></div>
+    <p class="sub" style="margin-bottom:6px">${esc(d.source)}.</p>
+    <p class="sub">Every prompt auto-fills from your brand voice + the MoreSpace project directory &mdash; just press Generate. Renders use GPT Image 1.</p>
+    ${d.systems.map(s=>`<div class="idea" style="margin:12px 0">
+      <div class="row"><b>${s.n}. ${esc(s.title)}</b></div>
+      <p class="sub" style="margin:4px 0 8px">${esc(s.goal)}</p>
+      <div class="row" style="flex-wrap:wrap;gap:6px">
+        ${s.prompts.map(p=>`<button class="sm ghost" onclick="runPlaybook('${s.id}','${p.id}',this)">${p.kind==='image'?'\u{1F3A8} ':'✍️ '}${esc(p.title)}</button>`).join("")}
+      </div>
+      <div id="pb_${s.id}"></div>
+    </div>`).join("")}
+  </div>`;
+}
+async function runPlaybook(sys,prompt,btn){
+  busy(btn,true,"Generating…");
+  const out=$("pb_"+sys);
+  try{
+    const r=await api(`/brands/${state.brand.id}/playbook/run`,"POST",{system:sys,prompt:prompt});
+    busy(btn,false);
+    if(r.kind==="image"){
+      const u=r.asset_url+(r.asset_url.startsWith("http")?"":"?t="+Date.now());
+      out.innerHTML=`<div class="card" style="margin-top:8px"><img src="${u}" alt="Generated render" loading="lazy" style="max-width:340px;border-radius:10px;border:1px solid var(--line)"></div>`;
+    } else {
+      out.innerHTML=`<div class="card" style="margin-top:8px;white-space:pre-wrap">${esc(r.text||"")}</div>`;
+    }
+  }catch(e){ busy(btn,false); toast(e.message,true); }
+}
+
+function _cstate(){ if(!state.create) state.create={step:1,topic:"",fmt:"post",mood:null,prompt:"",reference:null,refName:"",imageUrl:null,assetPath:null,slides:[],caption:"",busy:false}; return state.create; }
+function cReset(){ state.create=null; tabCreate(); }
+function cFmt(f){ const t=$("cTopic"); if(t) state.create.topic=t.value; state.create.fmt=f; tabCreate(); }
+function tabCreate(){
+  const c=_cstate(); const el=$("tabBody"); if(!el) return;
+  const dot=(n,label)=>`<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:${c.step>=n?'var(--yelD)':'var(--mut)'}"><span style="width:20px;height:20px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:11px;background:${c.step>=n?'var(--yel)':'var(--mut)'}">${c.step>n?'✓':n}</span>${label}</span>`;
+  const steps=`<div class="row" style="gap:16px;flex-wrap:wrap;margin-bottom:14px">${dot(1,'Brief')}${dot(2,'Moodboard')}${dot(3,'Image')}${dot(4,'Caption')}${dot(5,'Done')}</div>`;
+  let body="";
+  if(c.step===1){
+    body=`<div class="card"><h3>1 &middot; What's this post about?</h3>
+      <p class="sub">Tell me the goal or topic. The art-director agent turns it into a creative direction, an image prompt, and a caption &mdash; you don't fill anything else.</p>
+      <textarea id="cTopic" placeholder="e.g. Why Kokapet is Hyderabad's best investment corridor right now" style="width:100%;min-height:80px;margin:8px 0">${esc(c.topic)}</textarea>
+      <div class="row" style="gap:8px;margin:6px 0">
+        <button class="choice ${c.fmt==='post'?'on':''}" onclick="cFmt('post')">\u{1F5BC} Single post</button>
+        <button class="choice ${c.fmt==='carousel'?'on':''}" onclick="cFmt('carousel')">\u{1F3A0} Carousel</button>
+        <button class="choice ${c.fmt==='reel'?'on':''}" onclick="cFmt('reel')">🎬 Reel</button>
+        <button class="choice ${c.fmt==='video'?'on':''}" onclick="cFmt('video')">▶ Video</button>
+        <button class="choice ${c.fmt==='story'?'on':''}" onclick="cFmt('story')">⚡ Story</button>
+      </div>
+      <button class="grn" onclick="cMood(this)">Get creative direction →</button></div>`;
+  } else if(c.step===2){
+    body=`<div class="card"><h3>2 &middot; Creative direction (your moodboard)</h3>
+      <p style="white-space:pre-wrap;background:var(--panel2);padding:10px;border-radius:10px">${esc((c.mood&&c.mood.direction)||"")}</p>
+      <label style="font-weight:600;font-size:13px">Image prompt &mdash; edit if you like</label>
+      <textarea id="cPrompt" style="width:100%;min-height:90px;margin:6px 0">${esc(c.prompt)}</textarea>
+      <label style="font-weight:600;font-size:13px">Optional: paste/upload a reference image (a Pinterest screenshot, a look you like)</label>
+      <input type="file" accept="image/*" onchange="cRef(this)" style="display:block;margin:6px 0">
+      ${c.reference?`<img src="${c.reference}" style="height:64px;border-radius:8px;border:1px solid var(--line)"> <span class="sub">${esc(c.refName)}</span>`:''}
+      <div class="row" style="gap:8px;margin-top:10px"><button class="ghost sm" onclick="state.create.step=1;tabCreate()">← Back</button><button class="grn" onclick="cGenerate(this)">\u{1F3A8} Generate ${c.fmt==='carousel'?'carousel':'image'} →</button></div></div>`;
+  } else if(c.step===3){
+    if(c.busy){
+      body=`<div class="card" style="text-align:center;padding:42px"><span class="spinner"></span><p class="sub" style="margin-top:12px">\u{1F3A8} Painting your ${c.fmt} in MoreSpace colours… (GPT Image 1, ~15-30s)</p></div>`;
+    } else {
+      const imgs = c.fmt==='carousel'
+        ? `<div class="row" style="overflow-x:auto;flex-wrap:nowrap;gap:8px">${c.slides.map(u=>`<img src="${u}" alt="slide" loading="lazy" style="width:210px;border-radius:10px;border:1px solid var(--line)">`).join("")}</div>`
+        : `<img src="${c.imageUrl}" alt="generated post" style="max-width:360px;border-radius:12px;border:1px solid var(--line)">`;
+      body=`<div class="card"><h3>3 &middot; Your image &mdash; logo stamped on</h3>${imgs}
+        <div class="row" style="gap:8px;margin-top:12px"><button class="ghost sm" onclick="cGenerate(this)">↻ Regenerate</button><button class="ghost sm" onclick="state.create.step=2;tabCreate()">✎ Edit prompt</button><button class="grn" onclick="state.create.step=4;tabCreate()">Looks good → caption</button></div></div>`;
+    }
+  } else if(c.step===4){
+    body=`<div class="card"><h3>4 &middot; Caption</h3>
+      <textarea id="cCap" style="width:100%;min-height:150px;margin:6px 0">${esc(c.caption)}</textarea>
+      <div class="row" style="gap:8px"><button class="ghost sm" onclick="state.create.step=3;tabCreate()">← Back</button><button class="grn" onclick="cSave(this)">\u{1F4BE} Save to content board</button></div></div>`;
+  } else {
+    body=`<div class="card" style="text-align:center;padding:32px"><h3>\u{1F389} Saved to your content board</h3><p class="sub">It's in your Creatives / calendar &mdash; logo and all.</p><div class="row" style="justify-content:center;gap:8px;margin-top:12px"><button class="grn" onclick="cReset()">+ Create another</button><button class="ghost sm" onclick="state.tab='calendar';renderBrand()">Open content board</button></div></div>`;
+  }
+  el.innerHTML=steps+body;
+}
+async function cMood(btn){ const c=_cstate(); const t=$("cTopic"); if(t) c.topic=t.value.trim(); busy(btn,true,"Art-directing…");
+  try{ const m=await api(`/brands/${state.brand.id}/studio/moodboard`,"POST",{topic:c.topic,format:c.fmt}); c.mood=m; c.prompt=m.image_prompt||""; c.caption=m.caption||""; c.step=2; tabCreate(); }
+  catch(e){ busy(btn,false); toast(e.message,true); } }
+function cRef(input){ const f=input.files&&input.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>{ state.create.reference=r.result; state.create.refName=f.name; tabCreate(); }; r.readAsDataURL(f); }
+async function cGenerate(btn){ const c=_cstate(); const pe=$("cPrompt"); if(pe) c.prompt=pe.value.trim(); c.busy=true; c.step=3; tabCreate();
+  try{
+    if(c.fmt==='carousel'||c.fmt==='story'){ const r=await api(`/brands/${state.brand.id}/studio/carousel`,"POST",{prompts:((c.mood&&c.mood.slide_prompts)||[c.prompt])}); c.slides=r.slides.map(s=>s.asset_url); c.assetPath=(r.slides[0]||{}).asset_path; }
+    else { const r=await api(`/brands/${state.brand.id}/studio/image`,"POST",{prompt:c.prompt,reference:c.reference}); c.imageUrl=r.asset_url; c.assetPath=r.asset_path; }
+    c.busy=false; tabCreate();
+  }catch(e){ c.busy=false; c.step=2; tabCreate(); toast(e.message,true); } }
+async function cSave(btn){ const c=_cstate(); const ce=$("cCap"); if(ce) c.caption=ce.value; busy(btn,true,"Saving…");
+  try{ await api(`/brands/${state.brand.id}/studio/save`,"POST",{title:(c.topic||"New post").slice(0,80),caption:c.caption,asset_path:c.assetPath,format:c.fmt}); c.step=5; tabCreate(); }
+  catch(e){ busy(btn,false); toast(e.message,true); } }
+
+function _bstate(){ state.board=state.board||{filter:'all',sort:'updated',dir:-1}; return state.board; }
+function bFilter(f){ _bstate().filter=f; tabBoard(); }
+function bSort(col){ const B=_bstate(); B.dir = B.sort===col ? -B.dir : 1; B.sort=col; tabBoard(); }
+const BTYPES={post:{i:'🖼',c:'#1B3FA0',bg:'#eaeffb',l:'Post'},carousel:{i:'🎠',c:'#0f766e',bg:'#e6f6f4',l:'Carousel'},reel:{i:'🎬',c:'#6d28d9',bg:'#f1ebfb',l:'Reel'},video:{i:'▶',c:'#6d28d9',bg:'#f1ebfb',l:'Video'},story:{i:'⚡',c:'#b45309',bg:'#fdf0db',l:'Story'},blog:{i:'📝',c:'#475569',bg:'#eef2f7',l:'Blog'},email:{i:'✉',c:'#475569',bg:'#eef2f7',l:'Email'}};
+async function tabBoard(){
+  const b=state.brand; const B=_bstate(); const el=$("tabBody");
+  const head=`<div class="row" style="margin-bottom:12px"><h2 style="margin:0">Content board</h2><span style="flex:1"></span><button class="grn" onclick="state.tab='create';renderBrand()">➕ New post</button></div>`;
+  el.innerHTML=head+`<div class="card"><span class="spinner"></span></div>`;
+  let crs; try{ crs=await api('/brands/'+b.id+'/creatives'); }catch(e){ toast(e.message,true); return; }
+  if(!crs.length){ el.innerHTML=head+`<div class="card" style="text-align:center;padding:34px"><h3>No content yet</h3><p class="sub" style="margin:6px 0 14px">Create posts, carousels, reels, videos and stories — they line up here like a spreadsheet.</p><button class="grn" onclick="state.tab='create';renderBrand()">➕ New post</button></div>`; return; }
+  const meta=t=>BTYPES[t]||{i:'📄',c:'#475569',bg:'#eef2f7',l:(t||'post')};
+  let rows=crs.map(c=>({c,type:(c.format||'post'),title:(c.payload||{}).title||'Untitled',cap:((c.payload||{}).caption||''),ch:c.channel||'',st:c.state||'draft',up:(c.updated_at||c.created_at||c.created||'')}));
+  if(B.filter!=='all') rows=rows.filter(r=>r.type===B.filter);
+  const key={title:'title',type:'type',status:'st',channel:'ch',updated:'up'}[B.sort]||'up';
+  rows.sort((a,x)=>(String(a[key])>String(x[key])?1:String(a[key])<String(x[key])?-1:0)*B.dir);
+  const arr=col=>B.sort===col?(B.dir>0?' ▲':' ▼'):'';
+  const stChip=s=>{const m={approved:['#1f8a3e','#e8f7ec'],changes_requested:['#b45309','#fdf0db'],published:['#1B3FA0','#eaeffb'],live:['#1B3FA0','#eaeffb']}[s]||['#5b6b86','#eef2f7'];return `<span class="xchip" style="color:${m[0]};background:${m[1]}">${esc(s||'draft')}</span>`;};
+  const ftypes=[['all','All'],['post','Posts'],['carousel','Carousels'],['reel','Reels'],['video','Videos'],['story','Stories']];
+  const filt=`<div class="xflt">${ftypes.map(([k,l])=>`<button class="${B.filter===k?'on':''}" onclick="bFilter('${k}')">${esc(l)}</button>`).join("")}<span class="sub" style="align-self:center;margin-left:8px">${rows.length} item${rows.length===1?'':'s'}</span></div>`;
+  const STYLE=`<style>
+.xl{border-collapse:collapse;width:100%;font-size:12.5px;background:#fff}
+.xl th,.xl td{border:1px solid var(--line2,#eef2f8);padding:8px 11px;text-align:left;vertical-align:middle}
+.xl thead th{position:sticky;top:0;z-index:1;background:var(--panel2);font-weight:700;color:var(--mut);cursor:pointer;white-space:nowrap;font-size:11px;text-transform:uppercase;letter-spacing:.04em;user-select:none}
+.xl thead th:hover{color:var(--blue,#1B3FA0)}
+.xl tbody tr:nth-child(even){background:#fafbff}
+.xl tbody tr:hover{background:var(--yelBg,#eaeffb)}
+.xl td.t{font-weight:650;color:var(--txt)}
+.xl .thumb{width:48px;height:48px;object-fit:cover;border-radius:8px;border:1px solid var(--line);display:block}
+.xl .ph{width:48px;height:48px;border-radius:8px;display:grid;place-items:center;font-size:20px;background:var(--panel2);border:1px solid var(--line)}
+.xchip{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap}
+.xflt{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.xflt button{background:#fff;border:1px solid var(--line);color:var(--mut);padding:6px 13px;border-radius:999px;font-weight:600;font-size:12px}
+.xflt button.on{background:var(--blue,#1B3FA0);color:#fff;border-color:var(--blue,#1B3FA0)}
+.xwrap{overflow:auto;max-height:70vh;border:1px solid var(--line);border-radius:12px;box-shadow:var(--sh1,0 1px 2px rgba(18,32,68,.05))}
+</style>`;
+  const body=`${STYLE}${filt}<div class="xwrap"><table class="xl"><thead><tr>
+    <th style="width:64px"></th>
+    <th onclick="bSort('title')">Title${arr('title')}</th>
+    <th onclick="bSort('type')">Type${arr('type')}</th>
+    <th onclick="bSort('channel')">Channel${arr('channel')}</th>
+    <th onclick="bSort('status')">Status${arr('status')}</th>
+    <th>Caption</th>
+    <th onclick="bSort('updated')">Updated${arr('updated')}</th>
+  </tr></thead><tbody>
+  ${rows.map(r=>{const m=meta(r.type);const ap=r.c.asset_path;const th=ap?`<img class="thumb" loading="lazy" alt="" src="${assetUrl(b,ap)}${ap.startsWith('http')?'':'?t='+Date.now()}">`:`<div class="ph">${m.i}</div>`;return `<tr>
+    <td>${th}</td>
+    <td class="t">${esc(r.title)}</td>
+    <td><span class="xchip" style="color:${m.c};background:${m.bg}">${m.i} ${esc(m.l)}</span></td>
+    <td>${esc(r.ch)}</td>
+    <td>${stChip(r.st)}</td>
+    <td class="sub" style="max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(String(r.cap).slice(0,90))}</td>
+    <td class="sub" style="white-space:nowrap">${esc(String(r.up).slice(0,10))}</td>
+  </tr>`;}).join("")}
+  </tbody></table></div>`;
+  el.innerHTML=head+body;
+}
+/* ---------- AI coach ---------- */
+let CHAT = {};
+async function tabCoach(){
+  const bid=state.brand.id;
+  CHAT[bid]=CHAT[bid]||[];
+  $("tabBody").innerHTML=`
+    <div class="card" style="display:flex;flex-direction:column;height:62vh">
+      <h2>💬 AI Coach</h2>
+      <p class="sub">Knows this brand's full workspace: profile, ideas + virality scores, calendar, creatives, competitor gaps, and analytics. Ask anything.</p>
+      <div id="chatBox" style="flex:1;overflow-y:auto;padding:6px 2px"></div>
+      <div class="row" style="margin-top:10px">
+        <input id="chatMsg" placeholder="e.g. What should we post this week? Which idea has the best shot?" style="flex:1;margin:0" onkeydown="if(event.key==='Enter')sendChat(this)">
+        <button onclick="sendChat(this)">Send</button></div>
+      <div class="row" style="margin-top:6px">
+        ${["What should we post this week?","Which of our ideas will perform best and why?","How do we beat our competitors this month?","Write 3 hooks for our top idea"].map(q=>`<button class="sm ghost" onclick="$('chatMsg').value='${q.replace(/'/g,"\\'")}';sendChat()">${q}</button>`).join("")}
+      </div></div>`;
+  renderChat();
+}
+function renderChat(){
+  const box=$("chatBox"); if(!box) return;
+  const msgs=CHAT[state.brand.id]||[];
+  box.innerHTML = msgs.length? msgs.map(m=>`
+    <div style="margin:8px 0;display:flex;${m.role==='user'?'justify-content:flex-end':''}">
+      <div style="max-width:78%;padding:10px 14px;border-radius:13px;font-size:13px;white-space:pre-wrap;${m.role==='user'
+        ?'background:var(--yelBg);border:1px solid var(--yel)'
+        :'background:var(--panel2);border:1px solid var(--line)'}">${esc(m.content)}</div></div>`).join("")
+    : '<p class="sub">No messages yet — ask the coach something, it answers with your real data.</p>';
+  box.scrollTop=box.scrollHeight;
+}
+async function sendChat(btn){
+  const inp=$("chatMsg"); const msg=inp.value.trim(); if(!msg) return;
+  const bid=state.brand.id;
+  CHAT[bid].push({role:"user",content:msg}); inp.value=""; renderChat();
+  CHAT[bid].push({role:"assistant",content:"…"}); renderChat();
+  try{
+    const r=await api(`/brands/${bid}/chat`,"POST",{message:msg,history:CHAT[bid].slice(0,-2)});
+    CHAT[bid][CHAT[bid].length-1]={role:"assistant",content:r.reply};
+  }catch(e){ CHAT[bid][CHAT[bid].length-1]={role:"assistant",content:"⚠️ "+e.message}; }
+  renderChat();
+}
+
+/* ---------- campaigns: blog + email + tactics ---------- */
+async function tabCampaigns(){
+  const b=state.brand;
+  $("tabBody").innerHTML=`
+    <div class="card"><h2>\u270d\ufe0f Blog marketing</h2>
+      <p class="sub">Full publish-ready SEO article in the brand voice: outline, 900-1300 word draft, meta description, FAQ (people-also-ask), internal links, social snippets. Saved to Creatives + workspace.</p>
+      <div class="row">
+        <input id="blogTopic" placeholder="topic \u2014 e.g. how to choose your first padel racket" style="flex:1;margin:0">
+        <input id="blogKw" placeholder="primary keyword (optional)" style="width:230px;margin:0">
+        <button onclick="runBlog(this)">Write article</button></div>
+      <div id="blogOut"></div></div>
+    <div class="card"><h2>\ud83d\udce7 Email & newsletter marketing</h2>
+      <p class="sub">Single newsletter or a full automated sequence: A/B subject lines, preview text, complete copy, send timing, segmentation. Saved to Creatives + workspace.</p>
+      <div class="row">
+        <select id="emType" style="width:150px;margin:0">
+          <option value="newsletter">newsletter</option><option value="promo">promo</option>
+          <option value="welcome">welcome</option><option value="nurture">nurture</option>
+          <option value="winback">win-back</option><option value="launch">launch</option></select>
+        <input id="emTopic" placeholder="topic/occasion (optional \u2014 AI picks the best)" style="flex:1;margin:0">
+        <select id="emCount" style="width:130px;margin:0"><option value="1">single email</option><option value="3">3-email seq</option><option value="5">5-email seq</option></select>
+        <button onclick="runEmail(this)">Write email(s)</button></div>
+      <div id="emailOut"></div></div>
+    <div class="card"><div class="row"><h2>\ud83c\udfaf Marketing tactics playbook</h2>
+      <button class="grn sm" onclick="runPlaybook(this)">Generate playbook</button></div>
+      <p class="sub">10 concrete growth tactics beyond posting \u2014 acquisition, retention, referral, community \u2014 ranked by impact vs effort, each with first-week actions.</p>
+      <div id="pbOut"></div></div>`;
+}
+async function runBlog(btn){
+  const topic=$("blogTopic").value.trim(); if(!topic) return toast("Enter a topic",true);
+  busy(btn,true,"Writing article\u2026");
+  try{
+    const c=await api(`/brands/${state.brand.id}/blog`,"POST",{topic,keyword:$("blogKw").value.trim()});
+    const p=c.payload;
+    $("blogOut").innerHTML=`<div style="margin-top:14px">
+      <h3>${esc(p.title)}</h3><p class="sub">${esc(p.meta_description||"")} \u00b7 /${esc(p.slug||"")}</p>
+      <pre style="max-height:340px;overflow-y:auto">${esc(p.body_markdown||"")}</pre>
+      <h3>FAQ</h3><ul class="checklist">${(p.faq||[]).map(f=>`<li><b>${esc(f.q)}</b> \u2014 ${esc(f.a)}</li>`).join("")}</ul>
+      <p class="sub">\ud83d\udd17 Internal links: ${(p.internal_link_ideas||[]).join(" \u00b7 ")}</p>
+      <details><summary>Social snippets</summary><pre>${esc(JSON.stringify(p.social_snippets||{},null,2))}</pre></details>
+      <p class="sub">Saved to Creatives \u2014 generate the hero visual from there.</p></div>`;
+    busy(btn,false);
+  }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+async function runEmail(btn){
+  busy(btn,true,"Writing\u2026");
+  try{
+    const c=await api(`/brands/${state.brand.id}/email`,"POST",{etype:$("emType").value,topic:$("emTopic").value.trim(),email_count:parseInt($("emCount").value)});
+    $("emailOut").innerHTML=`<div style="margin-top:14px">${renderEmailPkg(c.payload)}</div>`;
+    busy(btn,false);
+  }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+function renderEmailPkg(p){
+  if(p.emails){ // sequence
+    return `<h3>${esc(p.sequence_name||"Sequence")}</h3><p class="sub">${esc(p.goal||"")}</p>`+
+      p.emails.map(e=>`<div class="idea" style="margin:8px 0">
+        <p><span class="tag y">${esc(e.send_day||"")}</span><span class="tag">${esc(e.purpose||"")}</span></p>
+        <b>Subjects:</b> ${(e.subject_variants||[]).map(s=>`<span class="tag">${esc(s)}</span>`).join("")}
+        <pre>${esc(e.body_markdown||"")}</pre></div>`).join("")+
+      `<p class="sub">\ud83d\udeaa Exit: ${esc(p.exit_condition||"")} \u00b7 \ud83c\udfaf ${esc(p.segmentation_tip||"")}</p>`;
+  }
+  return `<b>Subjects:</b> ${(p.subject_variants||[]).map(s=>`<span class="tag">${esc(s)}</span>`).join("")}
+    <p class="sub">Preview: ${esc(p.preview_text||"")}</p>
+    <pre>${esc(p.body_markdown||"")}</pre>
+    <p class="sub">\u23f0 ${esc(p.best_send_time||"")} \u00b7 \ud83c\udfaf ${esc(p.segmentation_tip||"")}</p>`;
+}
+async function runPlaybook(btn){
+  busy(btn,true,"Strategizing\u2026");
+  try{
+    const r=await api(`/brands/${state.brand.id}/playbook`,"POST");
+    $("pbOut").innerHTML=`<div class="grid" style="margin-top:10px">`+(r.tactics||[]).map(t=>`
+      <div class="idea"><p><span class="tag y">${esc(t.category)}</span><span class="tag">${esc(t.funnel_stage)}</span>
+        <span class="tag ${t.impact==='high'?'g':''}">impact: ${esc(t.impact)}</span><span class="tag">effort: ${esc(t.effort)}</span></p>
+        <h4>${esc(t.name)}</h4><p>${esc(t.summary)}</p>
+        <details><summary>Execution steps</summary><ol class="checklist">${(t.steps||[]).map(s=>`<li>${esc(s)}</li>`).join("")}</ol>
+          <p class="sub">\ud83d\udcc5 This week: ${esc(t.first_week_action||"")} \u00b7 \ud83d\udcca KPI: ${esc(t.kpi||"")}</p></details>
+      </div>`).join("")+`</div>`;
+    busy(btn,false);
+  }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+
+async function tabConnectors(){
+  const b=state.brand; const st=await api(`/brands/${b.id}/connectors`);
+  $("tabBody").innerHTML=`
+    <div class="card"><h2>Auto-posting connectors</h2>
+      <p class="sub">Simulated mode works out of the box. For live auto-posting, connect each platform once (guides below).</p>
+      <p>Configured: ${st.configured.length?st.configured.map(c=>`<span class="tag g">${c}</span>`).join(""):'<span class="tag">none — simulated mode</span>'}</p>
+      ${Object.entries(st.setup_guides).map(([pf,steps])=>`
+        <details><summary>${pf} setup guide</summary>
+          <ol class="checklist">${steps.map(s=>`<li>${esc(s)}</li>`).join("")}</ol>
+          <label>Credentials JSON</label><textarea id="cred_${pf}" rows="3" placeholder='{"access_token":"..."}'></textarea>
+          <button class="sm" onclick="saveCreds('${pf}',this)">Save ${pf}</button></details>`).join("")}
+    </div>`;
+}
+async function saveCreds(pf,btn){
+  let creds; try{ creds=JSON.parse($("cred_"+pf).value); }catch{ return toast("Invalid JSON",true); }
+  await api(`/brands/${state.brand.id}/connectors`,"POST",{platform:pf,credentials:creds});
+  toast(pf+" connected"); tabConnectors();
+}
+
+boot();
