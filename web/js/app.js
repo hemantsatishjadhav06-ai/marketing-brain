@@ -235,7 +235,7 @@ function kitOf(b){ return ((b.profile||{}).brand_kit)||{}; }
 function logoUrl(b){ const k=kitOf(b); return k.logo?`/workspaces/${b.grp?b.grp+"/":""}${b.slug}/${k.logo}`:null; }
 function renderBrand(){
   const b=state.brand, k=kitOf(b);
-  const SEC=[["create","✨ Create"],["content","\U0001F5C2 Content"],["plan","\U0001F5D3 Plan"],["grow","\U0001F4C8 Grow"],["settings","⚙ Settings"]];
+  const SEC=[["create","✨ Create"],["content","🗂 Content"],["plan","🗓 Plan"],["grow","📈 Grow"],["settings","⚙ Settings"]];
   const SUBS={create:[["create","Create"]],content:[["board","Board"],["reel studio","Reel studio"],["publish","Published"]],plan:[["ideas","Ideas"],["calendar","Calendar"],["campaigns","Campaigns"]],grow:[["growth","Growth"],["competitors","Competitors"],["analytics","Analytics"],["playbook","Playbook"]],settings:[["brand kit","Brand kit"],["connectors","Connectors"],["overview","Overview"]]};
   const S2S={}; Object.entries(SUBS).forEach(([sec,arr])=>arr.forEach(([t])=>S2S[t]=sec));
   const TABFN={create:tabCreate,board:tabBoard,"reel studio":tabReelStudio,publish:tabPublish,ideas:tabIdeas,calendar:tabCalendar,campaigns:tabCampaigns,growth:tabGrowth,competitors:tabCompetitors,analytics:tabAnalytics,playbook:tabPlaybook,"brand kit":tabKit,connectors:tabConnectors,overview:tabOverview,coach:tabCoach,creatives:tabCreatives};
@@ -247,12 +247,12 @@ function renderBrand(){
       ${logoUrl(b)?`<img class="brandlogo" alt="${esc(b.name)} logo" src="${logoUrl(b)}">`:""}
       <div style="min-width:0">
         <h1 style="font-size:20px;margin:0">${esc(b.name)}</h1>
-        <p class="sub" style="margin:2px 0 0">${esc(b.website||"")}${b.grp?` · \U0001F4C1 ${esc(b.grp)}`:""}${(b.setup&&b.setup.channels&&b.setup.channels.length)?` · ${esc(b.setup.channels.join(" · "))}`:""}</p>
+        <p class="sub" style="margin:2px 0 0">${esc(b.website||"")}${b.grp?` · 📁 ${esc(b.grp)}`:""}${(b.setup&&b.setup.channels&&b.setup.channels.length)?` · ${esc(b.setup.channels.join(" · "))}`:""}</p>
       </div>
       ${(k.colors||[]).slice(0,4).map(c=>`<span class="swatch" style="width:16px;height:16px;background:${c}" title="${c}"></span>`).join("")}
       <span style="flex:1"></span>
-      <button class="ghost sm" onclick="state.tab='coach';renderBrand()">\U0001F4AC Coach</button>
-      <button class="grn sm" onclick="runAutopilot(this)">\U0001F916 Autopilot</button>
+      <button class="ghost sm" onclick="state.tab='coach';renderBrand()">💬 Coach</button>
+      <button class="grn sm" onclick="runAutopilot(this)">🤖 Autopilot</button>
     </div>
     <div class="tabs sectionbar">${SEC.map(([sk,l])=>`<div class="tab ${sec===sk?'on':''}" onclick="state.tab='${SUBS[sk][0][0]}';renderBrand()">${l}</div>`).join("")}</div>
     ${subnav}
@@ -617,10 +617,10 @@ function renderPackage(p){
     if(p.script){const sc=p.script;
       S.push(`<div class="pkg"><h3>Script · ~${esc(sc.duration_seconds||"")}s</h3>${(sc.hook_options&&sc.hook_options.length)?`<div class="hooks">${sc.hook_options.map(x=>`<span class="hookchip">“${esc(x)}”</span>`).join("")}</div>`:""}
       <table class="scr"><thead><tr><th>Time</th><th>Camera</th><th>Action</th><th>VO</th><th>On-screen</th></tr></thead><tbody>${(sc.shots||[]).map(sh=>`<tr><td>${esc(sh.t)}</td><td>${esc(sh.camera)}</td><td>${esc(sh.action)}</td><td>${esc(sh.dialogue_or_vo)}</td><td>${esc(sh.on_screen_text)}</td></tr>`).join("")}</tbody></table>
-      ${sc.audio?`<p class="sub" style="margin-top:8px">\U0001F3B5 ${esc(sc.audio.style||"")}</p>`:""}</div>`);
+      ${sc.audio?`<p class="sub" style="margin-top:8px">🎵 ${esc(sc.audio.style||"")}</p>`:""}</div>`);
       if(p.filming_guide) S.push(`<details class="pkg"><summary>Filming &amp; editing guide</summary>${kvBlock(p.filming_guide)}</details>`);
     }
-    if(p.slides) S.push(`<div class="pkg"><h3>Slides · ${p.slides.length}</h3>${p.slides.map(s2=>`<div class="slide"><b>Slide ${s2.n}: ${esc(s2.headline)}</b><p>${esc(s2.body||"")}</p>${s2.visual_direction?`<p class="sub">\U0001F3A8 ${esc(s2.visual_direction)}</p>`:""}</div>`).join("")}</div>`);
+    if(p.slides) S.push(`<div class="pkg"><h3>Slides · ${p.slides.length}</h3>${p.slides.map(s2=>`<div class="slide"><b>Slide ${s2.n}: ${esc(s2.headline)}</b><p>${esc(s2.body||"")}</p>${s2.visual_direction?`<p class="sub">🎨 ${esc(s2.visual_direction)}</p>`:""}</div>`).join("")}</div>`);
     if(p.copy_variants) S.push(`<div class="pkg"><h3>Copy variants</h3>${p.copy_variants.map(v=>`<div class="variant"><div class="row" style="justify-content:space-between"><b>Variant ${esc(v.variant)}</b>${copyBtn(v.text)}</div><p class="cap" style="margin-top:6px">${esc(v.text)}</p></div>`).join("")}</div>`);
     if(p.frames) S.push(`<div class="pkg"><h3>Story frames</h3><ol class="clean">${p.frames.map(f=>`<li>${esc(f.content)}${f.sticker_or_interaction?` <span class="sub">— ${esc(f.sticker_or_interaction)}</span>`:""}</li>`).join("")}</ol></div>`);
     if(p.tweets) S.push(`<div class="pkg"><h3>Thread</h3><ol class="clean">${p.tweets.map(t=>`<li>${esc(t.text)}</li>`).join("")}</ol></div>`);
@@ -630,7 +630,7 @@ function renderPackage(p){
     const tags=p.hashtags?Object.values(p.hashtags).flat():[];
     S.push(`<div class="pkg"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Caption</h3>${copyBtn(p.caption||"")}</div><p class="cap" style="margin-top:6px">${esc(p.caption||"")}</p>
     ${tags.length?`<div class="tags" style="margin-top:8px">${tags.map(t=>`<span class="tag">#${esc(String(t).replace(/^#/,""))}</span>`).join("")}</div>`:""}
-    ${(p.best_time_hint||p.kpis_to_watch)?`<p class="meta">${p.best_time_hint?`⏰ ${esc(p.best_time_hint)}`:""}${p.kpis_to_watch?` · \U0001F3AF ${esc((p.kpis_to_watch||[]).join(", "))}`:""}</p>`:""}</div>`);
+    ${(p.best_time_hint||p.kpis_to_watch)?`<p class="meta">${p.best_time_hint?`⏰ ${esc(p.best_time_hint)}`:""}${p.kpis_to_watch?` · 🎯 ${esc((p.kpis_to_watch||[]).join(", "))}`:""}</p>`:""}</div>`);
   }
   return S.join("");
 }
@@ -1129,15 +1129,15 @@ let REVIEW_CID=null;
 function renderCreativeDetail(c){
   const b=state.brand, p=c.payload||{};
   const note=(p.approval&&p.approval.state==="changes_requested"&&p.approval.comment)?`<div class="revnote">✎ Change requested: ${esc(p.approval.comment)}</div>`:"";
-  const phone=c.asset_path?`<div class="phone"><div class="ph-h">${logoUrl(b)?`<img alt="" src="${logoUrl(b)}">`:""}<span>${esc(b.name)}</span></div><img class="ph-img" alt="" loading="lazy" src="${assetUrl(b,c.asset_path)}${c.asset_path.startsWith("http")?"":"?t="+Date.now()}"><div class="ph-a"><span>❤️</span><span>\U0001F4AC</span><span>➤</span></div><div class="ph-c"><b>${esc(b.name.toLowerCase().replace(/\s/g,""))}</b> ${esc((p.caption||"").slice(0,120))}</div></div>`:`<div class="pkg" style="text-align:center;color:var(--mut)">No visual yet — generate one ↓</div>`;
+  const phone=c.asset_path?`<div class="phone"><div class="ph-h">${logoUrl(b)?`<img alt="" src="${logoUrl(b)}">`:""}<span>${esc(b.name)}</span></div><img class="ph-img" alt="" loading="lazy" src="${assetUrl(b,c.asset_path)}${c.asset_path.startsWith("http")?"":"?t="+Date.now()}"><div class="ph-a"><span>❤️</span><span>💬</span><span>➤</span></div><div class="ph-c"><b>${esc(b.name.toLowerCase().replace(/\s/g,""))}</b> ${esc((p.caption||"").slice(0,120))}</div></div>`:`<div class="pkg" style="text-align:center;color:var(--mut)">No visual yet — generate one ↓</div>`;
   const acts=`<div class="rvactions">
-    <button class="sm" onclick="genImage('${c.id}',this)">\U0001F3A8 Generate branded visual</button>
-    ${p.slides?`<button class="sm" onclick="genSlides('${c.id}',this)">\U0001F5BC Generate ${p.slides.length} slides</button>`:""}
-    ${(p.format==="reel"||p.script)?`<button class="sm" onclick="genVO('${c.id}',this)">\U0001F399 Voiceover</button>`:""}
-    ${c.asset_path&&(p.format==="reel"||p.script)?`<button class="sm" onclick="buildVideo('${c.id}',this)">\U0001F3AC Build video</button>`:""}
-    ${c.channel==="instagram"?`<button class="sm ghost" onclick="algoAudit('${c.id}',this)">\U0001F4C8 IG algo audit</button>`:""}
-    <button class="sm grn" onclick="publishCreative('${c.id}','simulated',this)">\U0001F4E4 Publish (simulated)</button>
-    <button class="sm ghost" onclick="publishCreative('${c.id}','live',this)">\U0001F534 Publish live</button>
+    <button class="sm" onclick="genImage('${c.id}',this)">🎨 Generate branded visual</button>
+    ${p.slides?`<button class="sm" onclick="genSlides('${c.id}',this)">🖼 Generate ${p.slides.length} slides</button>`:""}
+    ${(p.format==="reel"||p.script)?`<button class="sm" onclick="genVO('${c.id}',this)">🎙 Voiceover</button>`:""}
+    ${c.asset_path&&(p.format==="reel"||p.script)?`<button class="sm" onclick="buildVideo('${c.id}',this)">🎬 Build video</button>`:""}
+    ${c.channel==="instagram"?`<button class="sm ghost" onclick="algoAudit('${c.id}',this)">📈 IG algo audit</button>`:""}
+    <button class="sm grn" onclick="publishCreative('${c.id}','simulated',this)">📤 Publish (simulated)</button>
+    <button class="sm ghost" onclick="publishCreative('${c.id}','live',this)">🔴 Publish live</button>
   </div>`;
   const gal=`${p.slide_assets?`<p class="sub" style="margin:12px 0 4px">Slide images</p><div class="row" style="overflow-x:auto;flex-wrap:nowrap">${p.slide_assets.map((a,i)=>`<img alt="Slide ${i+1}" loading="lazy" src="${assetUrl(b,a)}" style="width:120px;border-radius:9px;border:1px solid var(--line)">`).join("")}</div>`:""}
     ${p.scene_assets?`<p class="sub" style="margin:12px 0 4px">Storyboard</p><div class="row" style="overflow-x:auto;flex-wrap:nowrap">${p.scene_assets.map((a,i)=>`<img alt="Scene ${i+1}" loading="lazy" src="${assetUrl(b,a)}" style="width:110px;border-radius:9px;border:1px solid var(--line)">`).join("")}</div>`:""}
