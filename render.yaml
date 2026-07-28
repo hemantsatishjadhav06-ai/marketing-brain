@@ -15,6 +15,26 @@ services:
         value: openai/gpt-4o-mini
       - key: OPENROUTER_IMAGE_MODEL
         value: openai/gpt-image-1
+      - key: AIRTABLE_TOKEN
+        sync: false
+      - key: AIRTABLE_WEBHOOK_SECRET
+        sync: false
+      - key: AIRTABLE_BASE_ID
+        value: appvpMfpbNQDkUGeF
+      - key: AIRTABLE_CONTENT_TABLE_ID
+        value: tblWu3YzDoasrj0OG
+      - key: AIRTABLE_SLIDES_TABLE_ID
+        value: tblAbMcwp6DipTQqu
+      - key: AIRTABLE_CLAIMS_TABLE_ID
+        value: tbluMV1yECqSjpY0S
+      - key: AIRTABLE_PROJECTS_TABLE_ID
+        value: tblXdFUMM6E6qSKLF
+      - key: AIRTABLE_BRAND_RULES_TABLE_ID
+        value: tblP2Gqh59vI79IqW
+      - key: AIRTABLE_RUNS_TABLE_ID
+        value: tblir6QJU0Vo4qBeP
+      - key: AIRTABLE_APPROVALS_TABLE_ID
+        value: tbl7C6O77DDf6zd9D
       - key: DB_PATH
         value: /var/data/marketing_brain.db
       - key: WORKSPACES_ROOT

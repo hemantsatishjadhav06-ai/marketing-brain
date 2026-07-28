@@ -18,7 +18,7 @@ app/                     FastAPI application (Python package)
 ├── config.py            env-driven settings
 ├── core/                database · auth · storage
 ├── ai/engine.py         OpenRouter LLM + image generation + pipeline functions
-├── services/            scraper · trends · workspace · projects · connectors · playbook
+├── services/            Airtable orchestration · scraper · trends · workspace · projects
 ├── schemas.py           all Pydantic request models
 └── routes/              domain routers (auth, brands, pipeline, growth,
                          competitors, studio, autopilot, publishing, misc)
@@ -55,6 +55,20 @@ without a sign-in screen. Remove that variable to restore bearer-token login.
 | `DIRECT_ACCESS` | — | Set to `true` to open the admin workspace without login. |
 | `PUBLIC_BASE_URL` | — | Needed for IG image publishing. |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | — | Auto-creates an admin on boot. |
+| `AIRTABLE_TOKEN` | — | Airtable PAT used only by the backend. |
+| `AIRTABLE_WEBHOOK_SECRET` | — | Independent secret required by the agent-run endpoint. |
+| `AIRTABLE_*_TABLE_ID` | Content Generation base IDs | Stable table mapping for the Airtable operations layer. |
+
+## Airtable operations
+
+The Airtable Interface is the human-facing queue; this repository remains the
+tested backend. n8n calls `POST /api/airtable/content/{record_id}/run` with
+`X-Marketing-Brain-Secret`, and the backend source-locks evidence before any AI
+call, writes A/B/C concepts or a production package, records the run, and sends
+the row to QA or approval.
+
+See [`docs/AIRTABLE_CONTENT_SYSTEM.md`](docs/AIRTABLE_CONTENT_SYSTEM.md) for the
+table map, endpoint contract, n8n wiring, and deployment checklist.
 
 ## Tests
 

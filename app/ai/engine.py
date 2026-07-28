@@ -103,6 +103,18 @@ def brand_palette(brand):
     return kit.get("colors") or ((brand.get("scrape") or {}).get("colors") or [])[:4]
 
 
+def _source_evidence_block(source_evidence):
+    """Dedicated source context that is not truncated with marketer instructions."""
+    if not source_evidence:
+        return ""
+    return (
+        "\n\nSOURCE-LOCKED EVIDENCE AND RULES (authoritative):\n"
+        "Use only this material for factual claims. Never invent a missing fact. "
+        "If the material does not support a necessary claim, write NEEDS_RESEARCH.\n"
+        f"{json.dumps(source_evidence, ensure_ascii=False)}"
+    )
+
+
 # ---------------------------------------------------------------- analysis
 
 def analyze_brand(brand):
@@ -178,8 +190,9 @@ def generate_ideas(brand, channel, count=6, insights=None, options=None):
     filter_block = ("\nHARD REQUIREMENTS (follow exactly):\n- " + "\n- ".join(filters)) if filters else \
         "\nMix formats appropriate to the channel and mix funnel stages (awareness/consideration/conversion)."
     algo_block = f"\n{IG_ALGO_2026}" if channel in ("instagram", "reels") else ""
+    source_block = _source_evidence_block(o.get("source_evidence"))
     user = f"""Brand context: {_brand_context(brand)}
-Channel: {channel}{insight_block}{algo_block}
+Channel: {channel}{insight_block}{algo_block}{source_block}
 
 Generate {count} distinct content ideas for {channel}.{filter_block}
 
@@ -258,7 +271,7 @@ FORMAT_SPECS = {
 }
 
 
-def produce_creative(brand, idea_payload, channel, insights=None):
+def produce_creative(brand, idea_payload, channel, insights=None, source_evidence=None):
     fmt = (idea_payload.get("format") or "post").lower()
     spec = FORMAT_SPECS.get(fmt, FORMAT_SPECS["post"])
     system = (
@@ -269,9 +282,10 @@ def produce_creative(brand, idea_payload, channel, insights=None):
     insight_block = f"\nWhat has performed well so far: {json.dumps(insights)[:1000]}" if insights else ""
     if channel in ("instagram", "reels"):
         insight_block += f"\n{IG_ALGO_2026}\nBake one explicit SEND-TRIGGER and one SAVE-REASON into this piece."
+    source_block = _source_evidence_block(source_evidence)
     user = f"""Brand context: {_brand_context(brand)}
 Channel: {channel}. Format: {fmt}.
-Idea: {json.dumps(idea_payload, ensure_ascii=False)[:1500]}{insight_block}
+Idea: {json.dumps(idea_payload, ensure_ascii=False)}{insight_block}{source_block}
 
 Return JSON with these keys:
 {{
@@ -289,15 +303,16 @@ Return JSON with these keys:
     return _json_chat(system, user, max_tokens=5000)
 
 
-def algo_audit(brand, creative_payload):
+def algo_audit(brand, creative_payload, source_evidence=None):
     """Audit a creative against Instagram's confirmed 2026 ranking signals."""
     system = (
         "You are an Instagram growth engineer. Audit this content against the ranking signals below. "
         "Score harshly — published averages score 4-6 per signal. Every fix must be concrete and "
         "copy-pasteable, not advice.\n\n" + IG_ALGO_2026
     )
+    source_block = _source_evidence_block(source_evidence)
     user = f"""Brand context: {_brand_context(brand)}
-Creative to audit: {json.dumps(creative_payload, ensure_ascii=False)[:4000]}
+Creative to audit: {json.dumps(creative_payload, ensure_ascii=False)}{source_block}
 
 Return JSON:
 {{
@@ -311,6 +326,8 @@ Return JSON:
   {{"signal": "loop_design", "score": 0-10, "issue": "...", "fix": "..."}}
  ],
  "algo_score": 0-99 (weighted: watch_time and send_trigger count double),
+ "source_lock_pass": true/false,
+ "unsupported_claims": ["every claim not directly supported by the supplied evidence"],
  "verdict": "one blunt sentence",
  "optimized_hook": "rewritten first-3-seconds hook engineered for retention",
  "optimized_caption_opening": "rewritten first line with searchable keywords",

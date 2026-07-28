@@ -1,4 +1,6 @@
 """Pydantic request models."""
+from typing import Literal
+
 from pydantic import BaseModel
 
 
@@ -174,3 +176,15 @@ class StudioSaveIn(BaseModel):
     asset_path: str | None = None
     format: str = "post"
 
+
+class AirtableRunIn(BaseModel):
+    stage: Literal["auto", "concepts", "package", "qa"] = "auto"
+    dry_run: bool = False
+    idempotency_key: str = ""
+
+
+class AirtableApprovalIn(BaseModel):
+    stage: Literal["Direction", "Copy", "Design", "Final"]
+    decision: Literal["Approved", "Changes Requested", "Rejected"]
+    comment: str = ""
+    approved_by: str = ""
