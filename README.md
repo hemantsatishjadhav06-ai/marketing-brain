@@ -39,7 +39,9 @@ cp .env.example .env      # add your OPENROUTER_API_KEY
 ## Deploy (Render)
 
 `render.yaml` is a one-click blueprint. New → Blueprint → pick the repo, set
-`OPENROUTER_API_KEY`. Start command: `uvicorn app.main:app`.
+`OPENROUTER_API_KEY`. Start command: `uvicorn app.main:app`. The production
+blueprint enables `DIRECT_ACCESS=true`, so the admin workspace opens directly
+without a sign-in screen. Remove that variable to restore bearer-token login.
 
 ## Configuration
 
@@ -50,6 +52,7 @@ cp .env.example .env      # add your OPENROUTER_API_KEY
 | `OPENROUTER_IMAGE_MODEL` | `openai/gpt-image-1` | Image model. |
 | `DB_PATH` | `data/marketing_brain.db` | SQLite location (or Postgres URL). |
 | `WORKSPACES_ROOT` | `workspaces/` | Per-brand output folders. |
+| `DIRECT_ACCESS` | — | Set to `true` to open the admin workspace without login. |
 | `PUBLIC_BASE_URL` | — | Needed for IG image publishing. |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | — | Auto-creates an admin on boot. |
 

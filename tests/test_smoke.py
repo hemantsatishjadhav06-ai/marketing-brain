@@ -30,3 +30,18 @@ def test_login_rejects_bad_credentials():
 def test_protected_route_requires_auth():
     r = client.get("/api/brands")
     assert r.status_code in (401, 403)
+
+
+def test_direct_access_opens_admin_workspace(monkeypatch):
+    monkeypatch.setenv("DIRECT_ACCESS", "true")
+    try:
+        me = client.get("/api/auth/me")
+        assert me.status_code == 200
+        assert me.json()["role"] == "admin"
+        assert me.json()["direct_access"] is True
+        assert client.get("/api/brands").status_code == 200
+        health = client.get("/api/health")
+        assert health.status_code == 200
+        assert health.json()["direct_access"] is True
+    finally:
+        monkeypatch.delenv("DIRECT_ACCESS", raising=False)

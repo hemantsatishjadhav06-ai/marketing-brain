@@ -1,11 +1,14 @@
 services:
   - type: web
-    name: marketing-brain
+    name: marketing-brain-web
     runtime: python
     plan: starter
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
     envVars:
+      - key: DIRECT_ACCESS
+        value: "true"
       - key: OPENROUTER_API_KEY
         sync: false
       - key: OPENROUTER_MODEL
@@ -16,6 +19,8 @@ services:
         value: /var/data/marketing_brain.db
       - key: WORKSPACES_ROOT
         value: /var/data/workspaces
+      - key: PUBLIC_BASE_URL
+        value: https://marketing-brain-web.onrender.com
     disk:
       name: data
       mountPath: /var/data

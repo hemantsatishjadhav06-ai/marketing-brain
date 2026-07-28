@@ -9,7 +9,7 @@ async function api(path, method="GET", body=null, raw=false){
   if(body && !raw){ opt.headers["Content-Type"]="application/json"; opt.body = JSON.stringify(body); }
   if(body && raw){ opt.body = body; }
   const r = await fetch("/api"+path, opt);
-  if(r.status===401){ logout(); throw new Error("Session expired — sign in again"); }
+  if(r.status===401){ showLogin(); throw new Error("Access is not configured"); }
   if(!r.ok){ let d; try{d=await r.json()}catch{d={detail:r.statusText}}; throw new Error(typeof d.detail==="string"?d.detail:JSON.stringify(d.detail)); }
   return r.json();
 }
@@ -36,10 +36,15 @@ function showLogin(){ $("login").classList.add("on"); $("shell").classList.remov
 
 /* ---------- boot & nav ---------- */
 async function boot(){
-  if(!TOKEN){ showLogin(); return; }
-  try{ await api("/auth/me"); }catch{ return; }
+  try{
+    ME = await api("/auth/me");
+    if(TOKEN) localStorage.setItem("mb_me",JSON.stringify(ME));
+  }catch{ return; }
   $("login").classList.remove("on"); $("shell").classList.add("on");
-  $("uEmail").textContent = ME.email||""; $("uRole").textContent = ME.role==="admin"?"Administrator":"Client";
+  $("uEmail").textContent = ME.direct_access ? "Direct access" : (ME.email||"");
+  $("uRole").textContent = ME.direct_access ? "Administrator workspace" : (ME.role==="admin"?"Administrator":"Client");
+  const signOut = $("signOut");
+  if(signOut) signOut.hidden = Boolean(ME.direct_access);
   await loadBrands();
   if(!isAdmin() && BRANDS.length===1){ openBrand(BRANDS[0].id); } else nav("dash");
 }
