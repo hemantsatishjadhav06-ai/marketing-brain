@@ -11,6 +11,8 @@ services:
         value: "true"
       - key: OPENROUTER_API_KEY
         sync: false
+      - key: FAL_KEY
+        sync: false
       - key: OPENROUTER_MODEL
         value: openai/gpt-4o-mini
       - key: OPENROUTER_IMAGE_MODEL
