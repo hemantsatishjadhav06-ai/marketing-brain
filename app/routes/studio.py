@@ -1,5 +1,7 @@
 from fastapi import APIRouter
 from ._shared import *  # noqa: F401,F403
+from ..ai import brain as ai_brain
+from ..services import projects
 
 router = APIRouter()
 
@@ -19,6 +21,33 @@ def reel_job(job_id: str, user=Depends(current_user)):
     return j
 
 
+def _trim_headline(text, limit=40):
+    """Shorten a slide headline to whole words.
+
+    A blunt slice cut mid-word and the model faithfully rendered the broken string
+    into the image (e.g. "Discover the Pinnacle of Ultra-Luxury Li").
+    """
+    text = " ".join((text or "").split())
+    if len(text) <= limit:
+        return text
+    cut = text[:limit].rsplit(" ", 1)[0].rstrip(" ,;:-–—")
+    return cut or text[:limit]
+
+
+def _locality_hint(b):
+    """Anchor slide imagery to the brand's actual market.
+
+    Without this the model defaulted to generic western skylines — one Hyderabad
+    carousel rendered a New York interior with Central Park through the window.
+    """
+    rows = projects.brand_projects(b.get("name", "")) if hasattr(projects, "brand_projects") else []
+    if not rows:
+        return ""
+    areas = ", ".join(dict.fromkeys(r["area"] for r in rows))
+    return (f"Location: {areas} — Indian (Hyderabad) architecture, streetscape, landscaping and people. "
+            f"Do NOT depict New York, Dubai, Singapore or any non-Indian skyline or landmark. ")
+
+
 @router.post("/api/brands/{bid}/creatives/{cid}/slides")
 def slides(bid: str, cid: str, user=Depends(current_user)):
     """Generate one branded image per carousel slide (logo composited)."""
@@ -32,9 +61,11 @@ def slides(bid: str, cid: str, user=Depends(current_user)):
     palette = ai_engine.brand_palette(b)
     assets, errors = [], []
     for sl in slide_specs[:6]:
-        headline = (sl.get("headline") or "")[:40]
-        prompt = (f"Premium social media carousel slide design. Visual: {sl.get('visual_direction','')}. "
+        headline = _trim_headline(sl.get("headline") or "")
+        prompt = (f"{ai_brain.brand_lock(b)}"
+                  f"Premium social media carousel slide design. Visual: {sl.get('visual_direction','')}. "
                   f"{sl.get('design_notes','')} Vertical 4:5, clean modern layout, generous negative space. "
+                  f"{_locality_hint(b)}"
                   f"The ONLY text in the image: \"{headline}\" in large bold clean sans-serif lettering, "
                   f"spelled exactly like that. No other words, no paragraphs, no fine print.")
         blob = ai_engine.generate_image(prompt, b["name"], palette)

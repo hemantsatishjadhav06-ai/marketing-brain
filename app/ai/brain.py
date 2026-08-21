@@ -15,11 +15,12 @@ The LLM blueprint uses the same OpenRouter gateway as the rest of the app.
 Design notes
 ------------
 The creatives are built for the INDIAN real-estate market and are deliberately
-information-rich (config/BHK, sq.ft, INR price, locality, RERA, possession) and
+information-rich (config/BHK, sq.ft, INR price, locality) and
 art-directed with a rotating library of world-class concepts. Generated images
 are anchored to a small set of reference posters (STYLE_REFS, hosted on the fal
 CDN) used ONLY as loose style inspiration — never copied.
 """
+import io
 import os
 import time
 import json
@@ -40,7 +41,7 @@ INDIA_BRIEF = (
     "information-rich like a top Indian developer's launch creative. Use Indian conventions: prices in "
     "INR (write 'Rs 2.4 Cr', 'Rs 8,200/sq.ft', 'Rs 90 L'), configurations as BHK (2/3/4 BHK), carpet or "
     "built-up area in sq.ft, locality + city (e.g., Kokapet, Financial District, Gachibowli, West "
-    "Hyderabad), a RERA number, possession quarter (e.g., 'Possession Dec 2027'), key amenities "
+    "Hyderabad), key amenities "
     "(clubhouse, sky lounge, infinity pool, Vaastu-compliant), connectivity (ORR, metro), and a +91 "
     "contact. If the topic fits an Indian festival or civic moment (Ugadi, Diwali, Bonalu, Ganesh "
     "Chaturthi, Independence Day), a tasteful festive concept is welcome."
@@ -57,7 +58,7 @@ IMAGE_CONCEPTS = (
     "C. EDITORIAL INVESTMENT POSTER - a person viewing the skyline, a huge bold sans headline making a "
     "market/ROI point, a small bar or line chart, data chips; confident financial tone.\n"
     "D. ARCHITECTURAL HERO + INFO PANEL - clean daytime tower render with a structured spec panel "
-    "(config, sizes, price, RERA, land extent) and a highlights list; brochure-grade clarity.\n"
+    "(config, sizes, price, land extent) and a highlights list; brochure-grade clarity.\n"
     "E. DATA / GROWTH INFOGRAPHIC - a corridor map or numbered highlights with icons and stat chips; "
     "authoritative, insight-led.\n"
     "F. INDIAN FESTIVE GREETING - tasteful festival artwork (deity/motif/rangoli/tricolour) with a "
@@ -81,6 +82,55 @@ BRAND_LOGOS = {
     "morespace": os.environ.get("LOGO_MORESPACE", "https://v3b.fal.media/files/b/0aa0a181/mdPf3YDV4p9zTwyD7GpE3_morespace_T.png"),
     "neopolis":  os.environ.get("LOGO_NEOPOLIS",  "https://v3b.fal.media/files/b/0aa0a181/1hOsd69mADuryOEnwwRk6__neo_logo.png"),
 }
+
+
+# Exact brand palettes, sampled from the real logo files. A single-company brand is
+# LOCKED to its own palette — the model gets these hexes and nothing else, so it can
+# not drift into a generic "luxury gold" treatment that is not the company's identity.
+BRAND_PALETTES = {
+    "neopolis": {
+        "name": "Neopolis Infra",
+        "colors": ["#001848", "#14284A", "#303060", "#FFFFFF"],
+        "desc": "deep navy skyline wordmark on white; cool slate-blue secondaries; NO gold, NO orange",
+    },
+    "morespace": {
+        "name": "MoreSpace",
+        "colors": ["#1414C8", "#14A014", "#FFFFFF"],
+        "desc": "blue 'more' + green 'space' wordmark on white; NO gold, NO navy-luxury treatment",
+    },
+}
+
+
+def brand_kit(brand):
+    """Palette + logo for a brand, or None when the brand is not a known company."""
+    name = (brand.get("name") if isinstance(brand, dict) else str(brand or "")) or ""
+    n = name.lower().replace(" ", "")
+    for key, kit in BRAND_PALETTES.items():
+        if key in n:
+            return {**kit, "key": key, "logo": BRAND_LOGOS.get(key)}
+    return None
+
+
+def brand_lock(brand):
+    """Hard brand-identity constraint injected into every image/copy prompt.
+
+    Without this the model invents a plausible-looking competitor: one earlier run
+    produced SKYLINE REALTY, ELEVATE, JADE HEIGHTS and a generic REAL ESTATE mark on
+    the same brand's assets.
+    """
+    kit = brand_kit(brand)
+    if not kit:
+        return ""
+    return (
+        f"BRAND LOCK — this creative is for {kit['name']} and NO other company.\n"
+        f"Palette: use ONLY these hex colours and neutrals derived from them: "
+        f"{', '.join(kit['colors'])}. Character: {kit['desc']}.\n"
+        f"The ONLY brand name that may appear anywhere in the image is '{kit['name']}'. "
+        f"Do NOT invent, draw, letter or imply any other company name, wordmark, monogram or "
+        f"logo — no fictional realty brands, no generic 'REAL ESTATE' house icons, no placeholder "
+        f"marks. Leave the top-left logo tile EMPTY (a clean rounded white tile) if unsure; the "
+        f"real logo is composited over it afterwards.\n\n"
+    )
 
 
 def brand_logo_url(brand):
@@ -143,7 +193,7 @@ def master_blueprint(brand, topic, perspective="", style="Post"):
         "core_idea (one line), "
         "developer (the project builder/developer name; if the brand itself is the builder use the brand name), "
         "post_caption (ready-to-post caption, no markdown; MUST include real specifics: config/BHK, sizes "
-        "in sq.ft, price in INR Cr/Lakh, locality+city, possession, key amenities/USPs, RERA, a clear CTA "
+        "in sq.ft, price in INR Cr/Lakh, locality+city, key amenities/USPs, a clear CTA "
         "and a +91 contact), "
         "hashtags (array of 4-6 specific tags without the # sign), "
         "static_image_prompt (a detailed, art-directed master image prompt for nano-banana-pro: NAME a "
@@ -227,7 +277,8 @@ def _first_url(result, *keys):
     return None
 
 
-def fal_image(prompt, image_urls=None, logo_url=None, aspect_ratio=None, use_style_ref=True):
+def fal_image(prompt, image_urls=None, logo_url=None, aspect_ratio=None, use_style_ref=True,
+              brand=None):
     """Generate a 4:5 creative.
     - No caller image_urls: a matching folder STYLE_REF is auto-attached as a loose
       style anchor (never copied).
@@ -236,7 +287,7 @@ def fal_image(prompt, image_urls=None, logo_url=None, aspect_ratio=None, use_sty
       caller should composite the real logo file over that tile for guaranteed fidelity.
     Caller-supplied image_urls are used verbatim (logo, if any, is appended)."""
     aspect_ratio = aspect_ratio or IMAGE_ASPECT
-    refs, preamble = [], ""
+    refs, preamble = [], brand_lock(brand) if brand is not None else ""
     caller_refs = [u for u in (image_urls or []) if u]
     if caller_refs:
         refs.extend(caller_refs)
@@ -270,6 +321,91 @@ def fal_voice(text):
     payload = {"inputs": [{"text": text, "voice": FAL_VOICE_ID}]}
     res = _fal_wait(_fal_submit(FAL_VOICE_MODEL, payload), timeout=300)
     return _first_url(res, "audio")
+
+
+def _corner_plate_size(img, minimum, scan=0.42, thresh=232):
+    """Measure the near-white tile the model drew in the top-left corner.
+
+    Returns (width, height) at least `minimum` in each axis, so the composited plate
+    always swallows the model's own tile — and the invented monogram inside it.
+    """
+    try:
+        px = img.convert("RGB").load()
+        limit_x = int(img.width * scan)
+        limit_y = int(img.height * scan)
+        probe_y = max(2, int(img.height * 0.02))
+        probe_x = max(2, int(img.width * 0.02))
+
+        wide = minimum
+        for x in range(0, limit_x):
+            r, g, b = px[x, probe_y]
+            if r < thresh or g < thresh or b < thresh:
+                wide = max(minimum, x)
+                break
+        tall = minimum
+        for y in range(0, limit_y):
+            r, g, b = px[probe_x, y]
+            if r < thresh or g < thresh or b < thresh:
+                tall = max(minimum, y)
+                break
+        # a couple of px of bleed so no anti-aliased fringe survives
+        return min(limit_x, wide + 4), min(limit_y, tall + 4)
+    except Exception:
+        return minimum, minimum
+
+
+def composite_brand_logo(image_url_or_bytes, logo_url, box=0.24):
+    """Stamp the REAL logo into the top-left corner of a generated image.
+
+    nano-banana-pro reinterprets a logo passed as a reference — it has drawn entirely
+    invented marks (SKYLINE REALTY, JADE HEIGHTS, a generic house icon) into that
+    corner. It also draws its OWN white tile, usually larger than the reserved area,
+    with the invented monogram at the top of it. So the plate is anchored flush to the
+    corner and sized to swallow that whole tile; only the inner corner is rounded.
+
+    Accepts a URL or raw bytes. Returns PNG bytes, or None on failure so callers can
+    fall back to the original image.
+    """
+    if not image_url_or_bytes or not logo_url:
+        return None
+    try:
+        from PIL import Image, ImageDraw
+        with httpx.Client(timeout=120, follow_redirects=True) as cli:
+            if isinstance(image_url_or_bytes, (bytes, bytearray)):
+                img = Image.open(io.BytesIO(image_url_or_bytes)).convert("RGBA")
+            else:
+                img = Image.open(io.BytesIO(cli.get(image_url_or_bytes).content)).convert("RGBA")
+            logo = Image.open(io.BytesIO(cli.get(logo_url).content)).convert("RGBA")
+
+        side = min(img.width, img.height)
+        tile = int(side * box)
+
+        # The model draws its own white tile in that corner and its size varies, so
+        # measure the actual near-white region touching the corner and cover all of it.
+        w, h = _corner_plate_size(img, tile)
+
+        pad = int(min(w, h) * 0.14)
+        radius = int(min(w, h) * 0.18)
+
+        plate = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        d = ImageDraw.Draw(plate)
+        d.rounded_rectangle([0, 0, w - 1, h - 1], radius=radius, fill=(255, 255, 255, 255))
+        d.rectangle([0, 0, radius, radius], fill=(255, 255, 255, 255))                    # top-left
+        d.rectangle([w - radius - 1, 0, w - 1, radius], fill=(255, 255, 255, 255))        # top-right
+        d.rectangle([0, h - radius - 1, radius, h - 1], fill=(255, 255, 255, 255))        # bottom-left
+
+        iw, ih = w - 2 * pad, h - 2 * pad
+        scale = min(iw / logo.width, ih / logo.height)
+        logo = logo.resize((max(1, int(logo.width * scale)), max(1, int(logo.height * scale))),
+                           Image.LANCZOS)
+        plate.alpha_composite(logo, ((w - logo.width) // 2, (h - logo.height) // 2))
+
+        img.alpha_composite(plate, (0, 0))
+        out = io.BytesIO()
+        img.convert("RGB").save(out, "PNG")
+        return out.getvalue()
+    except Exception:
+        return None
 
 
 def produce_from_blueprint(bp, want_video=True, want_voice=True, logo_url=None):
@@ -312,7 +448,9 @@ ART_DIRECTOR_BRIEF = (
     "(2) BOLD TYPOGRAPHIC HIERARCHY - a small kicker, a strong headline (name the type style; champagne-gold "
     "or a brand accent), a one-line subhead; "
     "(3) an ON-IMAGE INFO BLOCK (frosted/solid card) with REAL specifics: configuration (BHK), sizes in "
-    "sq.ft, price in INR (Rs Cr / per sq.ft), locality+city, possession quarter, RERA no.; "
+    "sq.ft, price in INR (Rs Cr / per sq.ft), locality+city, land extent, tower/floor counts. "
+    "Include a RERA number or possession date ONLY if one is explicitly supplied in the brand "
+    "context; otherwise omit that row entirely — never print a placeholder or masked value; "
     "(4) one or two rounded PRICE BADGES and a CTA button (e.g., 'Book Site Visit'), plus a footer contact "
     "strip with brand name, +91 phone and website; "
     "(5) the brand-colour BACKGROUND field and accent colours as HEX; "
@@ -336,7 +474,7 @@ FINALIZE_BRIEF = (
     "brand_continuity, best_time_hint, kpis_to_watch (array). "
     "post_caption MUST be information-rich and India-market ready: a strong hook, then 2-4 lines of real "
     "specifics (config/BHK, sizes in sq.ft, price in INR Cr/Lakh, locality+city, possession, key "
-    "amenities/USPs, RERA), a clear CTA and a +91 contact; human voice, no markdown. Name the DEVELOPER/builder (the developer field) and place a small by {developer} credit near the project name on the image. "
+    "amenities/USPs), a clear CTA and the supplied +91 contact; human voice, no markdown. Never state a RERA number or possession date unless one is supplied in the brand context. Name the DEVELOPER/builder (the developer field) and place a small by {developer} credit near the project name on the image. "
     "static_image_prompt MUST be the Art Director's expert, art-directed prompt (verbatim or improved): a "
     "NAMED concept, bold typographic hierarchy, brand colour field, an on-image INFO BLOCK with real "
     "specifics, price badge(s), CTA, footer, depth and cinematic lighting, 4:5 vertical, and a reserved "
@@ -347,7 +485,7 @@ FINALIZE_BRIEF = (
 AGENT_LIB = {
     "brainstorm": ("1 · Brainstorm", "You are a creative brainstorm agent for an Indian real-estate brand. Produce FOUR distinct, specific content concepts/angles (mix launch, offer, investment/ROI, lifestyle, festive). For each give: a short title, the hook idea, and one line on why it works for Indian buyers/NRIs. Be concrete and on-brand; no fluff."),
     "strategist": ("2 · Strategist", "You are a content strategist. From the brainstormed concepts pick the single strongest one. State: the chosen angle, the target viewer (end-user / investor / NRI), the funnel stage, and the ONE key message. Tight and decisive."),
-    "copywriter": ("Copywriter", "You are a senior real-estate copywriter for the Indian market. Write the final on-platform copy for the chosen angle: a scroll-stopping hook, then an information-rich caption with real specifics (config/BHK, sizes in sq.ft, price in INR Cr/Lakh, locality+city, possession, key amenities/USPs, RERA, the developer/builder name), a clear CTA and a +91 contact, and 4-6 specific hashtags. Human voice, no markdown."),
+    "copywriter": ("Copywriter", "You are a senior real-estate copywriter for the Indian market. Write the final on-platform copy for the chosen angle: a scroll-stopping hook, then an information-rich caption with real specifics (config/BHK, sizes in sq.ft, price in INR Cr/Lakh, locality+city, key amenities/USPs, the developer/builder name exactly as supplied), a clear CTA and a +91 contact, and 4-6 specific hashtags. Human voice, no markdown."),
     "narrative": ("Narrative architect", "You are a carousel narrative architect. Design a slide-by-slide structure (5-7 slides). For each slide: headline, one-line body, and visual direction. Include a hook slide, spec/price slides with real numbers, and a CTA slide."),
     "scriptwriter": ("Scriptwriter", "You are a short-form video scriptwriter. Write a 4-scene script (hook, two value scenes, CTA). For each scene: time, on-screen text, voiceover line, and camera/action. Punchy and paced; weave in real specifics (price, config, locality)."),
     "frames": ("Frame designer", "You are an Instagram Story designer. Design a 3-5 frame sequence. For each frame: the content, a sticker/interaction, and the on-frame text. Include a spec/price frame and a CTA frame."),
@@ -369,11 +507,13 @@ def run_agent_team(brand, topic, perspective="", style="Post", cb=None):
     """Run the per-task agent team. cb(agents_list, blueprint_or_None, status) after each step."""
     roles = TEAMS.get(_style_key(style), TEAMS["post"])
     ctx = engine._brand_context(brand)
+    lock = brand_lock(brand)
     agents = []
     for role in roles:
         title, instr = AGENT_LIB[role]
         prior = "\n\n".join(f"[{a['role']}]\n{a['output']}" for a in agents) or "(you are first)"
-        system = f"{instr}\nContent style: {style}. Stay strictly on-brand.\n\nBRAND CONTEXT:\n{ctx}"
+        system = (f"{instr}\nContent style: {style}. Stay strictly on-brand.\n\n"
+                  f"{lock}BRAND CONTEXT:\n{ctx}")
         user = f"Topic: {topic}\nPerspective: {perspective}\n\nPrevious agents said:\n{prior}\n\nDo your part now."
         if role == "finalize":
             bp = engine._json_chat(system, user, max_tokens=4000)

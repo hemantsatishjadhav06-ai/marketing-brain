@@ -46,8 +46,8 @@ BRAND = {
         "positioning": "Ultra-luxury hanging apartments in Neopolis, Kokapet — 12 acres, only 5 homes per floor.",
         "content_pillars": ["Corridor & market insight", "Project specs and pricing", "Lifestyle & amenities", "Investment case"],
         "brand_kit": {
-            "colors": ["#0E1A2B", "#C8A45C", "#F5F1E8", "#1F3A5F"],
-            "style": "Architectural, cinematic, champagne-gold accents on deep navy, generous negative space.",
+            "colors": ["#001848", "#14284A", "#303060", "#FFFFFF"],
+            "style": "Architectural, cinematic, deep-navy skyline identity on white; cool slate secondaries.",
         },
     },
     "setup": {
@@ -75,6 +75,19 @@ TOPICS = {
         "kokapet luxury apartments",
     ),
 }
+
+
+LOCALITY = ("Location: Kokapet / Financial District, Hyderabad, India — Indian architecture, "
+            "streetscape, landscaping and people. Do NOT depict New York, Dubai, Singapore or any "
+            "non-Indian skyline or landmark.")
+
+
+def trim_headline(text, limit=40):
+    """Shorten to whole words — a blunt slice got rendered into the image mid-word."""
+    text = " ".join((text or "").split())
+    if len(text) <= limit:
+        return text
+    return text[:limit].rsplit(" ", 1)[0].rstrip(" ,;:-–—") or text[:limit]
 
 
 # ------------------------------------------------------------------ utilities
@@ -119,13 +132,19 @@ def download(url, dest):
 
 
 def render(prompt, outdir, filename, logo_url=None, refs=None):
-    """One fal image call + download. Returns (url, local_path)."""
+    """One brand-locked fal call, then stamp the REAL logo over the reserved tile."""
     log(f"  fal_image -> {filename}")
-    url = brain.fal_image(prompt, image_urls=refs, logo_url=logo_url)
+    url = brain.fal_image(prompt, image_urls=refs, logo_url=logo_url, brand=BRAND)
     if not url:
         log("  ! fal returned no image url")
         return None, None
-    local = download(url, outdir / filename)
+    dest = outdir / filename
+    blob = brain.composite_brand_logo(url, logo_url) if logo_url else None
+    if blob:
+        dest.write_bytes(blob)
+        log("    logo composited ✓")
+        return url, str(dest)
+    local = download(url, dest)
     return url, (str(local) if local else None)
 
 
@@ -176,10 +195,11 @@ def run_carousel(outdir, want_images):
 
     logo = brain.brand_logo_url(BRAND)
     for i, sl in enumerate(slides[:6], start=1):
-        headline = (sl.get("headline") or "")[:40]
+        headline = trim_headline(sl.get("headline") or "")
         prompt = (
             f"Premium social media carousel slide design. Visual: {sl.get('visual_direction', '')}. "
             f"{sl.get('design_notes', '')} Vertical 4:5, clean modern layout, generous negative space. "
+            f"{LOCALITY} "
             f"The ONLY text in the image: \"{headline}\" in large bold clean sans-serif lettering, "
             f"spelled exactly like that. No other words, no paragraphs, no fine print."
         )

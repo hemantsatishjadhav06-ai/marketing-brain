@@ -3,6 +3,8 @@ project. Used to ground the AI coach chatbot, the reel/voice scripts, and the in
 Projects directory. morespace.ai is the MASTER website for all projects.
 Data sourced from morespace.ai (keep in sync with the site)."""
 
+import re
+
 MASTER_SITE = "https://morespace.ai/"
 CONTACT = {
     "phone": "+91 73965 06318",
@@ -89,8 +91,44 @@ PROJECTS = [
 ]
 
 
+def _norm(s):
+    return re.sub(r"[^a-z0-9]", "", (s or "").lower())
+
+
 def is_morespace(brand_name=""):
-    return "morespace" in (brand_name or "").lower().replace(" ", "")
+    """True for the master MoreSpace brand (the multi-project portfolio account)."""
+    return "morespace" in _norm(brand_name)
+
+
+def brand_projects(brand_name=""):
+    """Projects that belong to this brand.
+
+    MoreSpace is the master portfolio account and owns every project. Any other
+    brand is treated as a SINGLE-COMPANY domain: it owns only the project whose
+    name/area matches its own name, so its prompts never see a competitor's
+    numbers. Returns [] when nothing matches.
+    """
+    if is_morespace(brand_name):
+        return list(PROJECTS)
+    n = _norm(brand_name)
+    if not n:
+        return []
+    # strip common suffixes so "Neopolis Infra" still matches the Neopolis project
+    for suffix in ("infra", "infrastructure", "realty", "realestate", "developers",
+                   "developer", "builders", "builder", "projects", "group", "llp",
+                   "pvtltd", "ltd", "homes", "estates"):
+        if n.endswith(suffix) and len(n) > len(suffix):
+            n = n[: -len(suffix)]
+            break
+    if not n:
+        return []
+    return [p for p in PROJECTS
+            if n in _norm(p["name"]) or n in _norm(p["area"]) or _norm(p["area"]).startswith(n)]
+
+
+def is_known(brand_name=""):
+    """True when we hold grounded facts for this brand."""
+    return bool(brand_projects(brand_name))
 
 
 def directory():
@@ -98,35 +136,58 @@ def directory():
     return {"master_site": MASTER_SITE, "contact": CONTACT, "index": INDEX_LINKS, "projects": PROJECTS}
 
 
+def _project_line(p):
+    return (f"• {p['name']} — {p['area']} | corridor: {p['corridor']} | developer: {p['developer']} | "
+            f"{p['status']} | configs: {p['configs']} | sizes: {p['sizes']} | price: {p['price']} | "
+            f"link: {p['url']}\n  " + "; ".join(p["highlights"]))
+
+
+FACT_RULES = (
+    "FACT RULES (non-negotiable): use ONLY the figures above. Never invent or round a price, "
+    "size, possession date, RERA number or phone number.\n"
+    "RERA NUMBER and POSSESSION DATE are NOT listed above for any project. They are therefore "
+    "UNKNOWN: do not print a RERA number, a 'RERA No.' row, a possession date or a handover "
+    "quarter anywhere — not even masked, partial or templated (no 'P1234567890', no "
+    "'P024000XXXX', no 'PXXXXXXXX', no 'Dec 2027', no 'Coming soon'). Omit the row entirely "
+    "and use the space for a fact that IS listed.\n"
+    "The ONLY phone number that may appear is the contact number given above, digit for digit. "
+    "Never write a specimen number such as '+91 98765 43210'.\n"
+    "Describe the builder exactly as the developer field states; if it says 'Reputed developer' "
+    "do not substitute the brand's own name as the developer."
+)
+
+
 def pointer(brand_name=""):
-    """Short pointer appended to every prompt's brand context (keeps prompts lean while
-    making ideas / reels / voiceovers project-aware). Empty for non-MoreSpace brands."""
-    if not is_morespace(brand_name):
+    """Grounded fact block appended to every prompt's brand context.
+
+    Previously this emitted project *names* only, and only for the master
+    MoreSpace account — so a single-company brand got no facts at all and the
+    model invented prices, RERA numbers and phone numbers. It now emits the real
+    figures for whichever projects the brand actually owns.
+    """
+    rows = brand_projects(brand_name)
+    if not rows:
         return ""
-    names = ", ".join(p["name"].split(" — ")[0].split(" / ")[0] for p in PROJECTS)
-    return (f"\nMORESPACE PROJECTS (master site {MASTER_SITE} — cite project links when relevant): "
-            f"{names}. Combine corridor + developer details; never invent prices.")
+    head = ("\n\nGROUNDED PROJECT FACTS — the ONLY source of truth for this brand's numbers "
+            f"(contact: {CONTACT['phone']} · {CONTACT['email']}):")
+    return head + "\n" + "\n".join(_project_line(p) for p in rows) + "\n" + FACT_RULES
 
 
 def context_block(brand_name=""):
-    """Full project directory injected into the AI coach system prompt. Empty for non-MoreSpace."""
-    if not is_morespace(brand_name):
+    """Full project directory injected into the AI coach system prompt."""
+    rows = brand_projects(brand_name)
+    if not rows:
         return ""
+    owner = "MORESPACE PROJECT DIRECTORY" if is_morespace(brand_name) else f"{brand_name.upper()} PROJECT DIRECTORY"
     lines = [
-        "MORESPACE PROJECT DIRECTORY — morespace.ai is the MASTER website for every project.",
+        f"{owner} — morespace.ai is the MASTER website for every project.",
         f"Master site: {MASTER_SITE}  |  Contact: {CONTACT['phone']} · {CONTACT['email']}",
         "When the user asks about properties, projects, areas/corridors, budgets, or where to buy, "
         "recommend the most relevant project(s) below and ALWAYS include the project's morespace.ai "
         "link plus concrete details (area, corridor, configs, sizes, price, key highlights). "
         "Combine the corridor (location/connectivity) with the developer/property details. "
-        "Use ONLY the facts below — never invent projects or prices. Always point buyers to the "
-        "master site and the contact number.",
+        + FACT_RULES,
         "",
     ]
-    for p in PROJECTS:
-        lines.append(
-            f"• {p['name']} — {p['area']} | corridor: {p['corridor']} | {p['status']} | "
-            f"{p['configs']} ({p['sizes']}) | {p['price']} | link: {p['url']}\n  "
-            + "; ".join(p["highlights"])
-        )
+    lines += [_project_line(p) for p in rows]
     return "\n".join(lines)

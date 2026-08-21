@@ -66,6 +66,26 @@ def proceed(bid: str, cid: str, user=Depends(current_user)):
     return {"started": True}
 
 
+def _stamp_logo(brand, image_url, logo_url, cid):
+    """Paint the real brand logo over the reserved tile and persist the result.
+
+    fal reproduces a referenced logo only approximately — it has rendered entirely
+    invented brands into that corner — so the generated URL is never trusted as final.
+    Falls back to the original URL if compositing or saving fails.
+    """
+    if not (brand and image_url and logo_url):
+        return image_url
+    blob = brain.composite_brand_logo(image_url, logo_url)
+    if not blob:
+        return image_url
+    try:
+        rel = f"brain/assets/{cid}.png"
+        ref = _save_asset(brand, rel, blob)
+        return ref if ref.startswith("http") else f"/workspaces/{_wslug(brand)}/{ref}"
+    except Exception:
+        return image_url
+
+
 def _run_proceed(cid, bid=None):
     try:
         c = db.get_doc("creatives", cid)
@@ -73,7 +93,9 @@ def _run_proceed(cid, bid=None):
         brand = db.get_doc("brands", bid) if bid else None
         logo_url = brain.brand_logo_url(brand) if brand else None
         _patch(cid, gen_status="Rendering image…")
-        img = brain.fal_image(bp.get("static_image_prompt") or bp.get("core_idea") or "", logo_url=logo_url)
+        img = brain.fal_image(bp.get("static_image_prompt") or bp.get("core_idea") or "",
+                              logo_url=logo_url, brand=brand)
+        img = _stamp_logo(brand, img, logo_url, cid)
         _patch(cid, asset_path=img, gen_status="Rendering video…")
         video = None
         if bp.get("video_prompt") or bp.get("scenes"):
