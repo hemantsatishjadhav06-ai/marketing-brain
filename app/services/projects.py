@@ -140,7 +140,7 @@ def directory():
 def _project_line(p):
     return (f"• {p['name']} — {p['area']} | corridor: {p['corridor']} | developer: {p['developer']} | "
             f"{p['status']} | configs: {p['configs']} | sizes: {p['sizes']} | price: {p['price']} | "
-            f"link: {p['url']}\n  " + "; ".join(p["highlights"]))
+            f"official website: {p['url']}\n  " + "; ".join(p["highlights"]))
 
 
 FACT_RULES = (
@@ -153,6 +153,9 @@ FACT_RULES = (
     "and use the space for a fact that IS listed.\n"
     "The ONLY phone number that may appear is the contact number given above, digit for digit. "
     "Never write a specimen number such as '+91 98765 43210'.\n"
+    "The ONLY website that may appear is the 'official website' URL given above, character for "
+    "character. Never invent, shorten or guess a domain — do not write a plausible-looking address "
+    "such as 'www.<brandname>.com'. If no website is listed, print no website at all.\n"
     "Describe the builder exactly as the developer field states; if it says 'Reputed developer' "
     "do not substitute the brand's own name as the developer."
 )

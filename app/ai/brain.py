@@ -128,8 +128,11 @@ def brand_lock(brand):
         f"The ONLY brand name that may appear anywhere in the image is '{kit['name']}'. "
         f"Do NOT invent, draw, letter or imply any other company name, wordmark, monogram or "
         f"logo — no fictional realty brands, no generic 'REAL ESTATE' house icons, no placeholder "
-        f"marks. Leave the top-left logo tile EMPTY (a clean rounded white tile) if unsure; the "
-        f"real logo is composited over it afterwards.\n\n"
+        f"marks.\n"
+        f"LOGO SAFE AREA: keep the top-left corner — out to about 28% of the width and 22% of "
+        f"the height — COMPLETELY EMPTY. No headline, kicker, badge or subject may enter or sit "
+        f"behind it. The real logo is composited over that area afterwards and will hide anything "
+        f"underneath, so start the headline below or to the right of it.\n\n"
     )
 
 
@@ -456,7 +459,7 @@ ART_DIRECTOR_BRIEF = (
     "(5) the brand-colour BACKGROUND field and accent colours as HEX; "
     "(6) DEPTH & FINISH - soft cast shadows, bokeh/particles, subtle grain, realistic lighting, ultra-"
     "detailed 8K, crisp perfectly-legible text, WCAG-AA contrast; "
-    "(7) a clean EMPTY ~180x180px top-left corner reserved for the brand logo (if a logo image is supplied to the renderer, reproduce it there exactly). "
+    "(7) a strictly EMPTY top-left LOGO SAFE AREA covering the whole top-left corner out to about 28% of the image width and 22% of its height. No headline, kicker, badge, photo subject or any other element may enter or sit behind that area — the real logo is composited over it afterwards, and anything underneath will be hidden. Start headlines and all other content BELOW or to the RIGHT of that area. "
     "(8) a small DEVELOPER CREDIT under the project name, e.g. by {developer} or Developed by {developer}. "
     + INDIA_BRIEF + " "
     "STRICTLY AVOID: a plain photo with text on top, clip-art, clutter, watermarks, gibberish/lorem text, "
