@@ -135,7 +135,12 @@ def brand_lock(brand):
         f"underneath, so start the headline below or to the right of it.\n"
         f"SINGLE INSTANCE: every text element appears EXACTLY ONCE. Do not repeat the kicker, "
         f"headline, subhead, price line, CTA button, contact strip or any badge anywhere in the "
-        f"layout — one of each, in one place only.\n\n"
+        f"layout — one of each, in one place only.\n"
+        f"ONE TEXT ZONE: the kicker + headline + subhead form a single block that sits ONCE in the "
+        f"upper-left quadrant, directly beneath the logo safe area. If the background is split into "
+        f"a light band and a dark band, the headline block still appears in only ONE of those bands "
+        f"— never mirrored, echoed or restated in the other. The lower half carries only the info "
+        f"card, badges, CTA and footer strip.\n\n"
     )
 
 
