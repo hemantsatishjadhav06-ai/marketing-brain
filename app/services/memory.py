@@ -92,9 +92,20 @@ def recall(brand_id, limit=PROMPT_LIMIT, kinds=None):
     return out[:limit] if limit else out
 
 
-def forget(memory_id):
-    """Drop a single memory — the operator disagreed with something learned."""
+def forget(memory_id, brand_id=None):
+    """Drop a single memory — the operator disagreed with something learned.
+
+    brand_id is required by callers acting on a request: without it any brand's
+    memory id could be deleted from another brand's endpoint.
+    """
+    if not memory_id:
+        return False
     try:
+        row = db.get_doc(TABLE, memory_id)
+        if not row:
+            return False
+        if brand_id is not None and row.get("brand_id") != brand_id:
+            return False
         db.delete_doc(TABLE, memory_id)
         return True
     except Exception:

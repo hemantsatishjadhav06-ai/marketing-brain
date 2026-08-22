@@ -85,7 +85,7 @@ STYLE_REFS = {
 # Brand logos on the fal CDN. Passed to the image model as an EXACT-reproduce
 # reference (LOGO_GUARD). NOTE: nano-banana-pro still tends to reinterpret a logo,
 # so for guaranteed fidelity the caller composites the real logo file over the
-# reserved top-left tile afterwards.
+# reserved top-right slot afterwards.
 BRAND_LOGOS = {
     "morespace": os.environ.get("LOGO_MORESPACE", "https://v3b.fal.media/files/b/0aa0a181/mdPf3YDV4p9zTwyD7GpE3_morespace_T.png"),
     "neopolis":  os.environ.get("LOGO_NEOPOLIS",  "https://v3b.fal.media/files/b/0aa0a181/1hOsd69mADuryOEnwwRk6__neo_logo.png"),
@@ -229,7 +229,7 @@ def master_blueprint(brand, topic, perspective="", style="Post"):
         "static_image_prompt (a detailed, art-directed master image prompt for nano-banana-pro: NAME a "
         "concept from the world-class library, describe the scene, bold typographic hierarchy, an on-image "
         "INFO BLOCK with real specifics, price badge(s), CTA button, footer contact strip, brand colours as "
-        "hex, depth/lighting, 4:5 vertical, crisp legible text, and a clean empty top-left area reserved for "
+        "hex, depth/lighting, 4:5 vertical, crisp legible text, and a clean empty top-right area reserved for "
         "the logo; premium — never a plain photo-with-text), "
         "video_prompt (a single cinematic motion prompt for an AI video model), "
         "audio_script (a spoken voiceover script, 2-4 sentences), "
@@ -313,7 +313,7 @@ def fal_image(prompt, image_urls=None, logo_url=None, aspect_ratio=None, use_sty
     - No caller image_urls: a matching folder STYLE_REF is auto-attached as a loose
       style anchor (never copied).
     - logo_url is attached as an EXACT-reproduce reference (LOGO_GUARD) so the brand
-      logo lands in the top-left tile. The model may still reinterpret it, so the
+      logo lands in the top-right slot. The model may still reinterpret it, so the
       caller should composite the real logo file over that tile for guaranteed fidelity.
     Caller-supplied image_urls are used verbatim (logo, if any, is appended)."""
     aspect_ratio = aspect_ratio or IMAGE_ASPECT
@@ -354,11 +354,21 @@ def fal_voice(text):
     return _first_url(res, "audio")
 
 
+# A percentage is only a layout spec when it is attached to a layout noun. An
+# earlier, blanket "\d+%" rule deleted real marketing facts — "75% open space"
+# became "open space" — which is exactly the kind of silent fact loss the fact
+# rules exist to prevent.
+_LAYOUT_NOUN = r"(?:width|height|canvas|image|frame|margin|padding|gutter|inset|" \
+               r"bleed|column|gutter|leading|tracking|kerning|baseline|grid|safe\s*area|slot)"
+
 _SPEC_PATTERNS = [
-    r"\b\d{1,3}\s?%(?:\s*(?:of\s+)?(?:the\s+)?(?:width|height|canvas|image|margin))?",
+    # "16% of the image width", "28% of its width"
+    rf"\b\d{{1,3}}\s?%\s*(?:of\s+)?(?:the\s+|its\s+)?{_LAYOUT_NOUN}\b",
+    # "a margin of 7%", "slot width: 16%"
+    rf"\b{_LAYOUT_NOUN}\s*(?:of|:|=)?\s*[~]?\d{{1,3}}\s?%",
     r"\b\d{1,4}\s?(?:px|pt|pts|point|points)\b",
     r"\b\d{1,2}\s?:\s?\d{1,2}\s+(?:ratio|scale|jump)\b",
-    r"\b(?:margin|padding|gutter|leading|tracking|kerning)\s*(?:of|:)?\s*[~]?\d[\d.]*\s?\w*",
+    rf"\b(?:margin|padding|gutter|leading|tracking|kerning)\s*(?:of|:)?\s*[~]?\d[\d.]*\s?\w*",
 ]
 
 
@@ -490,13 +500,16 @@ def _mean_luma(img, x, y, w, h):
         return 255
 
 
-def produce_from_blueprint(bp, want_video=True, want_voice=True, logo_url=None):
+def produce_from_blueprint(bp, want_video=True, want_voice=True, logo_url=None, brand=None):
     """Generate assets from an approved blueprint. Returns partial dict as it goes.
-    Pass logo_url (e.g. brand_logo_url(brand)) to attach the brand logo as an
-    exact-reproduce reference; composite the real logo afterwards for fidelity."""
+
+    Pass `brand` as well as `logo_url`: without it the brand lock is never applied
+    and the model is free to invent a palette and a competitor's name, which is
+    what it did before the lock existed.
+    """
     out = {}
     img_prompt = bp.get("static_image_prompt") or bp.get("core_idea") or ""
-    out["image_url"] = fal_image(img_prompt, logo_url=logo_url)  # style-anchored + exact-logo reference
+    out["image_url"] = fal_image(img_prompt, logo_url=logo_url, brand=brand)
     if want_video and (bp.get("video_prompt") or bp.get("scenes")):
         vp = bp.get("video_prompt") or (bp.get("scenes") or [{}])[0].get("visual_description", "")
         out["video_url"] = fal_video(vp, image_url=out.get("image_url"))

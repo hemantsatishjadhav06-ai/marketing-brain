@@ -231,3 +231,60 @@ def test_logo_upload_rejects_non_images():
                        files={"file": ("a.png", b"not-an-image", "image/png")}).status_code == 400
     assert client.post(f"/api/brands/{bid}/logo",
                        files={"file": ("a.png", b"", "image/png")}).status_code == 400
+
+
+# ------------------------------------------------- regressions found by audit
+
+def test_forget_will_not_delete_another_brands_memory(brand):
+    other = db.create_brand("Rival Co", "rival-co", "https://rival.example", {})
+    mid = mem.remember(other, "Rival's private rule.", kind="rule")
+    # scoped to the wrong brand: must refuse, and the memory must survive
+    assert mem.forget(mid, brand_id=brand) is False
+    assert len(mem.recall(other)) == 1
+    assert mem.forget(mid, brand_id=other) is True
+
+
+def test_memory_delete_endpoint_is_brand_scoped():
+    a = client.post("/api/brands", json={"name": "Aco", "website": "https://a2.example"}).json()["id"]
+    b = client.post("/api/brands", json={"name": "Bco", "website": "https://b2.example"}).json()["id"]
+    client.post(f"/api/brands/{b}/memory", json={"content": "B's rule.", "kind": "rule"})
+    mid = client.get(f"/api/brands/{b}/memory").json()["memory"][0]["id"]
+    # deleting B's memory through A's endpoint must fail
+    assert client.delete(f"/api/brands/{a}/memory/{mid}").status_code == 404
+    assert client.get(f"/api/brands/{b}/memory").json()["count"] == 1
+
+
+def test_strip_layout_spec_keeps_marketing_percentages():
+    from app.ai.brain import strip_layout_spec
+    # a blanket percentage rule turned "75% open space" into "open space"
+    for fact in ("12 acres, 75% open space", "100% Vaastu compliant", "20:80 payment plan"):
+        assert strip_layout_spec(fact) == fact
+
+
+def test_strip_layout_spec_still_removes_layout_percentages():
+    from app.ai.brain import strip_layout_spec
+    out = strip_layout_spec("a margin of 7% and a slot 16% of the image width, headline 76pt")
+    for spec in ("7%", "16%", "76pt"):
+        assert spec not in out
+
+
+def test_logo_position_guidance_is_consistent():
+    """The compositor paints the top-right slot; no prompt may say top-left."""
+    import pathlib
+    src = pathlib.Path("app/ai/brain.py").read_text()
+    assert "top-left" not in src.lower()
+    assert "top-right" in src.lower()
+
+
+def test_produce_from_blueprint_passes_the_brand_lock(monkeypatch):
+    from app.ai import brain
+    seen = {}
+
+    def fake_fal_image(prompt, **kw):
+        seen.update(kw)
+        return "https://fal.invalid/x.png"
+
+    monkeypatch.setattr(brain, "fal_image", fake_fal_image)
+    brain.produce_from_blueprint({"static_image_prompt": "p"}, want_video=False, want_voice=False,
+                                 brand={"name": "Neopolis Infra"})
+    assert seen.get("brand") == {"name": "Neopolis Infra"}

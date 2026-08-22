@@ -44,8 +44,8 @@ def add_memory(bid: str, body: MemoryIn, user=Depends(current_user)):
 def drop_memory(bid: str, mid: str, user=Depends(current_user)):
     """Forget something the system learned wrongly."""
     _brand_or_404(bid, user)
-    if not mem.forget(mid):
-        raise HTTPException(404, "Memory not found")
+    if not mem.forget(mid, brand_id=bid):
+        raise HTTPException(404, "Memory not found for this brand")
     return {"ok": True}
 
 
