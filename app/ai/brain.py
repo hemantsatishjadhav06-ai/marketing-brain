@@ -132,7 +132,10 @@ def brand_lock(brand):
         f"LOGO SAFE AREA: keep the top-left corner — out to about 28% of the width and 22% of "
         f"the height — COMPLETELY EMPTY. No headline, kicker, badge or subject may enter or sit "
         f"behind it. The real logo is composited over that area afterwards and will hide anything "
-        f"underneath, so start the headline below or to the right of it.\n\n"
+        f"underneath, so start the headline below or to the right of it.\n"
+        f"SINGLE INSTANCE: every text element appears EXACTLY ONCE. Do not repeat the kicker, "
+        f"headline, subhead, price line, CTA button, contact strip or any badge anywhere in the "
+        f"layout — one of each, in one place only.\n\n"
     )
 
 
@@ -463,6 +466,8 @@ ART_DIRECTOR_BRIEF = (
     "(8) a small DEVELOPER CREDIT under the project name, e.g. by {developer} or Developed by {developer}. "
     + INDIA_BRIEF + " "
     "STRICTLY AVOID: a plain photo with text on top, clip-art, clutter, watermarks, gibberish/lorem text, "
+    "any element rendered twice (one kicker, one headline, one subhead, one price line, one CTA, "
+    "one contact strip — never a repeated block), "
     "copying any reference verbatim, more than ~25 words of body copy. "
     "Tailor every element to the specific product, brand voice and audience. "
     "Output the single detailed image-prompt paragraph, then one line starting 'Brand continuity:' with "
