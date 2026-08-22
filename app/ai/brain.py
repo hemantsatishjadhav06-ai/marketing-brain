@@ -159,6 +159,10 @@ def brand_logo_url(brand):
     if isinstance(brand, dict):
         if brand.get("logo_url"):
             return brand["logo_url"]
+        # A logo the operator uploaded for this brand beats the built-in table.
+        kit = (brand.get("profile") or {}).get("brand_kit") or {}
+        if kit.get("logo_url"):
+            return kit["logo_url"]
         name = brand.get("name") or ""
     else:
         name = str(brand or "")
@@ -376,6 +380,20 @@ def strip_layout_spec(prompt):
     return re.sub(r"\s+([,.;])", r"\1", out).strip()
 
 
+def _logo_bytes(logo, cli):
+    """Logo bytes from raw bytes, a local file, or a URL.
+
+    An uploaded logo may only exist on disk when object storage is not
+    configured, so compositing must not depend on it being publicly hosted.
+    """
+    if isinstance(logo, (bytes, bytearray)):
+        return bytes(logo)
+    if isinstance(logo, str) and not logo.startswith(("http://", "https://")):
+        with open(logo, "rb") as fh:
+            return fh.read()
+    return cli.get(logo).content
+
+
 def composite_brand_logo(image_url_or_bytes, logo_url, slot_w=0.20, slot_h=0.11, margin=0.045):
     """Clear the reserved logo slot and drop the real logo into it.
 
@@ -396,7 +414,7 @@ def composite_brand_logo(image_url_or_bytes, logo_url, slot_w=0.20, slot_h=0.11,
                 img = Image.open(io.BytesIO(image_url_or_bytes)).convert("RGBA")
             else:
                 img = Image.open(io.BytesIO(cli.get(image_url_or_bytes).content)).convert("RGBA")
-            logo = Image.open(io.BytesIO(cli.get(logo_url).content)).convert("RGBA")
+            logo = Image.open(io.BytesIO(_logo_bytes(logo_url, cli))).convert("RGBA")
 
         logo = _trim_alpha(logo)
         m = int(img.width * margin)

@@ -52,6 +52,7 @@ async function loadBrands(){ BRANDS = await api("/brands"); renderSidebar(); }
 function renderSidebar(){
   let h="";
   h+=`<div class="navitem ${state.view==='dash'?'on':''}" onclick="nav('dash')">📊 Dashboard</div>`;
+  h+=`<div class="navitem ${state.view==='approvals'?'on':''}" onclick="nav('approvals')">✅ Approvals${APPROVAL_COUNT?` <span class="tag y" style="margin:0 0 0 6px">${APPROVAL_COUNT}</span>`:""}</div>`;
   if(isAdmin()) h+=`<div class="navitem" onclick="startWizard()">➕ New Brand</div>`;
   const groups={};
   BRANDS.forEach(b=>{ (groups[b.grp||""]=groups[b.grp||""]||[]).push(b); });
@@ -64,7 +65,82 @@ function renderSidebar(){
   }
   $("sidenav").innerHTML=h;
 }
-function nav(view){ state.view=view; state.brand=null; renderSidebar(); if(view==="dash") renderDash(); }
+function nav(view){
+  state.view=view; state.brand=null; renderSidebar();
+  if(view==="dash") renderDash();
+  else if(view==="approvals") renderApprovals();
+}
+
+/* ---------- approvals: the one queue a human works from ---------- */
+let APPROVAL_COUNT = 0;
+
+async function refreshApprovalCount(){
+  try{ const q = await api("/approvals"); APPROVAL_COUNT = q.counts.waiting + q.counts.changes_requested; renderSidebar(); }
+  catch(e){ /* badge is cosmetic — never block the UI on it */ }
+}
+
+function approvalCard(it, needsDecision){
+  const img = it.asset_path ? (it.asset_path.startsWith("http") ? it.asset_path : it.asset_path) : null;
+  return `<div class="card" style="display:flex;gap:14px;align-items:flex-start">
+    ${img?`<img src="${esc(img)}" alt="" style="width:132px;border-radius:10px;flex:none">`
+         :`<div style="width:132px;height:165px;border-radius:10px;background:var(--line);display:flex;align-items:center;justify-content:center;flex:none" class="sub">${it.ready?"no image":"generating…"}</div>`}
+    <div style="flex:1;min-width:0">
+      <span class="tag y" style="margin:0">${esc(it.brand||"")}</span>
+      <span class="tag" style="margin:0 0 0 6px">${esc(it.format||"")}</span>
+      <h2 style="margin:8px 0 4px">${esc(it.title||"Untitled")}</h2>
+      <p class="sub" style="white-space:pre-wrap;margin:0 0 10px">${esc((it.caption||"").slice(0,240))}</p>
+      ${it.comment?`<p class="sub" style="color:var(--warn)">Your note: ${esc(it.comment)}</p>`:""}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+        ${needsDecision?`<button class="sm" onclick="decide('${it.brand_id}','${it.id}','approved',this)">Approve</button>`:""}
+        <button class="sm ghost" onclick="askRevision('${it.brand_id}','${it.id}')">Change this…</button>
+      </div>
+    </div></div>`;
+}
+
+async function renderApprovals(){
+  const m=$("main");
+  m.innerHTML=`<h1 style="font-size:21px;margin-bottom:4px">Approvals</h1>
+    <p class="sub">The agents do the work. This is the only screen you have to act on.</p>
+    <div id="apBody"><span class="spinner"></span></div>`;
+  let q;
+  try{ q = await api("/approvals"); }
+  catch(e){ $("apBody").innerHTML=`<div class="card"><p class="sub">Could not load the queue: ${esc(e.message||e)}</p></div>`; return; }
+  APPROVAL_COUNT = q.counts.waiting + q.counts.changes_requested;
+  renderSidebar();
+  let h="";
+  if(!APPROVAL_COUNT){
+    h = `<div class="card"><h2>All clear 🎉</h2><p class="sub">Nothing is waiting on you. New work will appear here as the agents finish it.</p></div>`;
+  }else{
+    if(q.waiting_for_approval.length){
+      h+=`<h2 style="margin:18px 0 8px">Waiting for you (${q.waiting_for_approval.length})</h2>`;
+      h+=q.waiting_for_approval.map(it=>approvalCard(it,true)).join("");
+    }
+    if(q.changes_requested.length){
+      h+=`<h2 style="margin:22px 0 8px">Changes you asked for (${q.changes_requested.length})</h2>`;
+      h+=q.changes_requested.map(it=>approvalCard(it,true)).join("");
+    }
+  }
+  $("apBody").innerHTML=h;
+}
+
+async function decide(bid, cid, state_, btn){
+  if(btn){ btn.disabled=true; btn.textContent="…"; }
+  try{
+    await api(`/brands/${bid}/creatives/${cid}/approval`,"POST",{state:state_,comment:""});
+    toast(state_==="approved"?"Approved — the agents learned from it":"Saved");
+    renderApprovals();
+  }catch(e){ toast(e.message||"Failed",true); if(btn){ btn.disabled=false; btn.textContent="Approve"; } }
+}
+
+async function askRevision(bid, cid){
+  const what = prompt("What should change? Be specific — the agents will remember this for next time.");
+  if(!what || !what.trim()) return;
+  try{
+    await api(`/brands/${bid}/creatives/${cid}/revise`,"POST",{instruction:what.trim(),remember:true});
+    toast("Redoing it with your change — and remembering it");
+    renderApprovals();
+  }catch(e){ toast(e.message||"Failed",true); }
+}
 
 /* ---------- dashboard ---------- */
 async function renderDash(){
@@ -241,9 +317,9 @@ function logoUrl(b){ const k=kitOf(b); return k.logo?`/workspaces/${b.grp?b.grp+
 function renderBrand(){
   const b=state.brand, k=kitOf(b);
   const SEC=[["create","✨ Create"],["content","🗂 Content"],["plan","🗓 Plan"],["grow","📈 Grow"],["settings","⚙ Settings"]];
-  const SUBS={create:[["create","Create"],["brief","✦ Master brief"]],content:[["board","Board"],["reel studio","Reel studio"],["publish","Published"]],plan:[["ideas","Ideas"],["calendar","Calendar"],["campaigns","Campaigns"]],grow:[["growth","Growth"],["competitors","Competitors"],["analytics","Analytics"],["playbook","Playbook"]],settings:[["brand kit","Brand kit"],["connectors","Connectors"],["overview","Overview"]]};
+  const SUBS={create:[["create","Create"],["brief","✦ Master brief"]],content:[["board","Board"],["reel studio","Reel studio"],["publish","Published"]],plan:[["ideas","Ideas"],["calendar","Calendar"],["campaigns","Campaigns"]],grow:[["growth","Growth"],["competitors","Competitors"],["analytics","Analytics"],["playbook","Playbook"]],settings:[["brand kit","Brand kit"],["memory","🧠 Memory"],["connectors","Connectors"],["overview","Overview"]]};
   const S2S={}; Object.entries(SUBS).forEach(([sec,arr])=>arr.forEach(([t])=>S2S[t]=sec));
-  const TABFN={create:tabCreate,brief:tabBrief,board:tabBoard,"reel studio":tabReelStudio,publish:tabPublish,ideas:tabIdeas,calendar:tabCalendar,campaigns:tabCampaigns,growth:tabGrowth,competitors:tabCompetitors,analytics:tabAnalytics,playbook:tabPlaybook,"brand kit":tabKit,connectors:tabConnectors,overview:tabOverview,coach:tabCoach,creatives:tabCreatives};
+  const TABFN={create:tabCreate,brief:tabBrief,board:tabBoard,"reel studio":tabReelStudio,publish:tabPublish,ideas:tabIdeas,calendar:tabCalendar,campaigns:tabCampaigns,growth:tabGrowth,competitors:tabCompetitors,analytics:tabAnalytics,playbook:tabPlaybook,"brand kit":tabKit,memory:tabMemory,connectors:tabConnectors,overview:tabOverview,coach:tabCoach,creatives:tabCreatives};
   if(!TABFN[state.tab]) state.tab="create";
   const sec = state.tab==="coach" ? "" : (S2S[state.tab]||"content");
   const subnav = sec ? `<div class="subnav">${SUBS[sec].map(([t,l])=>`<button class="${state.tab===t?'on':''}" onclick="state.tab='${t}';renderBrand()">${esc(l)}</button>`).join("")}</div>` : "";
@@ -1249,4 +1325,63 @@ async function pollBrain(cid){
     if(REVIEW_CID===cid) await openReview(cid);
     if(st.indexOf("done")===0||st.indexOf("error")===0) break;
   }
+}
+
+
+/* ---------- memory: what the agents have learned, and who is driving ---------- */
+async function tabMemory(){
+  const b = state.brand, host = $("tabBody");
+  host.innerHTML = '<span class="spinner"></span>';
+  let mem, mode;
+  try{
+    [mem, mode] = await Promise.all([api(`/brands/${b.id}/memory`), api(`/brands/${b.id}/mode`)]);
+  }catch(e){ host.innerHTML = `<div class="card"><p class="sub">Could not load memory: ${esc(e.message||e)}</p></div>`; return; }
+
+  const rows = mem.memory || [];
+  const badge = {rule:"y", correction:"", learning:""};
+  host.innerHTML = `
+  <div class="card">
+    <h2>Who is driving</h2>
+    <p class="sub">In <b>auto</b> the agents generate on their own and you only approve. Switch to <b>manual</b> to stop automatic generation and drive each step yourself. You can always change a single post without leaving auto — use “Change this…” in Approvals.</p>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="${mode.mode==='auto'?'':'ghost'}" onclick="setMode('auto')">Auto — agents work, I approve</button>
+      <button class="${mode.mode==='manual'?'':'ghost'}" onclick="setMode('manual')">Manual — I drive</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Brand memory (${rows.length})</h2>
+    <p class="sub">Everything the system has learned about this brand. The top ${mem.prompt_limit} go into every prompt. Rules you set here are never broken; corrections come from what you rejected.</p>
+    <div style="display:flex;gap:8px;margin:10px 0">
+      <input id="memText" placeholder="e.g. Never use the word luxury more than once" style="flex:1">
+      <button onclick="addMemory(this)">Add rule</button>
+    </div>
+    ${rows.length ? rows.map(mm=>`
+      <div class="feeditem">
+        <span class="tag ${badge[mm.kind]||''}" style="margin:0">${esc(mm.kind)}</span>
+        <span style="flex:1">${esc(mm.content)}</span>
+        <span class="sub" style="white-space:nowrap">×${mm.hits}</span>
+        <button class="sm ghost" onclick="dropMemory('${mm.id}')">forget</button>
+      </div>`).join("")
+    : '<p class="sub">Nothing learned yet. Approve or reject a few creatives and this fills in on its own.</p>'}
+  </div>`;
+}
+
+async function setMode(m){
+  try{ await api(`/brands/${state.brand.id}/mode`,"POST",{mode:m}); toast(`Switched to ${m}`); tabMemory(); }
+  catch(e){ toast(e.message||"Failed",true); }
+}
+
+async function addMemory(btn){
+  const el=$("memText"), v=(el.value||"").trim();
+  if(!v) return toast("Type the rule first",true);
+  btn.disabled=true;
+  try{ await api(`/brands/${state.brand.id}/memory`,"POST",{content:v,kind:"rule",weight:5}); el.value=""; toast("Rule saved"); tabMemory(); }
+  catch(e){ toast(e.message||"Failed",true); }
+  finally{ btn.disabled=false; }
+}
+
+async function dropMemory(mid){
+  try{ await api(`/brands/${state.brand.id}/memory/${mid}`,"DELETE"); toast("Forgotten"); tabMemory(); }
+  catch(e){ toast(e.message||"Failed",true); }
 }

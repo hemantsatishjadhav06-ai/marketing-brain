@@ -78,9 +78,15 @@ def _stamp_logo(brand, image_url, logo_url, cid):
     """
     if os.environ.get("LOGO_COMPOSITE", "true").strip().lower() in ("0", "false", "no"):
         return image_url
-    if not (brand and image_url and logo_url):
+    if not (brand and image_url):
         return image_url
-    blob = brain.composite_brand_logo(image_url, logo_url)
+    # An operator-uploaded logo has no public URL unless object storage is
+    # configured, but it is on disk — and the compositor accepts a local path,
+    # so a self-hosted brand still gets its real mark on the creative.
+    logo_ref = logo_url or _logo_path(brand)
+    if not logo_ref:
+        return image_url
+    blob = brain.composite_brand_logo(image_url, logo_ref)
     if not blob:
         return image_url
     try:

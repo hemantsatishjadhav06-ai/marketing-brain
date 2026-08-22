@@ -63,6 +63,60 @@ def update_kit(bid: str, body: KitIn, user=Depends(current_user)):
     return profile["brand_kit"]
 
 
+@router.post("/api/brands/{bid}/logo")
+async def upload_logo(bid: str, file: UploadFile = File(...), user=Depends(current_user)):
+    """Store the brand's own logo.
+
+    The UI has always offered this upload but the endpoint did not exist, so every
+    attempt 404'd and only the two hard-coded logos ever reached a creative.
+
+    The file is kept three ways because each covers a different failure: on disk
+    for local serving, base64 in the brand kit so an ephemeral container can
+    restore it, and — when object storage is configured — a public URL, which is
+    the only form fal.ai can take as a reference.
+    """
+    import base64 as _b64
+
+    b = _brand_or_404(bid, user)
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(400, "Empty file")
+    if len(raw) > 5 * 1024 * 1024:
+        raise HTTPException(400, "Logo must be 5 MB or smaller")
+
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in (".png", ".jpg", ".jpeg", ".webp", ".svg"):
+        raise HTTPException(400, "Logo must be a PNG, JPG, WEBP or SVG")
+    try:
+        if ext != ".svg":
+            from PIL import Image
+            Image.open(io.BytesIO(raw)).verify()   # reject anything that is not really an image
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(400, "That file is not a readable image")
+
+    rel = f"brand/logo{ext}"
+    ref = _save_asset(b, rel, raw)
+
+    profile = b.get("profile") or {}
+    kit = dict(profile.get("brand_kit") or {})
+    kit["logo"] = rel
+    kit["logo_b64"] = _b64.b64encode(raw).decode()
+    if ref.startswith("http"):
+        kit["logo_url"] = ref          # publicly reachable — usable as a fal reference
+    else:
+        kit.pop("logo_url", None)
+    profile["brand_kit"] = kit
+    db.update_brand(bid, profile=profile)
+
+    return {"ok": True, "logo": rel, "logo_url": kit.get("logo_url"),
+            "hosted": bool(kit.get("logo_url")),
+            "note": None if kit.get("logo_url") else
+                    "Stored locally. Configure Supabase storage to give it a public URL "
+                    "so the image model can use it as a reference."}
+
+
 @router.post("/api/brands/{bid}/ideas")
 def ideas(bid: str, body: IdeasIn, user=Depends(current_user)):
     b = _brand_or_404(bid, user)
