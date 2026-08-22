@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from ._shared import *  # noqa: F401,F403
 from ..ai import brain as ai_brain
-from ..services import projects
+from ..services import projects, memory
 
 router = APIRouter()
 
@@ -137,6 +137,13 @@ def set_approval(bid: str, cid: str, body: ApprovalIn, user=Depends(current_user
     payload["approval"] = {"state": body.state, "comment": body.comment[:1000],
                            "by": user.get("uid"), "role": user.get("role"), "at": time.time()}
     db.update_doc("creatives", cid, payload=payload)
+    # An approve/reject is the strongest signal the system gets — record it so the
+    # next brief already knows, instead of repeating a correction the operator
+    # has already made.
+    try:
+        memory.capture_approval(bid, c, body.state, body.comment)
+    except Exception:
+        pass
     return db.get_doc("creatives", cid)
 
 

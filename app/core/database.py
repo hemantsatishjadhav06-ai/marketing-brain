@@ -164,6 +164,23 @@ CREATE TABLE IF NOT EXISTS competitors (
     payload TEXT NOT NULL,
     created_at REAL
 );
+CREATE TABLE IF NOT EXISTS brand_memory (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    kind TEXT DEFAULT 'learning',
+    payload TEXT NOT NULL,
+    weight REAL DEFAULT 1.0,
+    created_at REAL
+);
+CREATE TABLE IF NOT EXISTS agent_runs (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    creative_id TEXT DEFAULT '',
+    stage TEXT DEFAULT '',
+    status TEXT DEFAULT 'running',
+    payload TEXT NOT NULL,
+    created_at REAL
+);
 CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     email TEXT NOT NULL,
@@ -356,6 +373,15 @@ def delete_docs(table, brand_id, **where):
         vals.append(v)
     with _lock, _conn() as c:
         c.execute(q, vals)
+
+
+def delete_doc(table, did):
+    """Delete a single document by id, on whichever backend is configured."""
+    if IS_REST:
+        _rest("DELETE", table, params={"id": f"eq.{did}"})
+        return
+    with _lock, _conn() as c:
+        c.execute(f"DELETE FROM {table} WHERE id=?", (did,))
 
 
 # ---------- connectors ----------

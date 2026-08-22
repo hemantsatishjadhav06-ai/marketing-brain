@@ -95,7 +95,17 @@ def _brand_context(brand):
         "brand_colors_hex": colors,
         "visual_style": kit.get("style"),
     }
-    return json.dumps({k: v for k, v in ctx.items() if v}, ensure_ascii=False) + projects.pointer(brand.get("name", ""))
+    block = json.dumps({k: v for k, v in ctx.items() if v}, ensure_ascii=False)
+    block += projects.pointer(brand.get("name", ""))
+    # Everything the brand has already established — approvals, rejections, rules.
+    # Without this each run starts blind and repeats corrections the operator
+    # has already made.
+    try:
+        from ..services import memory
+        block += memory.context_block(brand.get("id") or "")
+    except Exception:
+        pass
+    return block
 
 
 def brand_palette(brand):
