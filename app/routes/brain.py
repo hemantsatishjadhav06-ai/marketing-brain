@@ -1,4 +1,6 @@
 """Master Prompt Brain routes: per-task agent team → blueprint → approve → proceed."""
+import os
+
 from fastapi import APIRouter
 from ._shared import *  # noqa: F401,F403
 from ..ai import brain
@@ -67,12 +69,15 @@ def proceed(bid: str, cid: str, user=Depends(current_user)):
 
 
 def _stamp_logo(brand, image_url, logo_url, cid):
-    """Paint the real brand logo over the reserved tile and persist the result.
+    """Drop the real logo into the slot the art director reserved for it.
 
-    fal reproduces a referenced logo only approximately — it has rendered entirely
-    invented brands into that corner — so the generated URL is never trusted as final.
-    Falls back to the original URL if compositing or saving fails.
+    The model letters the brand name or invents a mark when asked to draw a logo, so
+    the file is always placed by us — into a light, empty slot that is part of the
+    composition, which reads as designed rather than pasted. Set LOGO_COMPOSITE=false
+    to skip it.
     """
+    if os.environ.get("LOGO_COMPOSITE", "true").strip().lower() in ("0", "false", "no"):
+        return image_url
     if not (brand and image_url and logo_url):
         return image_url
     blob = brain.composite_brand_logo(image_url, logo_url)

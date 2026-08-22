@@ -35,6 +35,11 @@ FAL_VOICE_MODEL = os.environ.get("FAL_VOICE_MODEL", "fal-ai/elevenlabs/text-to-d
 FAL_VOICE_ID = os.environ.get("FAL_VOICE_ID", "wJ5MX7uuKXZwFqGdWM4N")
 IMAGE_ASPECT = os.environ.get("FAL_IMAGE_ASPECT", "4:5")
 
+# The art director and the lead editor carry the design quality of every creative, so they run
+# on a stronger model than the cheap default used for the earlier ideation steps.
+CREATIVE_MODEL = os.environ.get("CREATIVE_MODEL", "anthropic/claude-sonnet-4.5")
+CREATIVE_ROLES = {"art_director", "finalize", "copywriter", "narrative"}
+
 # --------------------------------------------------------- market + art library
 INDIA_BRIEF = (
     "AUDIENCE & MARKET: Indian real-estate buyers — end-users, NRIs and investors. Be concrete and "
@@ -49,20 +54,22 @@ INDIA_BRIEF = (
 
 # World-class concept library distilled from real top-tier Indian real-estate posters.
 IMAGE_CONCEPTS = (
-    "A. FLOATING ISLAND - a hyper-real 3D chunk of land floating in the sky carrying the project's "
-    "towers with manicured lawns, trees and a curving road, dramatic clouds, a tiny figure walking the "
-    "road; bold flat brand-colour background.\n"
-    "B. DARK-LUXURY TOWER HERO - cinematic blue-hour photoreal towers, glass glowing warm gold, palms "
-    "and a reflecting pool, deep navy field, champagne-gold serif headline, frosted info card + gold "
-    "price badges.\n"
-    "C. EDITORIAL INVESTMENT POSTER - a person viewing the skyline, a huge bold sans headline making a "
-    "market/ROI point, a small bar or line chart, data chips; confident financial tone.\n"
-    "D. ARCHITECTURAL HERO + INFO PANEL - clean daytime tower render with a structured spec panel "
-    "(config, sizes, price, land extent) and a highlights list; brochure-grade clarity.\n"
-    "E. DATA / GROWTH INFOGRAPHIC - a corridor map or numbered highlights with icons and stat chips; "
-    "authoritative, insight-led.\n"
-    "F. INDIAN FESTIVE GREETING - tasteful festival artwork (deity/motif/rangoli/tricolour) with a "
-    "subtle project mention and warm wishes."
+    "A. FLOATING ISLAND - a hyper-real chunk of land suspended in a clean colour field, carrying the "
+    "project's towers with lawns, trees and a curving road; generous air around it; one bold headline.\n"
+    "B. ARCHITECTURAL HERO - a single cinematic photograph of the towers at blue hour or honest "
+    "daylight, treated like a magazine cover: full bleed or one shaped block, a high-contrast display "
+    "headline in the brand colour, and almost nothing else.\n"
+    "C. EDITORIAL INVESTMENT POSTER - a strong stated point about the market or corridor set in large "
+    "display type over a restrained image, with at most one supporting figure; confident, financial, "
+    "text-led.\n"
+    "D. SPEC PANEL - a clean daytime render paired with ONE compact panel carrying no more than four "
+    "facts, set on a strict grid with real negative space; brochure-grade clarity without brochure "
+    "clutter.\n"
+    "E. CORRIDOR MAP - a simplified, elegantly drawn locality or connectivity diagram as the hero, "
+    "with a handful of labelled points; insight-led and quiet.\n"
+    "F. INDIAN FESTIVE GREETING - restrained festival artwork (a single motif, rangoli geometry or "
+    "diya) in the brand palette, with a small project mention and warm wishes.\n"
+    "In every concept the palette comes from the brand context — never a default gold or luxury cliché."
 )
 
 # Reference posters on the fal CDN, used ONLY as loose style anchors (never copied).
@@ -129,18 +136,19 @@ def brand_lock(brand):
         f"Do NOT invent, draw, letter or imply any other company name, wordmark, monogram or "
         f"logo — no fictional realty brands, no generic 'REAL ESTATE' house icons, no placeholder "
         f"marks.\n"
-        f"LOGO SAFE AREA: keep the top-left corner — out to about 28% of the width and 22% of "
-        f"the height — COMPLETELY EMPTY. No headline, kicker, badge or subject may enter or sit "
-        f"behind it. The real logo is composited over that area afterwards and will hide anything "
-        f"underneath, so start the headline below or to the right of it.\n"
+        f"LOGO SLOT: leave a clean EMPTY slot on a light field in the top-right corner (about 16% "
+        f"of the width by 9% of the height) for the brand logo — the real file is dropped in "
+        f"afterwards. Draw NOTHING in it, and place no other logo, monogram or brand mark anywhere "
+        f"else in the image. Do not letter the brand name as display type.\n"
+        f"NEVER RENDER THE SPEC: sizes, percentages, pt values, hex codes and margin notes are "
+        f"instructions, not content — none of them may appear as visible text.\n"
         f"SINGLE INSTANCE: every text element appears EXACTLY ONCE. Do not repeat the kicker, "
         f"headline, subhead, price line, CTA button, contact strip or any badge anywhere in the "
         f"layout — one of each, in one place only.\n"
-        f"ONE TEXT ZONE: the kicker + headline + subhead form a single block that sits ONCE in the "
-        f"upper-left quadrant, directly beneath the logo safe area. If the background is split into "
-        f"a light band and a dark band, the headline block still appears in only ONE of those bands "
-        f"— never mirrored, echoed or restated in the other. The lower half carries only the info "
-        f"card, badges, CTA and footer strip.\n\n"
+        f"ONE TEXT ZONE: the kicker + headline + subhead form a single block placed ONCE. If the "
+        f"background is split into bands, that block appears in only ONE band — never mirrored, "
+        f"echoed or restated in the other. Keep the remaining zones to the compact spec strip and "
+        f"the footer lockup, and leave at least a third of the canvas empty.\n\n"
     )
 
 
@@ -160,10 +168,15 @@ def brand_logo_url(brand):
 
 
 LOGO_GUARD = (
-    "The BRAND LOGO is attached as reference image {n}. Reproduce it EXACTLY and unaltered "
-    "(identical colours and wordmark; do not redraw, restyle, recolour, crop or add/remove text), "
-    "placed inside a clean rounded WHITE tile in the TOP-LEFT corner, perfectly legible. "
-    "Do NOT invent any other logo anywhere.\n\n"
+    "The BRAND LOGO is attached as reference image {n}. Place it INTO the design as a designer would: "
+    "small, aligned to the layout's margin, in whichever corner or footer lockup best suits the "
+    "composition, at a size that reads clearly without dominating, with clear space around it equal to "
+    "at least half its height. Sit it on a background that gives it contrast — if the field behind it "
+    "is dark, place it on a small clean light shape sized to the logo, not a large slab. "
+    "Reproduce the mark EXACTLY and unaltered: identical colours, proportions and wordmark. Do NOT "
+    "redraw, restyle, recolour, crop, add or remove any text, and do NOT letter the brand name as a "
+    "substitute for the mark. Do NOT invent any other logo, monogram or company mark anywhere in the "
+    "image.\n\n"
 )
 
 REF_GUARD = (
@@ -334,53 +347,21 @@ def fal_voice(text):
     return _first_url(res, "audio")
 
 
-def _corner_plate_size(img, minimum, scan=0.42, thresh=232):
-    """Measure the near-white tile the model drew in the top-left corner.
+def composite_brand_logo(image_url_or_bytes, logo_url, slot_w=0.16, slot_h=0.09, margin=0.07):
+    """Drop the real logo into the light slot the art director reserved for it.
 
-    Returns (width, height) at least `minimum` in each axis, so the composited plate
-    always swallows the model's own tile — and the invented monogram inside it.
-    """
-    try:
-        px = img.convert("RGB").load()
-        limit_x = int(img.width * scan)
-        limit_y = int(img.height * scan)
-        probe_y = max(2, int(img.height * 0.02))
-        probe_x = max(2, int(img.width * 0.02))
+    The model letters a brand name or invents a mark when left to its own devices, so
+    the logo file is always placed by us. The art-director brief reserves an EMPTY
+    light-field slot in the top-right at these proportions, which means the mark can be
+    dropped straight in with no plate or chip behind it — it reads as part of the design
+    rather than a sticker pasted onto a finished image.
 
-        wide = minimum
-        for x in range(0, limit_x):
-            r, g, b = px[x, probe_y]
-            if r < thresh or g < thresh or b < thresh:
-                wide = max(minimum, x)
-                break
-        tall = minimum
-        for y in range(0, limit_y):
-            r, g, b = px[probe_x, y]
-            if r < thresh or g < thresh or b < thresh:
-                tall = max(minimum, y)
-                break
-        # a couple of px of bleed so no anti-aliased fringe survives
-        return min(limit_x, wide + 4), min(limit_y, tall + 4)
-    except Exception:
-        return minimum, minimum
-
-
-def composite_brand_logo(image_url_or_bytes, logo_url, box=0.24):
-    """Stamp the REAL logo into the top-left corner of a generated image.
-
-    nano-banana-pro reinterprets a logo passed as a reference — it has drawn entirely
-    invented marks (SKYLINE REALTY, JADE HEIGHTS, a generic house icon) into that
-    corner. It also draws its OWN white tile, usually larger than the reserved area,
-    with the invented monogram at the top of it. So the plate is anchored flush to the
-    corner and sized to swallow that whole tile; only the inner corner is rounded.
-
-    Accepts a URL or raw bytes. Returns PNG bytes, or None on failure so callers can
-    fall back to the original image.
+    Accepts a URL or raw bytes; returns PNG bytes, or None so callers can fall back.
     """
     if not image_url_or_bytes or not logo_url:
         return None
     try:
-        from PIL import Image, ImageDraw
+        from PIL import Image
         with httpx.Client(timeout=120, follow_redirects=True) as cli:
             if isinstance(image_url_or_bytes, (bytes, bytearray)):
                 img = Image.open(io.BytesIO(image_url_or_bytes)).convert("RGBA")
@@ -388,35 +369,51 @@ def composite_brand_logo(image_url_or_bytes, logo_url, box=0.24):
                 img = Image.open(io.BytesIO(cli.get(image_url_or_bytes).content)).convert("RGBA")
             logo = Image.open(io.BytesIO(cli.get(logo_url).content)).convert("RGBA")
 
-        side = min(img.width, img.height)
-        tile = int(side * box)
-
-        # The model draws its own white tile in that corner and its size varies, so
-        # measure the actual near-white region touching the corner and cover all of it.
-        w, h = _corner_plate_size(img, tile)
-
-        pad = int(min(w, h) * 0.14)
-        radius = int(min(w, h) * 0.18)
-
-        plate = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-        d = ImageDraw.Draw(plate)
-        d.rounded_rectangle([0, 0, w - 1, h - 1], radius=radius, fill=(255, 255, 255, 255))
-        d.rectangle([0, 0, radius, radius], fill=(255, 255, 255, 255))                    # top-left
-        d.rectangle([w - radius - 1, 0, w - 1, radius], fill=(255, 255, 255, 255))        # top-right
-        d.rectangle([0, h - radius - 1, radius, h - 1], fill=(255, 255, 255, 255))        # bottom-left
-
-        iw, ih = w - 2 * pad, h - 2 * pad
-        scale = min(iw / logo.width, ih / logo.height)
+        logo = _trim_alpha(logo)
+        box_w, box_h = int(img.width * slot_w), int(img.height * slot_h)
+        scale = min(box_w / logo.width, box_h / logo.height)
         logo = logo.resize((max(1, int(logo.width * scale)), max(1, int(logo.height * scale))),
                            Image.LANCZOS)
-        plate.alpha_composite(logo, ((w - logo.width) // 2, (h - logo.height) // 2))
 
-        img.alpha_composite(plate, (0, 0))
+        m = int(img.width * margin)
+        x = img.width - m - logo.width
+        y = max(m, int(img.height * margin * 0.75))
+
+        # If the reserved slot did not come out light, the dark mark would disappear —
+        # lay down a soft white pad just big enough to carry it.
+        if _mean_luma(img, x, y, logo.width, logo.height) < 140:
+            pad = int(min(logo.width, logo.height) * 0.35)
+            plate = Image.new("RGBA", (logo.width + 2 * pad, logo.height + 2 * pad), (255, 255, 255, 236))
+            img.alpha_composite(plate, (x - pad, y - pad))
+
+        img.alpha_composite(logo, (x, y))
         out = io.BytesIO()
         img.convert("RGB").save(out, "PNG")
         return out.getvalue()
     except Exception:
         return None
+
+
+def _trim_alpha(im):
+    """Crop transparent padding so the mark fills its slot optically."""
+    try:
+        bbox = im.split()[-1].getbbox()
+        return im.crop(bbox) if bbox else im
+    except Exception:
+        return im
+
+
+def _mean_luma(img, x, y, w, h):
+    """Average brightness of the region the logo will land on."""
+    try:
+        region = img.convert("RGB").crop((max(0, x), max(0, y),
+                                          min(img.width, x + w), min(img.height, y + h)))
+        px = list(region.getdata())
+        if not px:
+            return 255
+        return sum(0.299 * r + 0.587 * g + 0.114 * b for r, g, b in px) / len(px)
+    except Exception:
+        return 255
 
 
 def produce_from_blueprint(bp, want_video=True, want_voice=True, logo_url=None):
@@ -447,37 +444,66 @@ def _style_key(style):
 # the "finalize" agent returns the strict-JSON blueprint.
 
 ART_DIRECTOR_BRIEF = (
-    "You are an award-winning SENIOR ART DIRECTOR at India's top real-estate advertising agency. "
-    "You design scroll-stopping, information-rich premium Instagram creatives — NEVER a plain stock photo "
-    "with text slapped on top. Write ONE meticulous, production-ready image prompt for nano-banana-pro "
-    "(4:5 vertical). "
-    "STEP 1 - pick the single best-fitting CONCEPT for this topic from the library below and state its "
-    "letter first (e.g., 'Concept B'). Deliberately VARY concepts across briefs; never default to the same one.\n"
+    "You are one of the world's best graphic designers — the level of Pentagram, Collins or a "
+    "senior AD at Ogilvy India. You are designing a single Instagram creative (4:5 vertical) that a "
+    "design director would be proud to publish. Write ONE meticulous, production-ready image prompt "
+    "for nano-banana-pro.\n\n"
+    "THE STANDARD YOU ARE HELD TO: restraint, hierarchy and craft. Great design is what you leave "
+    "OUT. A cluttered spec sheet is a brochure, not a designed post. If an element does not earn its "
+    "place, delete it.\n\n"
+    "STEP 1 — pick the single best-fitting CONCEPT below and state its letter first (e.g. 'Concept B'). "
+    "Vary concepts across briefs; never default to the same one.\n"
     + IMAGE_CONCEPTS + "\n"
-    "STEP 2 - write the prompt. It MUST include: "
-    "(1) the chosen concept rendered in cinematic photoreal detail; "
-    "(2) BOLD TYPOGRAPHIC HIERARCHY - a small kicker, a strong headline (name the type style; champagne-gold "
-    "or a brand accent), a one-line subhead; "
-    "(3) an ON-IMAGE INFO BLOCK (frosted/solid card) with REAL specifics: configuration (BHK), sizes in "
-    "sq.ft, price in INR (Rs Cr / per sq.ft), locality+city, land extent, tower/floor counts. "
-    "Include a RERA number or possession date ONLY if one is explicitly supplied in the brand "
-    "context; otherwise omit that row entirely — never print a placeholder or masked value; "
-    "(4) one or two rounded PRICE BADGES and a CTA button (e.g., 'Book Site Visit'), plus a footer contact "
-    "strip with brand name, +91 phone and website; "
-    "(5) the brand-colour BACKGROUND field and accent colours as HEX; "
-    "(6) DEPTH & FINISH - soft cast shadows, bokeh/particles, subtle grain, realistic lighting, ultra-"
-    "detailed 8K, crisp perfectly-legible text, WCAG-AA contrast; "
-    "(7) a strictly EMPTY top-left LOGO SAFE AREA covering the whole top-left corner out to about 28% of the image width and 22% of its height. No headline, kicker, badge, photo subject or any other element may enter or sit behind that area — the real logo is composited over it afterwards, and anything underneath will be hidden. Start headlines and all other content BELOW or to the RIGHT of that area. "
-    "(8) a small DEVELOPER CREDIT under the project name, e.g. by {developer} or Developed by {developer}. "
-    + INDIA_BRIEF + " "
-    "STRICTLY AVOID: a plain photo with text on top, clip-art, clutter, watermarks, gibberish/lorem text, "
-    "any element rendered twice (one kicker, one headline, one subhead, one price line, one CTA, "
-    "one contact strip — never a repeated block), "
-    "copying any reference verbatim, more than ~25 words of body copy. "
-    "Tailor every element to the specific product, brand voice and audience. "
-    "Output the single detailed image-prompt paragraph, then one line starting 'Brand continuity:' with "
-    "colour/lighting/logo rules."
+    "STEP 2 — write the prompt to these RULES OF CRAFT:\n"
+    "• ONE IDEA. A single focal message. Choose the strongest angle and commit to it.\n"
+    "• AT MOST THREE TEXT ZONES: (a) a kicker + headline + one-line subhead, (b) a compact spec strip "
+    "of NO MORE THAN FOUR facts, (c) a footer with brand name, phone and website. That is the ceiling, "
+    "not a target — two zones is often stronger. Every further fact belongs in the caption, not on the "
+    "image.\n"
+    "• TYPOGRAPHY IS THE DESIGN. Name a real pairing (e.g. a high-contrast serif display such as "
+    "Playfair/Canela against a clean grotesque such as Inter/Söhne). Specify a decisive size jump "
+    "between headline and body — roughly 4:1 — tight optical tracking on the display line, generous "
+    "leading on body text. The headline is at most SIX words. No outlines, no drop-shadowed text, no "
+    "gradient-filled letters, no faux-3D type.\n"
+    "• GRID AND AIR. State a clear margin (about 7-8% of the width) that nothing crosses, and align "
+    "every element to a simple column grid. Leave real negative space — at least a third of the canvas "
+    "should carry no text or graphic element. Do not fill corners just because they are empty.\n"
+    "• COLOUR DISCIPLINE. Use the brand palette supplied in the brand context and nothing else: one "
+    "dominant field, one supporting neutral, one accent used ONCE. Never introduce champagne gold, "
+    "rose gold or any luxury cliché that is not in the brand's own palette.\n"
+    "• PHOTOGRAPHY IS REQUIRED. Every creative carries ONE hero architectural photograph of the "
+    "project — art-directed like a magazine cover: real lens behaviour, honest daylight or blue "
+    "hour, controlled highlights, no HDR crunch, no plastic CGI sheen, no lens flare. It occupies a "
+    "substantial share of the canvas as a full bleed or a clean shaped block that sits on the grid. "
+    "A pure type poster with no photograph is NOT acceptable.\n"
+    "• ONE CTA at most, as a quiet button or a simple underlined line — never two. At most ONE badge, "
+    "and only if it carries a genuinely distinct fact.\n"
+    "• FINISH. Crisp perfectly-legible text, true WCAG-AA contrast, subtle real-paper grain at most. "
+    "No bokeh sparkles, no floating particles, no glow.\n"
+    "• LOGO SLOT — design it in, leave it empty. Reserve a clean rectangular slot for the brand logo in "
+    "the TOP-RIGHT corner, on the layout margin, about 16% of the image width and 9% of its height. "
+    "That slot MUST sit on a plain LIGHT field (white or the palette's lightest neutral) so a dark "
+    "mark reads on it, and it must contain NOTHING — no lettering, no monogram, no drawn mark, no "
+    "photograph, no texture. Treat it as a deliberate part of the composition and balance the layout "
+    "around it. The real logo file is dropped into that slot afterwards at full fidelity.\n"
+    "• EXACTLY ONE LOGO, and it is the reserved slot above. Do NOT draw, letter or place a brand "
+    "mark anywhere else — not in the footer, not beside the CTA, not over the photograph. The "
+    "footer carries only the phone number and website as plain text. Never set the brand name as "
+    "display type in place of the logo, and never draw a substitute mark.\n"
+    "• DEVELOPER CREDIT: one small line, e.g. 'Developed by {developer}'.\n"
+    + INDIA_BRIEF + "\n"
+    "STRICTLY AVOID: a plain photo with text slapped on top; a spec sheet masquerading as a poster; "
+    "clip-art or stock icons; more than four facts on the image; two CTAs; stacked badges; clutter in "
+    "the margins; any element rendered twice; watermarks; gibberish or lorem text; copying a reference "
+    "verbatim; more than ~25 words of body copy total.\n"
+    "NEVER RENDER THE SPEC. Sizes, percentages, ratios, margins, hex codes, pt values and grid notes "
+    "are instructions to the renderer — they must NOT appear as visible text anywhere in the image. "
+    "Do not label, annotate, dimension or caption the layout. The only text drawn is the actual "
+    "marketing copy.\n"
+    "Output the single detailed image-prompt paragraph, then one line starting 'Brand continuity:' "
+    "with colour, typography and logo rules."
 )
+
 FINALIZE_BRIEF = (
     "You are the lead creative editor and QA for an INDIAN real-estate brand. Review every prior agent "
     "output, raise it to award-winning agency quality, and OUTPUT THE FINAL PRODUCTION BLUEPRINT as STRICT "
@@ -488,10 +514,11 @@ FINALIZE_BRIEF = (
     "post_caption MUST be information-rich and India-market ready: a strong hook, then 2-4 lines of real "
     "specifics (config/BHK, sizes in sq.ft, price in INR Cr/Lakh, locality+city, possession, key "
     "amenities/USPs), a clear CTA and the supplied +91 contact; human voice, no markdown. Never state a RERA number or possession date unless one is supplied in the brand context. Name the DEVELOPER/builder (the developer field) and place a small by {developer} credit near the project name on the image. "
-    "static_image_prompt MUST be the Art Director's expert, art-directed prompt (verbatim or improved): a "
-    "NAMED concept, bold typographic hierarchy, brand colour field, an on-image INFO BLOCK with real "
-    "specifics, price badge(s), CTA, footer, depth and cinematic lighting, 4:5 vertical, and a reserved "
-    "top-left logo area — NEVER a plain photo-with-text. "
+    "static_image_prompt MUST be the Art Director's prompt (verbatim or improved) and must keep its "
+    "restraint: a NAMED concept, one headline of at most six words, at most FOUR facts on the image, "
+    "at most one CTA and one badge, a named type pairing, a stated margin, real negative space, the "
+    "brand palette only, and the logo placed small on the margin. 4:5 vertical. NEVER a plain "
+    "photo-with-text, and never a crowded spec sheet. "
     "The video_prompt MUST be cinematic and specific (camera move, motion, lighting, mood). JSON only, no commentary."
 )
 
@@ -529,7 +556,7 @@ def run_agent_team(brand, topic, perspective="", style="Post", cb=None):
                   f"{lock}BRAND CONTEXT:\n{ctx}")
         user = f"Topic: {topic}\nPerspective: {perspective}\n\nPrevious agents said:\n{prior}\n\nDo your part now."
         if role == "finalize":
-            bp = engine._json_chat(system, user, max_tokens=4000)
+            bp = engine._json_chat(system, user, max_tokens=4000, model=CREATIVE_MODEL)
             bp.setdefault("scenes", [])
             bp.setdefault("hashtags", [])
             bp.setdefault("developer", "")
@@ -540,7 +567,8 @@ def run_agent_team(brand, topic, perspective="", style="Post", cb=None):
             return {"agents": agents, "blueprint": bp}
         out = engine._chat(
             [{"role": "system", "content": system}, {"role": "user", "content": user}],
-            max_tokens=1200, temperature=0.85,
+            max_tokens=1600 if role in CREATIVE_ROLES else 1200, temperature=0.85,
+            model=CREATIVE_MODEL if role in CREATIVE_ROLES else None,
         ).strip()
         agents.append({"role": title, "output": out})
         if cb:

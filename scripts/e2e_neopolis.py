@@ -139,11 +139,14 @@ def render(prompt, outdir, filename, logo_url=None, refs=None):
         log("  ! fal returned no image url")
         return None, None
     dest = outdir / filename
-    blob = brain.composite_brand_logo(url, logo_url) if logo_url else None
-    if blob:
-        dest.write_bytes(blob)
-        log("    logo composited ✓")
-        return url, str(dest)
+    # The logo is placed by the model as part of the design; compositing a plate on top
+    # afterwards is only a fallback (LOGO_COMPOSITE=true).
+    if os.environ.get("LOGO_COMPOSITE", "true").strip().lower() not in ("0", "false", "no") and logo_url:
+        blob = brain.composite_brand_logo(url, logo_url)
+        if blob:
+            dest.write_bytes(blob)
+            log("    logo composited ✓")
+            return url, str(dest)
     local = download(url, dest)
     return url, (str(local) if local else None)
 

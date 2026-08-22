@@ -43,14 +43,15 @@ def _chat(messages, max_tokens=4000, temperature=0.8, model=None):
     return data["choices"][0]["message"]["content"]
 
 
-def _json_chat(system, user, max_tokens=4000, temperature=0.8):
+def _json_chat(system, user, max_tokens=4000, temperature=0.8, model=None):
     """Chat that must return JSON; robust extraction with one retry."""
     msgs = [
         {"role": "system", "content": system + "\nRespond ONLY with valid JSON. No markdown fences, no commentary."},
         {"role": "user", "content": user},
     ]
     for attempt in range(2):
-        raw = _chat(msgs, max_tokens=max_tokens, temperature=temperature if attempt == 0 else 0.4)
+        raw = _chat(msgs, max_tokens=max_tokens,
+                    temperature=temperature if attempt == 0 else 0.4, model=model)
         parsed = _extract_json(raw)
         if parsed is not None:
             return parsed
