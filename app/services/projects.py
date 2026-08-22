@@ -1,11 +1,12 @@
 """MoreSpace project knowledge base — the master directory of every live / prelaunch
 project. Used to ground the AI coach chatbot, the reel/voice scripts, and the in-app
-Projects directory. morespace.ai is the MASTER website for all projects.
-Data sourced from morespace.ai (keep in sync with the site)."""
+Projects directory. morespace.netlify.app is the MASTER website for all projects;
+Neopolis Infra has its own site at neopolis-infra.netlify.app.
+Data sourced from those sites (keep in sync)."""
 
 import re
 
-MASTER_SITE = "https://morespace.ai/"
+MASTER_SITE = "https://morespace.netlify.app/"
 CONTACT = {
     "phone": "+91 73965 06318",
     "alt_phone": "+91 70751 68306",
@@ -14,9 +15,9 @@ CONTACT = {
     "whatsapp": "https://wa.me/917396506318",
 }
 INDEX_LINKS = {
-    "all_projects": "https://morespace.ai/httpsmorespaceailuxury-residential-projects-hyderabad",
-    "upcoming": "https://morespace.ai/httpsmorespaceaiprelaunch-apartments-hyderabad",
-    "contact": "https://morespace.ai/property-buying-contact",
+    "all_projects": "https://morespace.netlify.app/",
+    "upcoming": "https://morespace.netlify.app/",
+    "contact": "https://morespace.netlify.app/",
 }
 
 PROJECTS = [
@@ -35,7 +36,7 @@ PROJECTS = [
             "11 ft ceilings, private lobby per unit, double-height entrance lobbies",
             "Opposite CBIT College; Gandipet & Kokapet lake + skyline views",
         ],
-        "url": "https://morespace.ai/httpsmorespaceailuxury-apartments-neopolis",
+        "url": "https://neopolis-infra.netlify.app/",
     },
     {
         "name": "Rajendra Nagar — Luxury Gated Community",
@@ -52,7 +53,7 @@ PROJECTS = [
             "Only 91 flats/acre, 60% corner flats, 80% open area",
             "5 min PVNR Expressway, 10 min ORR, 10 min to Rajiv Gandhi airport",
         ],
-        "url": "https://morespace.ai/morespaceailuxury-gated-community-rajendra-nagar-3-4bhk",
+        "url": "https://morespace.netlify.app/",
     },
     {
         "name": "Manchirevula / Narsingi — Ultra-Luxury High-Rise",
@@ -69,7 +70,7 @@ PROJECTS = [
             "Beside ORR Exit 18A — 10 min Financial District, 12 min Wipro Circle, 11 min Neopolis",
             "Each flat tied to a proportional land share (land-backed investment)",
         ],
-        "url": "https://morespace.ai/httpsmorespaceaihigh-rise-gated-community-prelaunch-manchirevula-narsingi",
+        "url": "https://morespace.netlify.app/",
     },
     {
         "name": "Soul of Earth — Kukatpally Landmark",
@@ -86,7 +87,7 @@ PROJECTS = [
             "Private corridors, no two units face each other; 100% power backup, piped gas, 3-level basement",
             "5–10 min to Hitec City MMTS/Metro; near Mindspace, TCS, Infosys, KIMS, Apollo",
         ],
-        "url": "https://morespace.ai/prelaunch-3-and-4-bhk-apartments-kukatpally",
+        "url": "https://morespace.netlify.app/",
     },
 ]
 
@@ -180,10 +181,10 @@ def context_block(brand_name=""):
         return ""
     owner = "MORESPACE PROJECT DIRECTORY" if is_morespace(brand_name) else f"{brand_name.upper()} PROJECT DIRECTORY"
     lines = [
-        f"{owner} — morespace.ai is the MASTER website for every project.",
+        f"{owner} — morespace.netlify.app is the MASTER website for every project.",
         f"Master site: {MASTER_SITE}  |  Contact: {CONTACT['phone']} · {CONTACT['email']}",
         "When the user asks about properties, projects, areas/corridors, budgets, or where to buy, "
-        "recommend the most relevant project(s) below and ALWAYS include the project's morespace.ai "
+        "recommend the most relevant project(s) below and ALWAYS include the project's "
         "link plus concrete details (area, corridor, configs, sizes, price, key highlights). "
         "Combine the corridor (location/connectivity) with the developer/property details. "
         + FACT_RULES,
