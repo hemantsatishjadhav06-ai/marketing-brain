@@ -157,7 +157,10 @@ FACT_RULES = (
     "character. Never invent, shorten or guess a domain — do not write a plausible-looking address "
     "such as 'www.<brandname>.com'. If no website is listed, print no website at all.\n"
     "Describe the builder exactly as the developer field states; if it says 'Reputed developer' "
-    "do not substitute the brand's own name as the developer."
+    "do not substitute the brand's own name as the developer.\n"
+    "DO NOT DERIVE NEW NUMBERS. Never multiply, total, average or otherwise compute a figure that "
+    "is not written above — no unit counts, no totals, no per-sq.ft rates, no percentages, no "
+    "'X residences in total'. Quote only the figures as given."
 )
 
 

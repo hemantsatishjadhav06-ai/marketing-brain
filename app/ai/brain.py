@@ -22,6 +22,7 @@ CDN) used ONLY as loose style inspiration — never copied.
 """
 import io
 import os
+import re
 import time
 import json
 import httpx
@@ -136,12 +137,13 @@ def brand_lock(brand):
         f"Do NOT invent, draw, letter or imply any other company name, wordmark, monogram or "
         f"logo — no fictional realty brands, no generic 'REAL ESTATE' house icons, no placeholder "
         f"marks.\n"
-        f"LOGO SLOT: leave a clean EMPTY slot on a light field in the top-right corner (about 16% "
-        f"of the width by 9% of the height) for the brand logo — the real file is dropped in "
-        f"afterwards. Draw NOTHING in it, and place no other logo, monogram or brand mark anywhere "
-        f"else in the image. Do not letter the brand name as display type.\n"
-        f"NEVER RENDER THE SPEC: sizes, percentages, pt values, hex codes and margin notes are "
-        f"instructions, not content — none of them may appear as visible text.\n"
+        f"LOGO SLOT: leave a small clean EMPTY area on a light field in the top-right corner for the "
+        f"brand logo — the real file is dropped in afterwards. Draw NOTHING in it, and place no other "
+        f"logo, monogram or brand mark anywhere else in the image. Do not letter the brand name as "
+        f"display type, and do not state the slot's dimensions.\n"
+        f"NO SPEC ON THE IMAGE: measurements, percentages, pt values, ratios and margin notes are "
+        f"instructions, not content. Never draw them, and never annotate or dimension the layout. "
+        f"The only numerals rendered are the marketing facts themselves.\n"
         f"SINGLE INSTANCE: every text element appears EXACTLY ONCE. Do not repeat the kicker, "
         f"headline, subhead, price line, CTA button, contact strip or any badge anywhere in the "
         f"layout — one of each, in one place only.\n"
@@ -324,6 +326,7 @@ def fal_image(prompt, image_urls=None, logo_url=None, aspect_ratio=None, use_sty
     if logo_url:
         refs.append(logo_url)
         preamble += LOGO_GUARD.replace("{n}", str(len(refs)))
+    prompt = strip_layout_spec(prompt)
     payload = {"prompt": (preamble + prompt) if preamble else prompt,
                "aspect_ratio": aspect_ratio, "num_images": 1}
     if refs:
@@ -347,14 +350,40 @@ def fal_voice(text):
     return _first_url(res, "audio")
 
 
-def composite_brand_logo(image_url_or_bytes, logo_url, slot_w=0.16, slot_h=0.09, margin=0.07):
-    """Drop the real logo into the light slot the art director reserved for it.
+_SPEC_PATTERNS = [
+    r"\b\d{1,3}\s?%(?:\s*(?:of\s+)?(?:the\s+)?(?:width|height|canvas|image|margin))?",
+    r"\b\d{1,4}\s?(?:px|pt|pts|point|points)\b",
+    r"\b\d{1,2}\s?:\s?\d{1,2}\s+(?:ratio|scale|jump)\b",
+    r"\b(?:margin|padding|gutter|leading|tracking|kerning)\s*(?:of|:)?\s*[~]?\d[\d.]*\s?\w*",
+]
 
-    The model letters a brand name or invents a mark when left to its own devices, so
-    the logo file is always placed by us. The art-director brief reserves an EMPTY
-    light-field slot in the top-right at these proportions, which means the mark can be
-    dropped straight in with no plate or chip behind it — it reads as part of the design
-    rather than a sticker pasted onto a finished image.
+
+def strip_layout_spec(prompt):
+    """Remove layout measurements from an image prompt.
+
+    nano-banana-pro renders numbers it finds: a prompt that said the margin was a
+    percentage and the type scale a ratio came back with "76", "12", "240" drawn down
+    the sides like a design-spec sheet. The marketing figures (prices, sq.ft, phone)
+    are left untouched — only measurement-shaped tokens are dropped.
+    """
+    if not prompt:
+        return prompt
+    out = prompt
+    for pat in _SPEC_PATTERNS:
+        out = re.sub(pat, "", out, flags=re.I)
+    out = re.sub(r"\(\s*[,;]?\s*\)", "", out)
+    out = re.sub(r"\s{2,}", " ", out)
+    return re.sub(r"\s+([,.;])", r"\1", out).strip()
+
+
+def composite_brand_logo(image_url_or_bytes, logo_url, slot_w=0.20, slot_h=0.11, margin=0.045):
+    """Clear the reserved logo slot and drop the real logo into it.
+
+    The art-director brief reserves an empty light slot in the top-right, but the model
+    frequently draws its own monogram there anyway — placing the real mark on top then
+    produces two overlapping logos. So the slot is repainted first, in the colour
+    sampled from just outside it, which blends into the light field the brief asked for
+    and leaves a clean bed for the real mark.
 
     Accepts a URL or raw bytes; returns PNG bytes, or None so callers can fall back.
     """
@@ -370,28 +399,55 @@ def composite_brand_logo(image_url_or_bytes, logo_url, slot_w=0.16, slot_h=0.09,
             logo = Image.open(io.BytesIO(cli.get(logo_url).content)).convert("RGBA")
 
         logo = _trim_alpha(logo)
+        m = int(img.width * margin)
+
+        # Clear a region flush to the top-right corner. The model draws its own mark
+        # hard against the edge, so a repaint that respects the margin leaves a sliver
+        # of it showing above; the clear must reach the corner even though the logo
+        # itself is then inset to the margin like every other element.
+        clear_w = int(img.width * slot_w) + m
+        clear_h = int(img.height * slot_h) + m
+        cx, cy = img.width - clear_w, 0
+
+        bed = _slot_bed_colour(img, cx, cy, clear_w, clear_h)
+        img.alpha_composite(Image.new("RGBA", (clear_w, clear_h), bed), (cx, cy))
+
         box_w, box_h = int(img.width * slot_w), int(img.height * slot_h)
+        x0, y0 = img.width - m - box_w, m
         scale = min(box_w / logo.width, box_h / logo.height)
         logo = logo.resize((max(1, int(logo.width * scale)), max(1, int(logo.height * scale))),
                            Image.LANCZOS)
+        img.alpha_composite(logo, (x0 + (box_w - logo.width) // 2, y0 + (box_h - logo.height) // 2))
 
-        m = int(img.width * margin)
-        x = img.width - m - logo.width
-        y = max(m, int(img.height * margin * 0.75))
-
-        # If the reserved slot did not come out light, the dark mark would disappear —
-        # lay down a soft white pad just big enough to carry it.
-        if _mean_luma(img, x, y, logo.width, logo.height) < 140:
-            pad = int(min(logo.width, logo.height) * 0.35)
-            plate = Image.new("RGBA", (logo.width + 2 * pad, logo.height + 2 * pad), (255, 255, 255, 236))
-            img.alpha_composite(plate, (x - pad, y - pad))
-
-        img.alpha_composite(logo, (x, y))
         out = io.BytesIO()
         img.convert("RGB").save(out, "PNG")
         return out.getvalue()
     except Exception:
         return None
+
+
+def _slot_bed_colour(img, x0, y0, w, h, ring=6):
+    """Colour to repaint the logo slot with, sampled from the pixels just outside it.
+
+    Blends the repaint into whatever field the design put there. Falls back to white,
+    and lightens anything too dark for a navy wordmark to read against.
+    """
+    try:
+        rgb = img.convert("RGB")
+        samples = []
+        for x in range(max(0, x0 - ring), min(rgb.width, x0 + w + ring), 3):
+            for y in (max(0, y0 - ring), min(rgb.height - 1, y0 + h + ring)):
+                samples.append(rgb.getpixel((x, y)))
+        if not samples:
+            return (255, 255, 255, 255)
+        r = sum(c[0] for c in samples) // len(samples)
+        g = sum(c[1] for c in samples) // len(samples)
+        b = sum(c[2] for c in samples) // len(samples)
+        if 0.299 * r + 0.587 * g + 0.114 * b < 170:      # too dark for a navy mark
+            return (255, 255, 255, 255)
+        return (r, g, b, 255)
+    except Exception:
+        return (255, 255, 255, 255)
 
 
 def _trim_alpha(im):
@@ -461,13 +517,15 @@ ART_DIRECTOR_BRIEF = (
     "not a target — two zones is often stronger. Every further fact belongs in the caption, not on the "
     "image.\n"
     "• TYPOGRAPHY IS THE DESIGN. Name a real pairing (e.g. a high-contrast serif display such as "
-    "Playfair/Canela against a clean grotesque such as Inter/Söhne). Specify a decisive size jump "
-    "between headline and body — roughly 4:1 — tight optical tracking on the display line, generous "
-    "leading on body text. The headline is at most SIX words. No outlines, no drop-shadowed text, no "
-    "gradient-filled letters, no faux-3D type.\n"
-    "• GRID AND AIR. State a clear margin (about 7-8% of the width) that nothing crosses, and align "
-    "every element to a simple column grid. Leave real negative space — at least a third of the canvas "
-    "should carry no text or graphic element. Do not fill corners just because they are empty.\n"
+    "Playfair/Canela against a clean grotesque such as Inter/Söhne). Call for a dramatic, decisive "
+    "size difference between the headline and the body text, tight optical tracking on the display "
+    "line and generous leading on body text — describe these in WORDS, never as numbers. The "
+    "headline is at most six words. No outlines, no drop-shadowed text, no gradient-filled letters, "
+    "no faux-3D type.\n"
+    "• GRID AND AIR. Call for a generous, consistent outer margin that nothing crosses, and align every "
+    "element to a simple column grid. Ask for abundant negative space — a large share of the canvas "
+    "carrying no text or graphic. Describe all of this in words, never as percentages or pixel "
+    "values. Do not fill corners just because they are empty.\n"
     "• COLOUR DISCIPLINE. Use the brand palette supplied in the brand context and nothing else: one "
     "dominant field, one supporting neutral, one accent used ONCE. Never introduce champagne gold, "
     "rose gold or any luxury cliché that is not in the brand's own palette.\n"
@@ -480,12 +538,12 @@ ART_DIRECTOR_BRIEF = (
     "and only if it carries a genuinely distinct fact.\n"
     "• FINISH. Crisp perfectly-legible text, true WCAG-AA contrast, subtle real-paper grain at most. "
     "No bokeh sparkles, no floating particles, no glow.\n"
-    "• LOGO SLOT — design it in, leave it empty. Reserve a clean rectangular slot for the brand logo in "
-    "the TOP-RIGHT corner, on the layout margin, about 16% of the image width and 9% of its height. "
-    "That slot MUST sit on a plain LIGHT field (white or the palette's lightest neutral) so a dark "
-    "mark reads on it, and it must contain NOTHING — no lettering, no monogram, no drawn mark, no "
-    "photograph, no texture. Treat it as a deliberate part of the composition and balance the layout "
-    "around it. The real logo file is dropped into that slot afterwards at full fidelity.\n"
+    "• LOGO SLOT — design it in, leave it empty. Reserve a small, clean, empty rectangular area for the "
+    "brand logo in the TOP-RIGHT corner, sitting on the outer margin, roughly the width of a business "
+    "card relative to the canvas. It MUST sit on a plain LIGHT field (white or the palette's lightest "
+    "neutral) so a dark mark reads on it, and must contain NOTHING — no lettering, no monogram, no "
+    "drawn mark, no photograph, no texture. Treat it as a deliberate part of the composition. The real "
+    "logo file is dropped into it afterwards. Do not state its dimensions numerically.\n"
     "• EXACTLY ONE LOGO, and it is the reserved slot above. Do NOT draw, letter or place a brand "
     "mark anywhere else — not in the footer, not beside the CTA, not over the photograph. The "
     "footer carries only the phone number and website as plain text. Never set the brand name as "
@@ -496,10 +554,13 @@ ART_DIRECTOR_BRIEF = (
     "clip-art or stock icons; more than four facts on the image; two CTAs; stacked badges; clutter in "
     "the margins; any element rendered twice; watermarks; gibberish or lorem text; copying a reference "
     "verbatim; more than ~25 words of body copy total.\n"
-    "NEVER RENDER THE SPEC. Sizes, percentages, ratios, margins, hex codes, pt values and grid notes "
-    "are instructions to the renderer — they must NOT appear as visible text anywhere in the image. "
-    "Do not label, annotate, dimension or caption the layout. The only text drawn is the actual "
-    "marketing copy.\n"
+    "NO LAYOUT NUMERALS IN THE PROMPT. The renderer draws numbers it finds, so your prompt must "
+    "contain NO measurements at all: no percentages, no pixel or pt values, no ratios, no margin "
+    "figures, no hex codes beside the palette line, no grid counts. Describe every proportion in "
+    "words. The ONLY numerals anywhere in your prompt are the marketing facts that must appear on "
+    "the creative (prices, sizes, BHK, acreage, floor counts, phone number).\n"
+    "NEVER RENDER THE SPEC. Do not label, annotate, dimension or caption the layout — no callouts, "
+    "no measurement marks, no design-spec sheet styling. The only text drawn is the marketing copy.\n"
     "Output the single detailed image-prompt paragraph, then one line starting 'Brand continuity:' "
     "with colour, typography and logo rules."
 )

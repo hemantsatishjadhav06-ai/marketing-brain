@@ -108,3 +108,25 @@ def test_summary_is_written_for_failures(stubbed):
     text = (stubbed / "SUMMARY.md").read_text()
     assert "post — FAILED" in text
     assert "FAL_KEY is not set" in text
+
+
+def test_strip_layout_spec_removes_measurements_but_keeps_facts():
+    from app.ai.brain import strip_layout_spec
+
+    out = strip_layout_spec(
+        "Margin of 7% of the width, headline at 76pt with a 4:1 ratio jump, logo slot 16% wide. "
+        "Price Rs 2.7 Cr, 2850 / 3303 / 3850 sq.ft, call +91 73965 06318, 12 acres, 6 towers."
+    )
+    # layout measurements are gone — the renderer drew these as spec callouts
+    for spec in ("7%", "76pt", "16%", "4:1"):
+        assert spec not in out
+    # the marketing figures survive
+    for fact in ("Rs 2.7 Cr", "2850", "3303", "3850", "+91 73965 06318", "12 acres", "6 towers"):
+        assert fact in out
+
+
+def test_strip_layout_spec_handles_empty():
+    from app.ai.brain import strip_layout_spec
+
+    assert strip_layout_spec("") == ""
+    assert strip_layout_spec(None) is None
