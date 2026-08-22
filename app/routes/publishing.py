@@ -7,9 +7,7 @@ router = APIRouter()
 @router.post("/api/brands/{bid}/publish")
 def publish(bid: str, body: PublishIn, user=Depends(current_user)):
     b = _brand_or_404(bid, user)
-    c = db.get_doc("creatives", body.creative_id)
-    if not c:
-        raise HTTPException(404, "Creative not found")
+    c = _doc_or_404("creatives", body.creative_id, bid)
     channel = body.channel or c["channel"]
     caption = c["payload"].get("caption", "")
     ht = c["payload"].get("hashtags") or {}

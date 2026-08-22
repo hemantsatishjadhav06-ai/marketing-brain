@@ -7,7 +7,24 @@ services:
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
     envVars:
+      # Auth bypass. NEVER "true" on a reachable deployment: it makes every
+      # request an unauthenticated admin. Kept explicit so the default is visible.
       - key: DIRECT_ACCESS
+        value: "false"
+      # Signs bearer tokens. Without it the app falls back to a hard-coded
+      # default and anyone can mint a valid token.
+      - key: SECRET_KEY
+        generateValue: true
+      # Creates the first admin on boot; without these, turning DIRECT_ACCESS
+      # off locks everyone out because no account exists.
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      # Generated assets are referenced by <img src>, which cannot send the auth
+      # header, so they must stay world-readable by URL for the UI to render.
+      # Set to false and serve assets from object storage to close that off.
+      - key: PUBLIC_WORKSPACES
         value: "true"
       - key: OPENROUTER_API_KEY
         sync: false

@@ -56,9 +56,7 @@ def make_blueprint(bid: str, body: BlueprintIn, user=Depends(current_user)):
 @router.post("/api/brands/{bid}/creatives/{cid}/proceed")
 def proceed(bid: str, cid: str, user=Depends(current_user)):
     b = _brand_or_404(bid, user)
-    c = db.get_doc("creatives", cid)
-    if not c:
-        raise HTTPException(404, "Creative not found")
+    c = _doc_or_404("creatives", cid, bid)
     p = c.get("payload") or {}
     if not p.get("blueprint"):
         raise HTTPException(400, "The blueprint is still being written — wait for the agents to finish.")

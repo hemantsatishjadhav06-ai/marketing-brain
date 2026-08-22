@@ -88,6 +88,19 @@ def _logo_path(b):
     return path if os.path.exists(path) else None
 
 
+def _doc_or_404(table, did, bid):
+    """Fetch a document and prove it belongs to this brand.
+
+    Routes previously fetched by raw id, so any brand's URL could read or modify
+    another brand's creative, idea or competitor — an approve on /brands/A/... with
+    B's creative id returned and mutated B's content.
+    """
+    row = db.get_doc(table, did)
+    if not row or row.get("brand_id") != bid:
+        raise HTTPException(404, f"{table[:-1].capitalize()} not found for this brand")
+    return row
+
+
 def _save_asset(b, rel, blob):
     """Persist an asset: Supabase Storage (public URL) with local-disk fallback."""
     ws.write_bytes(_wslug(b), rel, blob)  # keep local copy for same-instance serving

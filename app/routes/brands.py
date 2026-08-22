@@ -39,9 +39,7 @@ def reel_studio(bid: str, body: ReelStudioIn, user=Depends(current_user)):
     b = _brand_or_404(bid, user)
     source = body.prompt.strip()
     if body.creative_id:
-        c = db.get_doc("creatives", body.creative_id)
-        if not c:
-            raise HTTPException(404, "Creative not found")
+        c = _doc_or_404("creatives", body.creative_id, bid)
         source = json.dumps({k: c["payload"].get(k) for k in ("title", "script", "caption")}, ensure_ascii=False)
     if len(source) < 10:
         raise HTTPException(400, "Describe the video idea, or pick an existing reel creative")

@@ -123,9 +123,7 @@ def trends(bid: str, body: TrendsIn = None, user=Depends(current_user)):
 def score(bid: str, body: ScoreIn, user=Depends(current_user)):
     b = _brand_or_404(bid, user)
     table = "ideas" if body.kind == "idea" else "creatives"
-    doc = db.get_doc(table, body.id)
-    if not doc:
-        raise HTTPException(404, f"{body.kind} not found")
+    doc = _doc_or_404(table, body.id, bid)
     try:
         result = ai_engine.score_virality(b, doc["payload"])
     except Exception as e:
