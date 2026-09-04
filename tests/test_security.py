@@ -114,3 +114,39 @@ def test_render_yaml_provisions_an_admin():
     import pathlib
     cfg = pathlib.Path("render.yaml").read_text()
     assert "ADMIN_EMAIL" in cfg and "ADMIN_PASSWORD" in cfg
+
+
+# ------------------------------------------------- Railway deployment config
+
+def test_railway_config_declares_a_start_command_and_healthcheck():
+    """Without these Railway builds an image it cannot start or verify."""
+    import json, pathlib
+    cfg = json.loads(pathlib.Path("railway.json").read_text())
+    start = cfg["deploy"]["startCommand"]
+    assert "app.main:app" in start
+    assert "$PORT" in start or "${PORT" in start, "must bind the port Railway assigns"
+    assert cfg["deploy"]["healthcheckPath"] == "/api/health"
+
+
+def test_the_auth_bypass_cannot_boot_on_a_public_host(monkeypatch):
+    """The render.yaml test only guarded Render; this guards every host."""
+    from app.routes import _shared
+    monkeypatch.setenv("DIRECT_ACCESS", "true")
+    monkeypatch.setenv("RAILWAY_PUBLIC_DOMAIN", "brain.up.railway.app")
+    with pytest.raises(RuntimeError, match="unauthenticated admin"):
+        _shared._assert_auth_is_enabled()
+
+
+def test_the_auth_bypass_is_still_allowed_locally(monkeypatch):
+    from app.routes import _shared
+    monkeypatch.setenv("DIRECT_ACCESS", "true")
+    for var in ("RAILWAY_PUBLIC_DOMAIN", "RENDER_EXTERNAL_HOSTNAME", "PUBLIC_BASE_URL"):
+        monkeypatch.delenv(var, raising=False)
+    _shared._assert_auth_is_enabled()  # must not raise
+
+
+def test_a_public_host_with_auth_on_boots_fine(monkeypatch):
+    from app.routes import _shared
+    monkeypatch.setenv("DIRECT_ACCESS", "false")
+    monkeypatch.setenv("RAILWAY_PUBLIC_DOMAIN", "brain.up.railway.app")
+    _shared._assert_auth_is_enabled()

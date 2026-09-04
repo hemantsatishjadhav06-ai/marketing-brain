@@ -151,6 +151,19 @@ class WorkflowError(RuntimeError):
         super().__init__(detail)
 
 
+def _git_sha() -> str:
+    """The deployed commit, whichever host we are on.
+
+    Each platform exposes it under its own name; GIT_SHA is the manual escape
+    hatch for hosts that expose none.
+    """
+    for var in ("RAILWAY_GIT_COMMIT_SHA", "RENDER_GIT_COMMIT", "GIT_SHA"):
+        sha = os.environ.get(var, "").strip()
+        if sha:
+            return sha
+    return ""
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -611,7 +624,7 @@ class AirtableOrchestrator:
                 RUN["status"]: "Running",
                 RUN["started_at"]: _now(),
                 RUN["backend_job_id"]: job_id,
-                RUN["git_sha"]: os.environ.get("RENDER_GIT_COMMIT", os.environ.get("GIT_SHA", ""))[:80],
+                RUN["git_sha"]: _git_sha()[:80],
                 RUN["model"]: os.environ.get("OPENROUTER_MODEL", "openai/gpt-4o-mini")[:120],
                 RUN["request"]: _json(plan),
                 RUN["content"]: [record_id],

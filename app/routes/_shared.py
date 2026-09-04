@@ -30,6 +30,38 @@ CYCLE_SECS = 7 * 86400  # weekly self-refresh per brand
 
 
 
+def _on_a_public_host() -> bool:
+    """True when this process is reachable from the internet.
+
+    Each PaaS advertises its own public hostname; if any of them is set, the
+    deployment is not a laptop.
+    """
+    for var in ("RAILWAY_PUBLIC_DOMAIN", "RENDER_EXTERNAL_HOSTNAME", "PUBLIC_BASE_URL"):
+        if os.environ.get(var, "").strip():
+            return True
+    return False
+
+
+def _assert_auth_is_enabled():
+    """Refuse to boot a publicly reachable instance with authentication off.
+
+    DIRECT_ACCESS makes every request an unauthenticated admin. On Render that
+    was guarded by a test over render.yaml, but Railway keeps its environment in
+    the platform rather than in the repo, so the guarantee has to live in the
+    app to survive the move.
+    """
+    if direct_access_enabled() and _on_a_public_host():
+        raise RuntimeError(
+            "DIRECT_ACCESS is enabled on a publicly reachable deployment: every "
+            "request would be an unauthenticated admin. Set DIRECT_ACCESS=false "
+            "and provide ADMIN_EMAIL / ADMIN_PASSWORD instead."
+        )
+
+
+def direct_access_enabled() -> bool:
+    return os.environ.get("DIRECT_ACCESS", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _bootstrap_admin():
     email = os.environ.get("ADMIN_EMAIL", "").strip().lower()
     password = os.environ.get("ADMIN_PASSWORD", "")
@@ -38,7 +70,7 @@ def _bootstrap_admin():
 
 
 def current_user(authorization: str = Header(default="")):
-    if os.environ.get("DIRECT_ACCESS", "").strip().lower() in {"1", "true", "yes", "on"}:
+    if direct_access_enabled():
         return {
             "uid": "direct-access",
             "role": "admin",

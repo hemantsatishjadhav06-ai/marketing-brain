@@ -37,6 +37,7 @@ def _workspace_router(ws_root):
 
 
 def create_app() -> FastAPI:
+    _shared._assert_auth_is_enabled()
     db.init_db()
     _shared._bootstrap_admin()
     app = FastAPI(title="Marketing Brain", version="3.0.0")
