@@ -137,8 +137,27 @@ def directory():
     return {"master_site": MASTER_SITE, "contact": CONTACT, "index": INDEX_LINKS, "projects": PROJECTS}
 
 
+# Descriptors we hold in place of a builder's actual name. They read as internal
+# shorthand, so printing one on a public creative ("by Reputed developer") looks
+# like an unfilled template rather than a credit.
+_UNNAMED_DEVELOPER = ("reputed", "tier-1", "tier 1", "grade-a", "grade a", "leading", "renowned")
+
+
+def developer_credit(value):
+    """The builder's name if we actually have one, else "" — never a descriptor.
+
+    A creative may only print a developer credit when a real name is known;
+    otherwise the line has to be omitted, not filled with the placeholder.
+    """
+    v = (value or "").strip()
+    return "" if (not v or v.lower().startswith(_UNNAMED_DEVELOPER)) else v
+
+
 def _project_line(p):
-    return (f"• {p['name']} — {p['area']} | corridor: {p['corridor']} | developer: {p['developer']} | "
+    named = developer_credit(p.get("developer"))
+    dev = f"developer: {named}" if named else \
+        "developer: NOT NAMED — print no developer credit for this project"
+    return (f"• {p['name']} — {p['area']} | corridor: {p['corridor']} | {dev} | "
             f"{p['status']} | configs: {p['configs']} | sizes: {p['sizes']} | price: {p['price']} | "
             f"official website: {p['url']}\n  " + "; ".join(p["highlights"]))
 
@@ -156,8 +175,10 @@ FACT_RULES = (
     "The ONLY website that may appear is the 'official website' URL given above, character for "
     "character. Never invent, shorten or guess a domain — do not write a plausible-looking address "
     "such as 'www.<brandname>.com'. If no website is listed, print no website at all.\n"
-    "Describe the builder exactly as the developer field states; if it says 'Reputed developer' "
-    "do not substitute the brand's own name as the developer.\n"
+    "DEVELOPER CREDIT: print one only when the developer field gives an actual company "
+    "name. Where it says NOT NAMED, omit the credit entirely — write no 'by …' line, no "
+    "'Developer:' row, and do not fall back to a descriptor such as 'by Reputed developer' "
+    "or to the brand's own name.\n"
     "DO NOT DERIVE NEW NUMBERS. Never multiply, total, average or otherwise compute a figure that "
     "is not written above — no unit counts, no totals, no per-sq.ft rates, no percentages, no "
     "'X residences in total'. Quote only the figures as given."

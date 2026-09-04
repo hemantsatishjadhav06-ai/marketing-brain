@@ -150,3 +150,29 @@ def test_a_public_host_with_auth_on_boots_fine(monkeypatch):
     monkeypatch.setenv("DIRECT_ACCESS", "false")
     monkeypatch.setenv("RAILWAY_PUBLIC_DOMAIN", "brain.up.railway.app")
     _shared._assert_auth_is_enabled()
+
+
+# ------------------------------------------- placeholder text in live output
+
+def test_a_placeholder_developer_never_becomes_a_credit():
+    """A live Railway render printed "by Reputed developer" on the creative."""
+    from app.services.projects import developer_credit
+    for placeholder in ("Reputed developer (EOI / pre-RERA launch)",
+                        "Tier-1 developer (two communities)",
+                        "Grade-A, Tier-1 builder",
+                        "Leading builder", "", None):
+        assert developer_credit(placeholder) == ""
+
+
+def test_a_real_developer_name_is_still_credited():
+    from app.services.projects import developer_credit
+    assert developer_credit("Prestige Group") == "Prestige Group"
+
+
+def test_the_fact_block_tells_the_model_to_omit_an_unnamed_developer():
+    from app.services import projects
+    block = projects.pointer("Neopolis Infra")
+    assert "NOT NAMED" in block
+    assert "omit the credit entirely" in block
+    # the descriptor itself must not reach the prompt as printable text
+    assert "developer: Reputed developer" not in block
