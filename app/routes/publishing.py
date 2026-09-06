@@ -4,6 +4,28 @@ from ._shared import *  # noqa: F401,F403
 router = APIRouter()
 
 
+def _public_asset_url(brand, asset_path):
+    """Turn a stored asset_path into the URL a platform can fetch.
+
+    asset_path is stored two ways: the image route keeps it relative
+    ("instagram/assets/<id>.png") while the brain/revise paths store it as the
+    absolute site path ("/workspaces/<slug>/brain/assets/<id>.png") or, with
+    object storage, a full URL. Prefixing all three the same way produced
+    ".../workspaces/<slug>//workspaces/<slug>/..." for brain renders, so every
+    live Instagram publish of an art-directed post failed to fetch its image.
+    """
+    if not asset_path:
+        return None
+    if asset_path.startswith(("http://", "https://")):
+        return asset_path
+    public_base = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
+    if not public_base:
+        return None
+    if asset_path.startswith("/workspaces/"):
+        return f"{public_base}{asset_path}"
+    return f"{public_base}/workspaces/{_wslug(brand)}/{asset_path.lstrip('/')}"
+
+
 @router.post("/api/brands/{bid}/publish")
 def publish(bid: str, body: PublishIn, user=Depends(current_user)):
     b = _brand_or_404(bid, user)
@@ -21,11 +43,7 @@ def publish(bid: str, body: PublishIn, user=Depends(current_user)):
         creds = db.get_connectors(bid).get(channel)
         if not creds:
             raise HTTPException(400, f"No credentials saved for {channel}. Save connector settings first, or use simulated mode.")
-        image_url = None
-        if c.get("asset_path"):
-            public_base = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
-            if public_base:
-                image_url = f"{public_base}/workspaces/{_wslug(b)}/{c['asset_path']}"
+        image_url = _public_asset_url(b, c.get("asset_path"))
         try:
             result = connectors.publish(channel, creds, full_caption, image_url)
             status = "published"

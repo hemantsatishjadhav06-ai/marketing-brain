@@ -176,3 +176,18 @@ def test_the_fact_block_tells_the_model_to_omit_an_unnamed_developer():
     assert "omit the credit entirely" in block
     # the descriptor itself must not reach the prompt as printable text
     assert "developer: Reputed developer" not in block
+
+
+# ------------------------------------------ live publish asset URL shapes
+
+def test_live_publish_does_not_double_the_workspaces_prefix(monkeypatch):
+    """brain.py stores asset_path as '/workspaces/<slug>/...'; publishing must not prefix it again."""
+    from app.routes import publishing
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://host.example")
+    brand = {"name": "Neopolis Infra", "slug": "neopolis-infra"}
+    assert publishing._public_asset_url(brand, "/workspaces/neopolis-infra/brain/assets/x.png") == \
+        "https://host.example/workspaces/neopolis-infra/brain/assets/x.png"
+    assert publishing._public_asset_url(brand, "instagram/assets/x.png") == \
+        "https://host.example/workspaces/neopolis-infra/instagram/assets/x.png"
+    assert publishing._public_asset_url(brand, "https://cdn.example/x.png") == "https://cdn.example/x.png"
+    assert publishing._public_asset_url(brand, None) is None
