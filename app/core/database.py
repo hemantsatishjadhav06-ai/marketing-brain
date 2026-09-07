@@ -189,6 +189,24 @@ CREATE TABLE IF NOT EXISTS users (
     brand_id TEXT DEFAULT '',
     created_at REAL
 );
+CREATE TABLE IF NOT EXISTS conversations (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    channel TEXT,
+    contact_ref TEXT,
+    status TEXT DEFAULT 'open',
+    payload TEXT NOT NULL,
+    created_at REAL
+);
+CREATE TABLE IF NOT EXISTS messages (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    conversation_id TEXT,
+    direction TEXT,
+    status TEXT DEFAULT 'received',
+    payload TEXT NOT NULL,
+    created_at REAL
+);
 """
 
 
