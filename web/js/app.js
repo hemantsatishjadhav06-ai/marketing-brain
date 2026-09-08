@@ -1128,7 +1128,7 @@ async function tabCampaigns(){
         <button onclick="runEmail(this)">Write email(s)</button></div>
       <div id="emailOut"></div></div>
     <div class="card"><div class="row"><h2>\ud83c\udfaf Marketing tactics playbook</h2>
-      <button class="grn sm" onclick="runPlaybook(this)">Generate playbook</button></div>
+      <button class="grn sm" onclick="runTactics(this)">Generate playbook</button></div>
       <p class="sub">10 concrete growth tactics beyond posting \u2014 acquisition, retention, referral, community \u2014 ranked by impact vs effort, each with first-week actions.</p>
       <div id="pbOut"></div></div>`;
 }
@@ -1170,7 +1170,7 @@ function renderEmailPkg(p){
     <pre>${esc(p.body_markdown||"")}</pre>
     <p class="sub">\u23f0 ${esc(p.best_send_time||"")} \u00b7 \ud83c\udfaf ${esc(p.segmentation_tip||"")}</p>`;
 }
-async function runPlaybook(btn){
+async function runTactics(btn){
   busy(btn,true,"Strategizing\u2026");
   try{
     const r=await api(`/brands/${state.brand.id}/playbook`,"POST");
