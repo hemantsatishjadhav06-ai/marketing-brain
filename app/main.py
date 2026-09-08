@@ -11,10 +11,10 @@ from fastapi.staticfiles import StaticFiles
 
 from .core import database as db
 from .routes import _shared, control, memory
-from .routes import airtable, auth, autopilot, brain, brands, competitors, growth, inbox, misc, pipeline, publishing, studio
+from .routes import airtable, auth, autopilot, brain, brands, competitors, growth, inbox, misc, onboarding, pipeline, publishing, studio
 
 ROUTERS = [airtable, auth, autopilot, brain, brands, competitors, control, growth, inbox, memory,
-           misc, pipeline, publishing, studio]
+           misc, onboarding, pipeline, publishing, studio]
 
 
 def _workspace_router(ws_root):

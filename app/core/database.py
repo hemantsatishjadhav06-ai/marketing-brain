@@ -207,6 +207,24 @@ CREATE TABLE IF NOT EXISTS messages (
     payload TEXT NOT NULL,
     created_at REAL
 );
+CREATE TABLE IF NOT EXISTS invites (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    email TEXT,
+    role TEXT DEFAULT 'client',
+    token TEXT,
+    status TEXT DEFAULT 'pending',
+    payload TEXT NOT NULL,
+    created_at REAL
+);
+CREATE TABLE IF NOT EXISTS password_resets (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    token TEXT,
+    status TEXT DEFAULT 'pending',
+    payload TEXT NOT NULL,
+    created_at REAL
+);
 """
 
 
@@ -343,6 +361,33 @@ def list_docs(table, brand_id, **where):
             d["payload"] = json.loads(d["payload"])
         out.append(d)
     return out
+
+
+def get_doc_by(table, **where):
+    """Fetch the first document matching arbitrary column filters (e.g. a token).
+
+    Works across all three backends. Used where the lookup key is not the id and
+    not the brand (invite/reset tokens). Returns the decoded row or None.
+    """
+    if IS_REST:
+        params = {k: f"eq.{v}" for k, v in where.items()}
+        params["limit"] = 1
+        rows = _rest("GET", table, params=params)
+        if not rows:
+            return None
+        d = rows[0]
+        if d.get("payload"):
+            d["payload"] = json.loads(d["payload"])
+        return d
+    q = f"SELECT * FROM {table} WHERE " + " AND ".join(f"{k}=?" for k in where) + " LIMIT 1"
+    with _conn() as c:
+        r = c.execute(q, list(where.values())).fetchone()
+    if not r:
+        return None
+    d = dict(r)
+    if d.get("payload"):
+        d["payload"] = json.loads(d["payload"])
+    return d
 
 
 def get_doc(table, did):
