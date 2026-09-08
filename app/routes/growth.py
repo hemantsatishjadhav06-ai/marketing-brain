@@ -35,7 +35,9 @@ def email(bid: str, body: EmailIn, user=Depends(current_user)):
 
 
 @router.post("/api/brands/{bid}/playbook")
-def playbook(bid: str, user=Depends(current_user)):
+def playbook_tactics(bid: str, user=Depends(current_user)):
+    # NOTE: must not be named `playbook` — that shadows the imported `playbook`
+    # service module and breaks GET /api/playbook (playbook.catalog()).
     b = _brand_or_404(bid, user)
     try:
         tactics = ai_engine.tactics_playbook(b, _latest_insights(bid))
