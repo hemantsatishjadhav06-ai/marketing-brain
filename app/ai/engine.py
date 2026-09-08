@@ -10,6 +10,7 @@ from datetime import date, timedelta
 import httpx
 
 from ..services import projects, playbook
+from ..core import guard
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_IMAGE_URL = "https://openrouter.ai/api/v1/images"
@@ -25,6 +26,8 @@ def _key():
 
 
 def _chat(messages, max_tokens=4000, temperature=0.8, model=None):
+    if not guard.generation_enabled():
+        raise RuntimeError("Generation is temporarily disabled (GENERATION_DISABLED).")
     payload = {
         "model": model or MODEL,
         "messages": messages,
@@ -419,6 +422,8 @@ def generate_image(prompt, brand_name="", colors=None, model=None, references=No
     """Generate a branded social image via OpenRouter. Tries the dedicated Images API
     first (correct for GPT Image 1 and other image models), then falls back to the
     chat-image path for gemini-style models. Returns PNG/JPEG bytes or None."""
+    if not guard.generation_enabled():
+        raise RuntimeError("Generation is temporarily disabled (GENERATION_DISABLED).")
     model = model or IMAGE_MODEL
     brief = _art_direct(prompt, brand_name, colors)
     try:

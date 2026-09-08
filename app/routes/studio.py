@@ -153,6 +153,7 @@ def studio_moodboard(bid: str, body: StudioMoodIn, user=Depends(current_user)):
 def studio_image(bid: str, body: StudioImageIn, user=Depends(current_user)):
     """Generate one image (optional paste reference) with the brand logo composited on."""
     b = _brand_or_404(bid, user)
+    _gen_guard(bid)
     refs = [body.reference] if body.reference else None
     blob = ai_engine.generate_image(body.prompt, b["name"], ai_engine.brand_palette(b), references=refs)
     if not blob:

@@ -104,6 +104,14 @@ def _admin_only(user):
         raise HTTPException(403, "Admin access required")
 
 
+def _gen_guard(bid):
+    """Gate a paid generation: global kill-switch + per-brand daily cap."""
+    from ..core import guard
+    ok, msg = guard.check_generation(bid)
+    if not ok:
+        raise HTTPException(429, msg)
+
+
 def _logo_path(b):
     """Path to the brand logo; restores it from the DB copy if the ephemeral disk lost it."""
     import base64 as _b64

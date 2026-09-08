@@ -11,6 +11,8 @@ from urllib.parse import urljoin, urlparse
 import httpx
 from bs4 import BeautifulSoup
 
+from ..core import guard
+
 UA = {"User-Agent": "Mozilla/5.0 (compatible; MarketingBrain/2.0; +https://marketing-brain.app)"}
 
 SOCIAL_PATTERNS = {
@@ -30,13 +32,22 @@ MAX_HTML = 400_000  # parse at most ~400KB per page
 
 
 def _fetch(url, timeout=10):
+    ok, why = guard.url_is_safe(url)
+    if not ok:
+        guard.log.warning("blocked unsafe fetch of %r: %s", url, why)
+        return None, url
     try:
-        with httpx.Client(follow_redirects=True, timeout=timeout, headers=UA) as cli:
+        with httpx.Client(follow_redirects=True, max_redirects=5, timeout=timeout, headers=UA) as cli:
             r = cli.get(url)
+            final = str(r.url)
+            # a public URL can redirect to an internal one — validate where we landed
+            if not guard.url_is_safe(final)[0]:
+                guard.log.warning("fetch of %r landed on a non-public host: %s", url, final)
+                return None, url
             if r.status_code < 400 and "text/html" in r.headers.get("content-type", "text/html"):
-                return r.text[:MAX_HTML], str(r.url)
-    except Exception:
-        pass
+                return r.text[:MAX_HTML], final
+    except Exception as e:
+        guard.log.info("fetch failed for %r: %s", url, e)
     return None, url
 
 

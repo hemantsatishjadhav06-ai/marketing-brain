@@ -120,6 +120,7 @@ async def upload_logo(bid: str, file: UploadFile = File(...), user=Depends(curre
 @router.post("/api/brands/{bid}/ideas")
 def ideas(bid: str, body: IdeasIn, user=Depends(current_user)):
     b = _brand_or_404(bid, user)
+    _gen_guard(bid)
     options = {k: getattr(body, k) for k in ("formats", "funnel_stage", "pillar", "topic", "tone", "instructions") if getattr(body, k)}
     return _generate_ideas(b, body.channels, body.count, options)
 
@@ -166,5 +167,6 @@ def list_creatives(bid: str, user=Depends(current_user)):
 @router.post("/api/brands/{bid}/images")
 def image(bid: str, body: ImageIn, user=Depends(current_user)):
     b = _brand_or_404(bid, user)
+    _gen_guard(bid)
     return _generate_image(b, body.creative_id, body.prompt_override)
 

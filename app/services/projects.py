@@ -133,8 +133,17 @@ def is_known(brand_name=""):
 
 
 def directory():
-    """Full master directory — for the /api/projects endpoint and the in-app Projects tab."""
-    return {"master_site": MASTER_SITE, "contact": CONTACT, "index": INDEX_LINKS, "projects": PROJECTS}
+    """Full master directory — for the /api/projects endpoint and the in-app Projects tab.
+
+    The `developer` field is sanitised so the API never emits an internal
+    placeholder like "Reputed developer": it is blanked unless a real builder
+    name is known (same rule the creative generator uses)."""
+    clean = []
+    for p in PROJECTS:
+        q = dict(p)
+        q["developer"] = developer_credit(p.get("developer"))
+        clean.append(q)
+    return {"master_site": MASTER_SITE, "contact": CONTACT, "index": INDEX_LINKS, "projects": clean}
 
 
 # Descriptors we hold in place of a builder's actual name. They read as internal

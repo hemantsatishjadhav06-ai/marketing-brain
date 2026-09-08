@@ -1,9 +1,11 @@
-fastapi>=0.110
-uvicorn[standard]>=0.27
-httpx>=0.25
-beautifulsoup4>=4.12
-python-dotenv>=1.0
-python-multipart>=0.0.9
-pillow>=10.0
+# Pinned with upper bounds so a breaking major release can't land on the next
+# redeploy without a deliberate change. Bump ranges intentionally, with tests.
+fastapi>=0.110,<0.116
+uvicorn[standard]>=0.27,<0.35
+httpx>=0.25,<0.28
+beautifulsoup4>=4.12,<5
+python-dotenv>=1.0,<2
+python-multipart>=0.0.9,<0.1
+pillow>=10.0,<12
 # Optional: only needed if you point DB_PATH at Postgres instead of SQLite
-psycopg2-binary>=2.9
+psycopg2-binary>=2.9,<3

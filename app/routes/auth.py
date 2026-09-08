@@ -1,11 +1,21 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from ._shared import *  # noqa: F401,F403
+from ..core import guard
 
 router = APIRouter()
 
+LOGIN_LIMIT = 10       # attempts
+LOGIN_WINDOW = 300     # per 5 minutes, per IP
+
 
 @router.post("/api/auth/login")
-def login(body: LoginIn):
+def login(body: LoginIn, request: Request):
+    # Active in production (where auth is enforced); bypassed on dev/test
+    # instances that run with DIRECT_ACCESS on.
+    if not direct_access_enabled():
+        ip = guard.client_ip(request)
+        if not guard.rate_ok(f"login:{ip}", LOGIN_LIMIT, LOGIN_WINDOW):
+            raise HTTPException(429, "Too many login attempts — wait a few minutes and try again.")
     u = db.get_user_by_email(body.email)
     if not u or not auth.check_pw(body.password, u["pw_hash"]):
         raise HTTPException(401, "Wrong email or password")

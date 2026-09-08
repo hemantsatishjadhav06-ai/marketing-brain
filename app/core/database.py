@@ -225,6 +225,25 @@ CREATE TABLE IF NOT EXISTS password_resets (
     payload TEXT NOT NULL,
     created_at REAL
 );
+CREATE TABLE IF NOT EXISTS gen_usage (
+    brand_id TEXT NOT NULL,
+    day TEXT NOT NULL,
+    count INTEGER DEFAULT 0,
+    PRIMARY KEY (brand_id, day)
+);
+CREATE INDEX IF NOT EXISTS idx_ideas_brand ON ideas(brand_id);
+CREATE INDEX IF NOT EXISTS idx_calendar_brand ON calendar_items(brand_id);
+CREATE INDEX IF NOT EXISTS idx_creatives_brand ON creatives(brand_id);
+CREATE INDEX IF NOT EXISTS idx_publish_brand ON publish_queue(brand_id, status);
+CREATE INDEX IF NOT EXISTS idx_metrics_brand ON metrics(brand_id);
+CREATE INDEX IF NOT EXISTS idx_memory_brand ON brand_memory(brand_id);
+CREATE INDEX IF NOT EXISTS idx_runs_brand ON agent_runs(brand_id);
+CREATE INDEX IF NOT EXISTS idx_competitors_brand ON competitors(brand_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_brand ON conversations(brand_id, channel, contact_ref);
+CREATE INDEX IF NOT EXISTS idx_messages_convo ON messages(brand_id, conversation_id);
+CREATE INDEX IF NOT EXISTS idx_invites_token ON invites(token);
+CREATE INDEX IF NOT EXISTS idx_resets_token ON password_resets(token);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 """
 
 
@@ -361,6 +380,32 @@ def list_docs(table, brand_id, **where):
             d["payload"] = json.loads(d["payload"])
         out.append(d)
     return out
+
+
+def bump_gen_usage(brand_id, day):
+    """Increment and return this brand's generation count for `day`.
+
+    Returns the new count, or None when the counter backend is unavailable
+    (Supabase REST) so callers treat the cap as best-effort, never blocking.
+    """
+    if IS_REST:
+        return None
+    with _lock, _conn() as c:
+        c.execute(
+            "INSERT INTO gen_usage (brand_id, day, count) VALUES (?,?,1) "
+            "ON CONFLICT(brand_id, day) DO UPDATE SET count = count + 1",
+            (brand_id, day),
+        )
+        r = c.execute("SELECT count FROM gen_usage WHERE brand_id=? AND day=?", (brand_id, day)).fetchone()
+    return (dict(r)["count"] if r else 1)
+
+
+def gen_usage_count(brand_id, day):
+    if IS_REST:
+        return 0
+    with _conn() as c:
+        r = c.execute("SELECT count FROM gen_usage WHERE brand_id=? AND day=?", (brand_id, day)).fetchone()
+    return dict(r)["count"] if r else 0
 
 
 def get_doc_by(table, **where):
