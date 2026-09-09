@@ -7,7 +7,7 @@ router = APIRouter()
 @router.post("/api/brands/{bid}/autopilot")
 def autopilot(bid: str, body: AutopilotIn, user=Depends(current_user)):
     b = _brand_or_404(bid, user)
-    if AUTOPILOT.get(bid, {}).get("state") == "running":
+    if (_ap_get(bid) or {}).get("state") == "running":
         raise HTTPException(400, "Autopilot already running for this brand")
     t = threading.Thread(target=_run_autopilot, args=(bid, body), daemon=True)
     t.start()
@@ -19,7 +19,7 @@ def autopilot_all(body: AutopilotIn, user=Depends(current_user)):
     _admin_only(user)
     started = []
     for b in db.list_brands():
-        if b.get("status") == "ready" and AUTOPILOT.get(b["id"], {}).get("state") != "running":
+        if b.get("status") == "ready" and (_ap_get(b["id"]) or {}).get("state") != "running":
             threading.Thread(target=_run_autopilot, args=(b["id"], body), daemon=True).start()
             started.append(b["name"])
             time.sleep(1)
@@ -29,9 +29,10 @@ def autopilot_all(body: AutopilotIn, user=Depends(current_user)):
 @router.get("/api/autopilot/status")
 def autopilot_status(user=Depends(current_user)):
     if user["role"] == "admin":
-        return AUTOPILOT
+        return _ap_all()
     bid = user.get("brand_id") or ""
-    return {bid: AUTOPILOT.get(bid)} if bid in AUTOPILOT else {}
+    j = _ap_get(bid)
+    return {bid: j} if j else {}
 
 
 @router.get("/api/cron")

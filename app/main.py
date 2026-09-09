@@ -39,6 +39,7 @@ def _workspace_router(ws_root):
 def create_app() -> FastAPI:
     _shared._assert_auth_is_enabled()
     db.init_db()
+    db.interrupt_stale_jobs()  # a killed process may have left jobs stuck 'running'
     _shared._bootstrap_admin()
     app = FastAPI(title="Marketing Brain", version="3.0.0")
     app.add_middleware(CORSMiddleware, allow_origins=["*"],

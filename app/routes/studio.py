@@ -13,7 +13,7 @@ def reel_options(user=Depends(current_user)):
 
 @router.get("/api/reel-studio/jobs/{job_id}")
 def reel_job(job_id: str, user=Depends(current_user)):
-    j = REEL_JOBS.get(job_id)
+    j = _reel_get(job_id)
     if not j:
         raise HTTPException(404, "Job not found")
     if user["role"] != "admin" and user.get("brand_id") != j.get("brand_id"):

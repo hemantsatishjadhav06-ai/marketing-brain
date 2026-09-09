@@ -231,6 +231,15 @@ CREATE TABLE IF NOT EXISTS gen_usage (
     count INTEGER DEFAULT 0,
     PRIMARY KEY (brand_id, day)
 );
+CREATE TABLE IF NOT EXISTS jobs (
+    kind TEXT NOT NULL,
+    job_key TEXT NOT NULL,
+    state TEXT,
+    log TEXT,
+    extra TEXT,
+    updated_at REAL,
+    PRIMARY KEY (kind, job_key)
+);
 CREATE INDEX IF NOT EXISTS idx_ideas_brand ON ideas(brand_id);
 CREATE INDEX IF NOT EXISTS idx_calendar_brand ON calendar_items(brand_id);
 CREATE INDEX IF NOT EXISTS idx_creatives_brand ON creatives(brand_id);
@@ -380,6 +389,56 @@ def list_docs(table, brand_id, **where):
             d["payload"] = json.loads(d["payload"])
         out.append(d)
     return out
+
+
+def save_job(kind, job_key, state, log, extra=None):
+    """Persist a background-job's state so it survives redeploys and is visible
+    across workers. Best-effort on the Supabase REST backend (skipped)."""
+    if IS_REST:
+        return
+    with _lock, _conn() as c:
+        c.execute(
+            "INSERT INTO jobs (kind, job_key, state, log, extra, updated_at) VALUES (?,?,?,?,?,?) "
+            "ON CONFLICT(kind, job_key) DO UPDATE SET "
+            "state=excluded.state, log=excluded.log, extra=excluded.extra, updated_at=excluded.updated_at",
+            (kind, job_key, state, json.dumps(log or []), json.dumps(extra or {}), _now()),
+        )
+
+
+def _job_row(d):
+    out = {"state": d.get("state"), "log": json.loads(d.get("log") or "[]"),
+           "updated_at": d.get("updated_at")}
+    out.update(json.loads(d.get("extra") or "{}"))
+    return out
+
+
+def get_job(kind, job_key):
+    if IS_REST:
+        return None
+    with _conn() as c:
+        r = c.execute("SELECT * FROM jobs WHERE kind=? AND job_key=?", (kind, job_key)).fetchone()
+    return _job_row(dict(r)) if r else None
+
+
+def list_jobs(kind):
+    if IS_REST:
+        return {}
+    with _conn() as c:
+        rows = c.execute("SELECT * FROM jobs WHERE kind=? ORDER BY updated_at DESC LIMIT 200", (kind,)).fetchall()
+    return {dict(r)["job_key"]: _job_row(dict(r)) for r in rows}
+
+
+def interrupt_stale_jobs(older_than_s=3600):
+    """On boot, mark jobs a killed process left 'running' as 'interrupted' — but
+    only stale ones, so a fresh job started by another worker isn't clobbered."""
+    if IS_REST:
+        return
+    try:
+        with _lock, _conn() as c:
+            c.execute("UPDATE jobs SET state='interrupted' WHERE state='running' AND updated_at < ?",
+                      (_now() - older_than_s,))
+    except Exception:
+        pass
 
 
 def bump_gen_usage(brand_id, day):

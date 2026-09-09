@@ -44,7 +44,7 @@ def reel_studio(bid: str, body: ReelStudioIn, user=Depends(current_user)):
     if len(source) < 10:
         raise HTTPException(400, "Describe the video idea, or pick an existing reel creative")
     job_id = db.new_id()
-    REEL_JOBS[job_id] = {"state": "running", "log": [], "creative_id": None, "brand_id": bid}
+    _reel_set(job_id, state="running", creative_id=None, brand_id=bid)
     threading.Thread(target=_run_reel_studio, args=(job_id, bid, source, body), daemon=True).start()
     return {"job_id": job_id}
 

@@ -29,6 +29,51 @@ REEL_JOBS = {}  # job_id -> {state, log, creative_id}
 CYCLE_SECS = 7 * 86400  # weekly self-refresh per brand
 
 
+# ---------- durable background-job state ----------
+# The dicts above are a fast in-process cache; every write is mirrored to a
+# Postgres `jobs` table so results/logs survive Railway's frequent redeploys and
+# are visible across workers. Reads fall back to the DB when the cache is cold.
+
+def _persist_job(kind, key, j):
+    try:
+        db.save_job(kind, key, j.get("state"), j.get("log", []),
+                    {k: v for k, v in j.items() if k not in ("state", "log")})
+    except Exception:
+        pass
+
+
+def _reel_set(job_id, **fields):
+    j = REEL_JOBS.setdefault(job_id, {"state": "running", "log": [], "creative_id": None, "brand_id": None})
+    j.update(fields)
+    _persist_job("reel", job_id, j)
+    return j
+
+
+def _reel_get(job_id):
+    return REEL_JOBS.get(job_id) or db.get_job("reel", job_id)
+
+
+def _ap_set(bid, **fields):
+    j = AUTOPILOT.setdefault(bid, {"state": "running", "log": []})
+    j.update(fields)
+    _persist_job("autopilot", bid, j)
+    return j
+
+
+def _ap_get(bid):
+    return AUTOPILOT.get(bid) or db.get_job("autopilot", bid)
+
+
+def _ap_all():
+    out = dict(AUTOPILOT)
+    try:
+        for k, v in db.list_jobs("autopilot").items():
+            out.setdefault(k, v)
+    except Exception:
+        pass
+    return out
+
+
 
 def _on_a_public_host() -> bool:
     """True when this process is reachable from the internet.
@@ -279,7 +324,9 @@ def _workspace_digest(b):
 
 
 def _rs_log(job_id, msg):
-    REEL_JOBS[job_id]["log"].append(f"{time.strftime('%H:%M:%S')} {msg}")
+    j = REEL_JOBS.setdefault(job_id, {"state": "running", "log": [], "creative_id": None, "brand_id": None})
+    j["log"].append(f"{time.strftime('%H:%M:%S')} {msg}")
+    _persist_job("reel", job_id, j)
 
 
 def _run_reel_studio(job_id, bid, source, cfg: ReelStudioIn):
@@ -301,7 +348,7 @@ def _run_reel_studio(job_id, bid, source, cfg: ReelStudioIn):
                             "cta_text": sb.get("cta_text", ""), "scenes": sb.get("scenes", [])},
         }
         cid = db.insert_doc("creatives", bid, payload, channel="instagram", format="reel")
-        REEL_JOBS[job_id]["creative_id"] = cid
+        _reel_set(job_id, creative_id=cid)
         _rs_log(job_id, f"Storyboard ready: {payload['title']}")
 
         palette = ai_engine.brand_palette(b)
@@ -333,18 +380,21 @@ def _run_reel_studio(job_id, bid, source, cfg: ReelStudioIn):
         db.update_doc("creatives", cid, payload=payload,
                       asset_path=scene_assets[0] if scene_assets else None)
         _rs_log(job_id, f"Done — {len(scene_assets)} scenes + voiceover. Open Creatives → Build video.")
-        REEL_JOBS[job_id]["state"] = "done"
+        _reel_set(job_id, state="done")
     except Exception as e:
         _rs_log(job_id, f"Failed: {e}")
-        REEL_JOBS[job_id]["state"] = "failed"
+        _reel_set(job_id, state="failed")
 
 
 def _ap_log(bid, msg):
-    AUTOPILOT.setdefault(bid, {"log": []})["log"].append(f"{time.strftime('%H:%M:%S')} {msg}")
+    j = AUTOPILOT.setdefault(bid, {"state": "running", "log": []})
+    j["log"].append(f"{time.strftime('%H:%M:%S')} {msg}")
+    _persist_job("autopilot", bid, j)
 
 
 def _run_autopilot(bid, cfg: AutopilotIn):
     AUTOPILOT[bid] = {"state": "running", "log": [], "started": time.time()}
+    _persist_job("autopilot", bid, AUTOPILOT[bid])
     try:
         b = db.get_brand(bid)
         _ap_log(bid, f"Autopilot engaged for {b['name']}")
@@ -372,10 +422,10 @@ def _run_autopilot(bid, cfg: AutopilotIn):
                     except Exception as e:
                         _ap_log(bid, f"  visual skipped: {e}")
         _ap_log(bid, f"Done — {produced} production-ready creatives. Review and publish.")
-        AUTOPILOT[bid]["state"] = "done"
+        _ap_set(bid, state="done")
     except Exception as e:
         _ap_log(bid, f"Stopped: {e}")
-        AUTOPILOT[bid]["state"] = "failed"
+        _ap_set(bid, state="failed")
 
 
 def _auto_cycle(bid):
