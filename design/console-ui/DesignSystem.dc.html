@@ -1,0 +1,89 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
+    *{box-sizing:border-box}
+    body{margin:0;font-family:"Manrope",system-ui,sans-serif;background:#0a0b12;color:#f4f5fb}
+    a{color:#a78bfa}a:hover{color:#c6b6ff}
+    .disp{font-family:"Space Grotesk","Manrope",sans-serif;letter-spacing:-.02em}
+    .sw{height:64px;border-radius:12px;display:flex;align-items:flex-end;padding:8px;font-size:10.5px;font-weight:700}
+    .lbl{font-size:11px;color:#9aa0b4;font-weight:700;letter-spacing:.08em;margin-bottom:12px}
+  </style>
+</helmet>
+<div style="width:1440px;height:1024px;background:#0a0b12;color:#f4f5fb;padding:40px 48px;overflow:hidden">
+  <div style="display:flex;align-items:center;gap:14px;margin-bottom:6px">
+    <div style="width:40px;height:40px;border-radius:13px;background:linear-gradient(135deg,#7c5cff,#c6f24e);display:flex;align-items:center;justify-content:center;font-weight:800;color:#0a0b12;font-size:18px">✦</div>
+    <div><div class="disp" style="font-size:26px;font-weight:700">Marketing Brain — Design System</div>
+    <div style="color:#9aa0b4;font-size:13px">Gen-Z premium · calm intelligence · built for dark</div></div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:40px;margin-top:30px">
+    <!-- color -->
+    <div>
+      <div class="lbl">COLOR — restrained, meaning-carrying</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+        <div class="sw" style="background:#0a0b12;border:1px solid rgba(255,255,255,.12);color:#9aa0b4">Canvas<br>#0A0B12</div>
+        <div class="sw" style="background:#12131d;border:1px solid rgba(255,255,255,.08);color:#9aa0b4">Surface<br>#12131D</div>
+        <div class="sw" style="background:#7c5cff;color:#fff">Violet<br>#7C5CFF</div>
+        <div class="sw" style="background:#a78bfa;color:#1a1030">Violet-2<br>#A78BFA</div>
+        <div class="sw" style="background:#c6f24e;color:#1a2400">Acid pop<br>#C6F24E</div>
+        <div class="sw" style="background:#ff6b8a;color:#1a0007">Coral<br>#FF6B8A</div>
+        <div class="sw" style="background:#ffb84d;color:#241500">Amber<br>#FFB84D</div>
+        <div class="sw" style="background:#f4f5fb;color:#0a0b12">Ink<br>#F4F5FB</div>
+      </div>
+      <div class="lbl" style="margin-top:28px">COMPONENTS</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button style="border:0;background:linear-gradient(135deg,#7c5cff,#8b6bff);color:#fff;font-weight:700;padding:10px 18px;border-radius:11px;font-family:inherit">Primary</button>
+        <button style="border:1px solid rgba(255,255,255,.16);background:transparent;color:#f4f5fb;font-weight:700;padding:10px 18px;border-radius:11px;font-family:inherit">Secondary</button>
+        <button style="border:0;background:#c6f24e;color:#0a0b12;font-weight:800;padding:10px 18px;border-radius:11px;font-family:inherit">Approve</button>
+        <span style="font-size:11px;font-weight:700;color:#c6f24e;border:1px solid rgba(198,242,78,.3);padding:4px 11px;border-radius:20px">● Live</span>
+        <span style="font-size:11px;font-weight:700;color:#a78bfa;border:1px solid rgba(124,92,255,.35);padding:4px 11px;border-radius:20px">● Running</span>
+        <span style="font-size:11px;font-weight:700;color:#ffb84d;border:1px solid rgba(255,184,77,.3);padding:4px 11px;border-radius:20px">● Waiting</span>
+      </div>
+      <div style="margin-top:18px;display:flex;gap:12px">
+        <div style="flex:1;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px">
+          <div style="font-size:11px;color:#9aa0b4;font-weight:700">HEALTH</div>
+          <div class="disp" style="font-size:30px;font-weight:700;background:linear-gradient(135deg,#fff,#a78bfa);-webkit-background-clip:text;background-clip:text;color:transparent">82</div>
+          <div style="font-size:11px;color:#c6f24e;font-weight:700">↑ 8%</div></div>
+        <div style="flex:1;background:rgba(124,92,255,.1);border:1px solid rgba(124,92,255,.3);border-radius:14px;padding:14px">
+          <div style="font-size:11px;color:#9aa0b4;font-weight:700">CONFIDENCE</div>
+          <div class="disp" style="font-size:17px;font-weight:700;color:#c6f24e;margin-top:6px">HIGH</div>
+          <div style="font-size:11px;color:#9aa0b4">14 sources</div></div>
+      </div>
+    </div>
+
+    <!-- type + modes -->
+    <div>
+      <div class="lbl">TYPE — Space Grotesk · Manrope</div>
+      <div class="disp" style="font-size:40px;font-weight:700;line-height:1.05">Display 40</div>
+      <div class="disp" style="font-size:26px;font-weight:600;margin-top:8px">Heading 26</div>
+      <div style="font-size:15px;margin-top:10px;color:#e6e8f2;line-height:1.55">Body 15 — calm, legible, generous. The interface emphasises decisions and outcomes, never the machinery behind them.</div>
+      <div style="font-size:12px;margin-top:8px;color:#9aa0b4">Caption 12 · muted</div>
+
+      <div class="lbl" style="margin-top:30px">EXECUTION MODES</div>
+      <div style="display:grid;gap:10px">
+        <div style="display:flex;align-items:center;gap:12px;border:1px solid rgba(255,255,255,.1);border-radius:13px;padding:12px 14px"><span style="width:11px;height:11px;border-radius:50%;border:2px solid #9aa0b4"></span><div><b style="font-size:13px">Manual</b><div style="font-size:11.5px;color:#9aa0b4">You control every step</div></div></div>
+        <div style="display:flex;align-items:center;gap:12px;border:1px solid rgba(124,92,255,.45);background:rgba(124,92,255,.1);border-radius:13px;padding:12px 14px"><span style="width:11px;height:11px;border-radius:50%;background:#7c5cff;box-shadow:0 0 10px #7c5cff"></span><div><b style="font-size:13px">AI Assist</b><div style="font-size:11.5px;color:#c3c8d8">AI prepares · you approve</div></div></div>
+        <div style="display:flex;align-items:center;gap:12px;border:1px solid rgba(255,255,255,.1);border-radius:13px;padding:12px 14px"><span style="width:11px;height:11px;border-radius:50%;border:2px solid #9aa0b4"></span><div><b style="font-size:13px">Autopilot</b><div style="font-size:11.5px;color:#9aa0b4">Low-risk actions only · high-impact waits for you</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:34px;border-top:1px solid rgba(255,255,255,.07);padding-top:18px;display:flex;align-items:center;gap:12px">
+    <div style="font-size:12.5px;color:#9aa0b4;font-weight:600">KNOW</div>
+    <div style="flex:1;height:2px;background:linear-gradient(90deg,#7c5cff,#a78bfa,#c6f24e)"></div>
+    <div style="font-size:12.5px;color:#c3c8d8;font-weight:600">THINK · CREATE · LAUNCH · CONVERT · MEASURE</div>
+    <div style="flex:1;height:2px;background:linear-gradient(90deg,#c6f24e,#a78bfa,#7c5cff)"></div>
+    <div style="font-size:12.5px;color:#9aa0b4;font-weight:600">LEARN ↺</div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
