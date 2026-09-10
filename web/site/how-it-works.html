@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How it works — Marketing Brain</title>
+<meta name="description" content="How Marketing Brain runs its loop step by step: missions, the approval model across Manual, AI Assist and Autopilot modes, and the Why? interface that shows evidence and confidence.">
+<meta name="theme-color" content="#0b1220">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Inter+Tight:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css">
+<script>try{var t=localStorage.getItem("mb-site-theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body>
+<a href="#main" class="skip-link">Skip to content</a>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+<defs>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+<symbol id="i-compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></symbol>
+<symbol id="i-pen" viewBox="0 0 24 24"><path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17z"/><path d="m13.5 6.5 3 3"/></symbol>
+<symbol id="i-send" viewBox="0 0 24 24"><path d="M21 3 10 14"/><path d="M21 3 14 21l-4-7-7-4z"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7"/><path d="M18 13.5a6.5 6.5 0 0 1 3.5 6.5"/></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></symbol>
+<symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 4.5 6v5.5c0 4.5 3 8 7.5 9.5 4.5-1.5 7.5-5 7.5-9.5V6z"/><path d="m9 12 2 2 4-4"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></symbol>
+<symbol id="i-github" viewBox="0 0 24 24"><path d="M9 19c-4.5 1.4-4.5-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/></symbol>
+<symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6"/><path d="M20 4 10 14"/><path d="M18 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5"/></symbol>
+<symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></symbol>
+<symbol id="i-inbox" viewBox="0 0 24 24"><path d="M3 13h5l1.5 2.5h5L16 13h5"/><path d="M5 5h14l2 8v6H3v-6z"/></symbol>
+<symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></symbol>
+<symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-8 9"/></symbol>
+<symbol id="i-doc" viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/></symbol>
+<symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/></symbol>
+<symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/><path d="m3 17 9 5 9-5"/></symbol>
+<symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17.5v.5"/></symbol>
+<symbol id="i-user-check" viewBox="0 0 24 24"><circle cx="10" cy="8" r="3.5"/><path d="M3 20a7 7 0 0 1 14 0"/><path d="m15.5 12.5 2 2 4-4"/></symbol>
+<symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></symbol>
+<symbol id="i-message" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></symbol>
+<symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h16"/><path d="m13 5 7 7-7 7"/></symbol>
+<symbol id="i-database" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></symbol>
+<symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 1-1 1.7"/><path d="M12 17v.5"/></symbol>
+<symbol id="i-brain-mark" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 5V2M12 22v-3M5 12H2M22 12h-3"/></symbol>
+<symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6.5 6.5 9 9M15 15l2.5 2.5M6.5 17.5 9 15M15 9l2.5-2.5"/></symbol>
+<symbol id="i-clipboard" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 11h6M9 15h6"/></symbol>
+<symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="14" r="4"/><path d="m11 11 9-9M15 7l2.5 2.5M18 4l2 2"/></symbol>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="m3 11 9-7 9 7"/><path d="M5 10v10h14V10"/></symbol>
+</defs></svg>
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="index.html" aria-label="Marketing Brain home"><svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true"><rect width="28" height="28" rx="8" fill="currentColor"/><circle cx="14" cy="14" r="6.5" fill="none" stroke="var(--surface)" stroke-width="2"/><circle cx="20.5" cy="7.5" r="2.4" fill="var(--surface)"/></svg><span>Marketing Brain</span></a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Open menu">
+      <svg class="icon icon-menu" aria-hidden="true"><use href="#i-menu"/></svg><svg class="icon icon-close" aria-hidden="true"><use href="#i-x"/></svg>
+    </button>
+    <nav class="site-nav" id="site-nav" aria-label="Primary">
+      <div class="nav-primary">
+        <a href="index.html">Overview</a><a href="features.html">Features</a><a href="how-it-works.html" aria-current="page">How it works</a><a href="security.html">Security &amp; control</a><a href="get-started.html">Get started</a>
+      </div>
+      <div class="nav-tools">
+        <a class="tool-link" href="https://github.com/hemantsatishjadhav06-ai/marketing-brain" rel="noopener"><svg class="icon icon--sm" aria-hidden="true"><use href="#i-github"/></svg>GitHub</a>
+        <a class="tool-link" href="https://marketing-brain-production-1f88.up.railway.app/operator.html" rel="noopener"><svg class="icon icon--sm" aria-hidden="true"><use href="#i-clipboard"/></svg>Operator console</a>
+        <a class="btn btn--primary btn--sm" href="https://marketing-brain-production-1f88.up.railway.app" rel="noopener">Open the live app<svg class="icon icon--sm" aria-hidden="true"><use href="#i-external"/></svg></a>
+        <button class="theme-toggle" type="button" aria-label="Toggle light or dark theme"><svg class="icon i-moon" aria-hidden="true"><use href="#i-moon"/></svg><svg class="icon i-sun" aria-hidden="true"><use href="#i-sun"/></svg></button>
+      </div>
+    </nav>
+  </div>
+</header>
+<main id="main" tabindex="-1">
+
+<section class="section section--tight">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">How it works</p>
+      <h1 style="font-size:clamp(2rem,4.2vw,3.2rem)">One loop, run as missions, stopped by gates, explained on demand.</h1>
+      <p class="lede">Here is what actually happens between "add the brand" and "post is live" — and where a person is in the loop.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="loop">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <p class="eyebrow">Step by step</p>
+      <h2>The loop, with its twelve internal stages.</h2>
+      <p>Seven steps you see; twelve stages underneath. Each one is a piece of work the specialists can do, and each records what it used and what it produced.</p>
+    </div>
+    <ol class="timeline reveal">
+      <li><div>
+  <h3>Know <span class="muted small" style="font-family:var(--mono);font-weight:400;letter-spacing:0">Research → Understand</span></h3>
+  <p class="muted">The brain reads what the company has said about itself — site, brochures, brand kit — and what the market is doing. It separates verified facts from prose, and records where each fact came from.</p>
+  <div class="who"><span class="pill pill--accent">AI does the work</span><span class="pill pill--gate">You confirm facts</span></div>
+</div></li>
+      <li><div>
+  <h3>Think <span class="muted small" style="font-family:var(--mono);font-weight:400;letter-spacing:0">Strategize</span></h3>
+  <p class="muted">With facts and context in hand, it proposes what to do: themes, a calendar, a campaign angle. Each proposal carries its reasoning and the evidence it rests on.</p>
+  <div class="who"><span class="pill pill--accent">AI proposes</span><span class="pill pill--gate">You choose</span></div>
+</div></li>
+      <li><div>
+  <h3>Create <span class="muted small" style="font-family:var(--mono);font-weight:400;letter-spacing:0">Create → Approve</span></h3>
+  <p class="muted">Creatives, captions, blogs and emails are drafted in the brand voice with the real logo and palette. Every draft goes to the approvals queue with its reason, expected outcome and risk.</p>
+  <div class="who"><span class="pill pill--accent">AI drafts</span><span class="pill pill--gate">Approval required</span></div>
+</div></li>
+      <li><div>
+  <h3>Launch <span class="muted small" style="font-family:var(--mono);font-weight:400;letter-spacing:0">Publish → Promote</span></h3>
+  <p class="muted">Approved items are scheduled and published to connected accounts through your own token. Promotion — paid amplification — is a separate approval with its own budget gate.</p>
+  <div class="who"><span class="pill pill--ok">Executed after approval</span><span class="pill pill--gate">Spend gated</span></div>
+</div></li>
+      <li><div>
+  <h3>Convert <span class="muted small" style="font-family:var(--mono);font-weight:400;letter-spacing:0">Engage → Capture leads</span></h3>
+  <p class="muted">Comments and messages arrive in one inbox. The brain drafts replies in the brand voice; a human reads and sends. Leads captured from those conversations are planned next.</p>
+  <div class="who"><span class="pill pill--accent">AI drafts replies</span><span class="pill pill--gate">Human sends</span></div>
+</div></li>
+      <li><div>
+  <h3>Measure <span class="muted small" style="font-family:var(--mono);font-weight:400;letter-spacing:0">Measure</span></h3>
+  <p class="muted">Results are compared with the expected outcome that was written on the approval. That comparison is what makes the next step honest.</p>
+  <div class="who"><span class="pill pill--partial">Partial today</span></div>
+</div></li>
+      <li><div>
+  <h3>Learn <span class="muted small" style="font-family:var(--mono);font-weight:400;letter-spacing:0">Learn → Improve</span></h3>
+  <p class="muted">Corrections you gave in review, and what the numbers said, are written into brand memory — rules, corrections, learnings — so the next loop starts from a better place.</p>
+  <div class="who"><span class="pill pill--ok">Memory live</span><span class="pill pill--partial">Auto-learning in progress</span></div>
+</div></li>
+    </ol>
+  </div>
+</section>
+
+<section class="section section--alt" id="missions">
+  <div class="wrap">
+    <div class="loop-grid">
+      <div class="reveal">
+        <p class="eyebrow">Missions</p>
+        <h2>Work is organised as missions, not as prompts.</h2>
+        <p class="lede">A mission is a goal with a scope: "Fill October with twelve on-brand posts for the launch." The brain breaks it into stages, runs the ones it is allowed to run in the current mode, and pauses at every gate with a card explaining what it wants to do and why.</p>
+        <ul class="card-list card-list--plain">
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>One mission, one visible track of progress</li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Each stage records inputs, outputs and cost</li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>You can step in at any stage, in any mode</li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Regenerating a stage invalidates approvals downstream of it</li>
+        </ul>
+      </div>
+      <div class="mission reveal" aria-label="Example mission track">
+        <div class="mission-head"><strong>October launch series</strong><span class="pill pill--accent">AI Assist</span></div>
+        <ol class="mission-track">
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>Research refreshed — 2 competitor campaigns found</span><span class="pill pill--ok">Done</span></li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>Facts confirmed — 14 verified, 1 flagged</span><span class="pill pill--ok">Done</span></li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>12 ideas proposed with rationale</span><span class="pill pill--ok">Done</span></li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span>Creatives and captions drafted</span><span class="pill pill--ok">Done</span></li>
+          <li class="gate"><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg><span><strong>Waiting for your approval</strong> — 12 items in the queue</span><span class="pill pill--gate">Gate</span></li>
+          <li class="pending"><svg class="icon" aria-hidden="true"><use href="#i-send"/></svg><span>Publish to Instagram and Facebook</span><span class="pill">Pending</span></li>
+          <li class="pending"><svg class="icon" aria-hidden="true"><use href="#i-chart"/></svg><span>Measure against expected outcome</span><span class="pill">Pending</span></li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="approvals">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <p class="eyebrow">The approval model</p>
+      <h2>What runs on its own, and what always waits for you.</h2>
+      <p>The execution mode decides how much preparation happens without you. It never decides who has the final say on high-impact actions.</p>
+    </div>
+    <div class="table-scroll reveal">
+      <table class="status-table">
+        <thead><tr><th scope="col">Action</th><th scope="col">Manual</th><th scope="col">AI Assist</th><th scope="col">Autopilot</th></tr></thead>
+        <tbody>
+          <tr><td>Refresh research, competitors, trends</td><td>On request</td><td>Prepared automatically</td><td>Runs on schedule</td></tr>
+          <tr><td>Generate ideas and drafts</td><td>On request</td><td>Prepared automatically</td><td>Runs on schedule</td></tr>
+          <tr><td>Draft a reply in the inbox</td><td>On request</td><td>Prepared automatically</td><td>Prepared automatically</td></tr>
+          <tr><td>Send a reply</td><td><span class="pill pill--gate">Human</span></td><td><span class="pill pill--gate">Human</span></td><td><span class="pill pill--gate">Human</span></td></tr>
+          <tr><td>Publish a post</td><td><span class="pill pill--gate">Human</span></td><td><span class="pill pill--gate">Human</span></td><td><span class="pill pill--gate">Human</span></td></tr>
+          <tr><td>Spend on ads</td><td><span class="pill pill--gate">Human</span></td><td><span class="pill pill--gate">Human</span></td><td><span class="pill pill--gate">Human</span></td></tr>
+          <tr><td>Start a new campaign</td><td><span class="pill pill--gate">Human</span></td><td><span class="pill pill--gate">Human</span></td><td><span class="pill pill--gate">Human</span></td></tr>
+          <tr><td>Change brand identity</td><td><span class="pill pill--gate">Human</span></td><td><span class="pill pill--gate">Human</span></td><td><span class="pill pill--gate">Human</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="grid grid-3" style="margin-top:28px">
+      <div class="card card--flat reveal">
+        <h3>Every approval carries five things</h3>
+        <ul class="card-list card-list--plain">
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>The recommendation</li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>The evidence it rests on</li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>The reason for doing it now</li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>The expected outcome</li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>The risk if it is wrong</li>
+        </ul>
+      </div>
+      <div class="card card--flat reveal">
+        <h3>Three ways to answer</h3>
+        <ul class="card-list card-list--plain">
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span><strong>Approve</strong> — it proceeds to the next stage</span></li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span><strong>Request changes</strong> — with a note the brain remembers as a correction</span></li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span><strong>Reject</strong> — it stops, and the reason is recorded</span></li>
+        </ul>
+      </div>
+      <div class="card card--flat reveal">
+        <h3>Who can approve</h3>
+        <ul class="card-list card-list--plain">
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Owners and admins approve for their workspace</li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Clients see and review their own brand only</li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Every decision is recorded with who made it and when</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section section--alt" id="why">
+  <div class="wrap">
+    <div class="loop-grid">
+      <div class="reveal">
+        <p class="eyebrow">The "Why?" interface</p>
+        <h2>Ask why, and get evidence — not a sales pitch.</h2>
+        <p class="lede">Anything the brain proposes can be questioned. The answer lists the sources it used, the confidence it has in each factual claim, and what it could not verify. If the evidence is thin, it says so plainly and suggests what to add.</p>
+        <ul class="card-list card-list--plain">
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Confidence is per claim, not per post</li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>"Insufficient evidence" is a valid, expected answer</li>
+          <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>Sources are the company's own: pages, documents, listings, approved facts</li>
+        </ul>
+      </div>
+      <div class="card why-card reveal" aria-label="Example of a Why? explanation">
+        <div class="q"><span class="btn btn--secondary btn--sm" aria-hidden="true">Why?</span>Why a "ready-to-move" series now?</div>
+        <dl class="kv">
+          <div><dt>Signal</dt><dd>Two competitors started possession-ready campaigns in the last seven days <span class="pill pill--ok">High</span></dd></div>
+          <div><dt>Fact</dt><dd>Your Phase 1 has an occupancy certificate on file <span class="pill pill--ok">High</span></dd></div>
+          <div><dt>Fact</dt><dd>Available units in Phase 1 <span class="pill pill--partial">Not verified</span></dd></div>
+          <div><dt>Gap</dt><dd>Add the current inventory sheet to Company Brain and the flagged claim can be included.</dd></div>
+          <div><dt>Expected</dt><dd>More site-visit enquiries from people ready to buy this quarter — measured in the inbox after publishing.</dd></div>
+          <div><dt>Risk</dt><dd>Low. No price or availability is stated until verified.</dd></div>
+        </dl>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap band-grid">
+    <div>
+      <h2>See the loop in the live app.</h2>
+      <p class="lede">Add a brand, watch the first approvals arrive, and ask "why?" on any of them.</p>
+      <div class="cta-row" style="margin-top:24px">
+        <a class="btn btn--primary btn--lg" href="https://marketing-brain-production-1f88.up.railway.app" rel="noopener">Open the live app</a>
+        <a class="btn btn--secondary btn--lg" href="security.html">Security &amp; control</a>
+      </div>
+    </div>
+    <blockquote>"You can approve it — or let me handle it." Either way, you can see why.<footer>The two sentences every approval card is built to earn.</footer></blockquote>
+  </div>
+</section>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <a class="brand" href="index.html"><svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true"><rect width="28" height="28" rx="8" fill="currentColor"/><circle cx="14" cy="14" r="6.5" fill="none" stroke="var(--surface)" stroke-width="2"/><circle cx="20.5" cy="7.5" r="2.4" fill="var(--surface)"/></svg><span>Marketing Brain</span></a>
+        <p class="footer-tagline">One brain. Many specialists. One source of truth. Human control. Continuous learning.</p>
+      </div>
+      <div>
+        <h4>Product</h4>
+        <ul>
+          <li><a href="index.html">Overview</a></li>
+          <li><a href="features.html">Features</a></li>
+          <li><a href="how-it-works.html">How it works</a></li>
+          <li><a href="security.html">Security &amp; control</a></li>
+          <li><a href="get-started.html">Get started</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Tools</h4>
+        <ul>
+          <li><a href="https://marketing-brain-production-1f88.up.railway.app" rel="noopener">Live app</a></li>
+          <li><a href="https://marketing-brain-production-1f88.up.railway.app/operator.html" rel="noopener">Operator console</a></li>
+          <li><a href="https://github.com/hemantsatishjadhav06-ai/marketing-brain" rel="noopener">GitHub repository</a></li>
+          <li><a href="https://github.com/hemantsatishjadhav06-ai/marketing-brain/issues" rel="noopener">Report an issue</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Principles</h4>
+        <ul>
+          <li><a href="security.html#human-control">Human in the loop</a></li>
+          <li><a href="security.html#source-first">Source-first AI</a></li>
+          <li><a href="security.html#not-claimed">What we do not claim</a></li>
+          <li><a href="features.html#status">Available now vs. coming</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>&copy; <span id="year">2026</span> Marketing Brain. Hide complexity. Expose control.</span>
+      <span>Built as one FastAPI service. No cookies, no tracking on this site.</span>
+    </div>
+  </div>
+</footer>
+<script src="site.js"></script>
+</body>
+</html>
