@@ -27,7 +27,7 @@
       if (nav.contains(e.target) || toggle.contains(e.target)) return;
       setOpen(false);
     });
-    window.matchMedia("(min-width: 961px)").addEventListener("change", function (m) { if (m.matches) setOpen(false); });
+    window.matchMedia("(min-width: 1100px)").addEventListener("change", function (m) { if (m.matches) setOpen(false); });
   }
 
   /* ---- Theme toggle (system by default; explicit choice persisted) ---- */
