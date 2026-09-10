@@ -149,7 +149,34 @@ def test_a_public_host_with_auth_on_boots_fine(monkeypatch):
     from app.routes import _shared
     monkeypatch.setenv("DIRECT_ACCESS", "false")
     monkeypatch.setenv("RAILWAY_PUBLIC_DOMAIN", "brain.up.railway.app")
+    # A correctly configured public host: real signing key + durable DB (or explicit override).
+    monkeypatch.setenv("SECRET_KEY", "test-only-long-random-secret-0123456789")
+    monkeypatch.setenv("ALLOW_EPHEMERAL_DB", "true")
     _shared._assert_auth_is_enabled()
+
+
+def test_a_public_host_with_default_secret_refuses_to_boot(monkeypatch):
+    """A forgeable default SECRET_KEY on a public host is a full auth bypass."""
+    import pytest
+    from app.routes import _shared
+    monkeypatch.setenv("DIRECT_ACCESS", "false")
+    monkeypatch.setenv("RAILWAY_PUBLIC_DOMAIN", "brain.up.railway.app")
+    monkeypatch.delenv("SECRET_KEY", raising=False)
+    monkeypatch.setenv("ALLOW_EPHEMERAL_DB", "true")
+    with pytest.raises(RuntimeError, match="SECRET_KEY"):
+        _shared._assert_auth_is_enabled()
+
+
+def test_a_public_host_without_durable_db_refuses_to_boot(monkeypatch):
+    """SQLite inside an ephemeral container is wiped on every redeploy."""
+    import pytest
+    from app.routes import _shared
+    monkeypatch.setenv("DIRECT_ACCESS", "false")
+    monkeypatch.setenv("RAILWAY_PUBLIC_DOMAIN", "brain.up.railway.app")
+    monkeypatch.setenv("SECRET_KEY", "test-only-long-random-secret-0123456789")
+    monkeypatch.delenv("ALLOW_EPHEMERAL_DB", raising=False)
+    with pytest.raises(RuntimeError, match="durable database"):
+        _shared._assert_auth_is_enabled()
 
 
 # ------------------------------------------- placeholder text in live output

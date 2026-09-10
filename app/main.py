@@ -29,6 +29,16 @@ def _workspace_router(ws_root):
         target = os.path.realpath(os.path.join(ws_root, path))
         if target != ws_root and not target.startswith(ws_root + os.sep):
             raise HTTPException(404, "Not found")
+        # Tenant scoping: "authenticated" is not "authorised". A client login must
+        # only reach its own brand's folder; slugs are guessable, so this is the
+        # only thing standing between tenants' generated assets and profiles.
+        if user.get("role") != "admin":
+            b = db.get_brand(user.get("brand_id") or "")
+            if not b:
+                raise HTTPException(404, "Not found")
+            own = os.path.realpath(os.path.join(ws_root, _shared._wslug(b)))
+            if target != own and not target.startswith(own + os.sep):
+                raise HTTPException(404, "Not found")
         if not os.path.isfile(target):
             raise HTTPException(404, "Not found")
         return FileResponse(target)

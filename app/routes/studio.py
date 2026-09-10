@@ -52,6 +52,7 @@ def _locality_hint(b):
 def slides(bid: str, cid: str, user=Depends(current_user)):
     """Generate one branded image per carousel slide (logo composited)."""
     b = _brand_or_404(bid, user)
+    _gen_guard(bid)
     c = _doc_or_404("creatives", cid, bid)
     slide_specs = c["payload"].get("slides") or []
     if not slide_specs:
@@ -85,6 +86,7 @@ def slides(bid: str, cid: str, user=Depends(current_user)):
 def voiceover(bid: str, cid: str, user=Depends(current_user)):
     """Generate spoken voiceover audio for a reel script."""
     b = _brand_or_404(bid, user)
+    _gen_guard(bid)
     c = _doc_or_404("creatives", cid, bid)
     s = c["payload"].get("script") or {}
     lines = [sh.get("dialogue_or_vo") for sh in (s.get("shots") or []) if sh.get("dialogue_or_vo")]
@@ -143,6 +145,7 @@ def set_approval(bid: str, cid: str, body: ApprovalIn, user=Depends(current_user
 def studio_moodboard(bid: str, body: StudioMoodIn, user=Depends(current_user)):
     """Art director: topic -> creative direction + ready image prompt + caption (+ slide prompts)."""
     b = _brand_or_404(bid, user)
+    _gen_guard(bid)
     try:
         return ai_engine.studio_moodboard(b, body.topic, body.format)
     except Exception as e:
@@ -169,6 +172,7 @@ def studio_image(bid: str, body: StudioImageIn, user=Depends(current_user)):
 def studio_carousel(bid: str, body: StudioCarouselIn, user=Depends(current_user)):
     """Generate carousel slides, logo composited on EVERY slide."""
     b = _brand_or_404(bid, user)
+    _gen_guard(bid)
     out = []
     for i, pr in enumerate((body.prompts or [])[:6]):
         blob = ai_engine.generate_image(pr, b["name"], ai_engine.brand_palette(b))

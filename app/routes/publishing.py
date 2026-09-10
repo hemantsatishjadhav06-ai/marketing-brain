@@ -36,6 +36,20 @@ def publish(bid: str, body: PublishIn, user=Depends(current_user)):
     tags = " ".join("#" + h.lstrip("#") for group in ht.values() for h in group)
     full_caption = (caption + "\n\n" + tags).strip()
 
+    # Idempotency (CTO: "ONE published post, not two"). A live re-publish of a
+    # creative that already went out on this channel is refused; an identical
+    # simulated request within a minute returns the existing row instead of
+    # queueing a duplicate.
+    prior = [p for p in db.list_docs("publish_queue", bid)
+             if p.get("creative_id") == body.creative_id and p.get("channel") == channel]
+    if body.mode == "live" and any(p.get("mode") == "live" and p.get("status") == "published" for p in prior):
+        raise HTTPException(409, "This creative was already published live on this channel.")
+    if body.mode != "live":
+        for p in prior:
+            if p.get("mode") == body.mode and p.get("scheduled_for") == body.scheduled_for \
+                    and (time.time() - float(p.get("created_at") or 0)) < 60:
+                return p
+
     if body.mode == "live":
         ap = (c["payload"].get("approval") or {})
         if ap.get("state") != "approved":

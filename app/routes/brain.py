@@ -56,6 +56,7 @@ def make_blueprint(bid: str, body: BlueprintIn, user=Depends(current_user)):
 @router.post("/api/brands/{bid}/creatives/{cid}/proceed")
 def proceed(bid: str, cid: str, user=Depends(current_user)):
     b = _brand_or_404(bid, user)
+    _gen_guard(bid)  # image + video + voice — the priciest chain in the app
     c = _doc_or_404("creatives", cid, bid)
     p = c.get("payload") or {}
     if not p.get("blueprint"):
@@ -102,6 +103,7 @@ def _run_proceed(cid, bid=None):
         brand = db.get_doc("brands", bid) if bid else None
         logo_url = brain.brand_logo_url(brand) if brand else None
         _patch(cid, gen_status="Rendering image…")
+        _check_budget(bid or c["brand_id"])
         img = brain.fal_image(bp.get("static_image_prompt") or bp.get("core_idea") or "",
                               logo_url=logo_url, brand=brand)
         img = _stamp_logo(brand, img, logo_url, cid)

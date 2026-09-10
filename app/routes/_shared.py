@@ -101,6 +101,14 @@ def _assert_auth_is_enabled():
             "request would be an unauthenticated admin. Set DIRECT_ACCESS=false "
             "and provide ADMIN_EMAIL / ADMIN_PASSWORD instead."
         )
+    if _on_a_public_host():
+        # Two more silent-failure traps that only bite once real customers exist:
+        # a forgeable default signing key, and an SQLite file inside an ephemeral
+        # container that is wiped on every redeploy.
+        if os.environ.get("SECRET_KEY", "").strip() in ("", auth.DEFAULT_SECRET):
+            raise RuntimeError("SECRET_KEY is unset on a public deployment: bearer tokens would be forgeable. Set a long random SECRET_KEY.")
+        if not (db.IS_PG or db.IS_REST) and os.environ.get("ALLOW_EPHEMERAL_DB", "").lower() not in {"1", "true", "yes"}:
+            raise RuntimeError("No durable database on a public deployment (DATABASE_URL / SUPABASE_* unset): all data would be lost on redeploy. Set DATABASE_URL, or ALLOW_EPHEMERAL_DB=true to override.")
 
 
 def direct_access_enabled() -> bool:
@@ -128,6 +136,15 @@ def current_user(authorization: str = Header(default="")):
     payload = auth.verify_token(authorization[7:])
     if not payload:
         raise HTTPException(401, "Invalid or expired session")
+    # Stateless HMAC tokens can't be revoked by themselves: without this, a deleted
+    # or demoted user kept full access for up to 30 days. Re-read the user so the
+    # token dies with the account and role/brand changes take effect immediately.
+    u = db.get_user(payload.get("uid", ""))
+    if not u:
+        raise HTTPException(401, "This account no longer exists")
+    payload["role"] = u.get("role") or payload.get("role")
+    payload["brand_id"] = u.get("brand_id") or ""
+    payload["email"] = u.get("email") or payload.get("email", "")
     return payload
 
 
@@ -263,7 +280,16 @@ def _produce_creative(b, idea_id):
     return c
 
 
+def _check_budget(bid):
+    """Background loops bypass the route guard, so re-check the per-brand cap here."""
+    from ..core import guard
+    ok, msg = guard.check_generation(bid)
+    if not ok:
+        raise RuntimeError(msg)
+
+
 def _generate_image(b, creative_id, prompt_override=None):
+    _check_budget(b["id"])
     c = db.get_doc("creatives", creative_id)
     if not c:
         raise HTTPException(404, "Creative not found")
@@ -357,6 +383,7 @@ def _run_reel_studio(job_id, bid, source, cfg: ReelStudioIn):
             _rs_log(job_id, f"Painting scene {s.get('n')} ({cfg.style})…")
             prompt = (f"{s.get('image_prompt','')} . Vertical 9:16 composition. "
                       f"Strictly no text, no letters, no words, no watermarks anywhere in the image.")
+            _check_budget(bid)
             blob = ai_engine.generate_image(prompt, b["name"], palette)
             if blob:
                 blob = _composite_logo(b, blob)

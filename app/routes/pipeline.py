@@ -134,7 +134,13 @@ def list_ideas(bid: str, user=Depends(current_user)):
 @router.post("/api/brands/{bid}/ideas/{iid}/state")
 def idea_state(bid: str, iid: str, body: dict, user=Depends(current_user)):
     _brand_or_404(bid, user)
-    db.update_doc("ideas", iid, state=body.get("state", "approved"))
+    # Ownership check: without it, any brand's URL could flip another brand's idea
+    # (the id alone was trusted). Also constrain the state to the known lifecycle.
+    _doc_or_404("ideas", iid, bid)
+    state = str((body or {}).get("state", "approved"))
+    if state not in ("new", "approved", "rejected", "selected", "archived"):
+        raise HTTPException(400, "state must be one of new, approved, rejected, selected, archived")
+    db.update_doc("ideas", iid, state=state)
     return db.get_doc("ideas", iid)
 
 

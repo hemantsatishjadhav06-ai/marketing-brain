@@ -150,6 +150,7 @@ def revise(bid: str, cid: str, body: ReviseIn, user=Depends(current_user)):
     running on autopilot while this single item is redone to your instruction.
     """
     _brand_or_404(bid, user)
+    _gen_guard(bid)
     c = _doc_or_404("creatives", cid, bid)
     instruction = (body.instruction or "").strip()
     if not instruction:

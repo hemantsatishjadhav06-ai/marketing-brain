@@ -19,6 +19,8 @@ def login(body: LoginIn, request: Request):
     u = db.get_user_by_email(body.email)
     if not u or not auth.check_pw(body.password, u["pw_hash"]):
         raise HTTPException(401, "Wrong email or password")
+    if auth.needs_rehash(u["pw_hash"]):
+        db.update_user_password(u["id"], auth.hash_pw(body.password))
     return {"token": auth.make_token(u["id"], u["role"], u.get("brand_id") or ""),
             "role": u["role"], "brand_id": u.get("brand_id") or "", "email": u["email"]}
 

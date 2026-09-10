@@ -219,10 +219,16 @@ Return JSON: {{"ideas": [{{
  "funnel_stage": "awareness|consideration|conversion",
  "effort": "low|medium|high",
  "why_it_works": "the psychological/algorithmic reason this performs",
+ "audience": "the specific segment this idea is for (who exactly, not 'everyone')",
+ "pain_point": "the concrete problem, fear or desire of that audience this idea speaks to",
+ "objective": "the measurable outcome this idea is meant to drive (reach|saves|shares|DMs|leads|site visits)",
  "cta": "...",
+ "source": "which brand-context fact, insight or search signal above this idea is grounded in — or 'none' if it is a generic angle",
+ "priority_score": 0-100,
  "virality": {{"score": 0-99, "hook_strength": 0-10, "flow": 0-10, "trend_fit": 0-10, "share_trigger": "the emotion/utility that makes people share this"}}
 }}]}}
-Score honestly — most ideas are 40-70; reserve 85+ for genuinely exceptional concepts."""
+Score honestly — most ideas are 40-70; reserve 85+ for genuinely exceptional concepts.
+priority_score = how strongly you would recommend producing this idea FIRST, considering fit, effort and evidence. Never invent facts to fill 'source' — use 'none'."""
     out = _json_chat(system, user, max_tokens=4500)
     return out.get("ideas", out if isinstance(out, list) else [])
 

@@ -3,16 +3,27 @@ let ME = JSON.parse(localStorage.getItem("mb_me") || "null");
 let state = { view:"dash", brand:null, tab:"overview", wizard:null };
 let BRANDS = [];
 
+class ApiError extends Error{ constructor(msg,status){ super(msg); this.status=status; } }
+const API_TIMEOUT_MS = 180000; // generation calls run 12–40s; never let a button spin forever
 async function api(path, method="GET", body=null, raw=false){
   const opt = {method, headers:{}};
   if(TOKEN) opt.headers["Authorization"] = "Bearer "+TOKEN;
   if(body && !raw){ opt.headers["Content-Type"]="application/json"; opt.body = JSON.stringify(body); }
   if(body && raw){ opt.body = body; }
-  const r = await fetch("/api"+path, opt);
-  if(r.status===401){ showLogin(); throw new Error("Access is not configured"); }
-  if(!r.ok){ let d; try{d=await r.json()}catch{d={detail:r.statusText}}; throw new Error(typeof d.detail==="string"?d.detail:JSON.stringify(d.detail)); }
+  const ctl = new AbortController(); opt.signal = ctl.signal;
+  const timer = setTimeout(()=>ctl.abort(), API_TIMEOUT_MS);
+  let r;
+  try{ r = await fetch("/api"+path, opt); }
+  catch(e){ clearTimeout(timer); throw new ApiError(e.name==="AbortError"?"The server took too long to respond. Please try again.":"Network error — check your connection.", 0); }
+  clearTimeout(timer);
+  if(r.status===401){ showLogin(); throw new ApiError("Your session has expired — please sign in again.",401); }
+  if(r.status===429){ let d; try{d=await r.json()}catch{d={}}; throw new ApiError(d.detail||"Generation is paused for today (daily limit reached). Try again tomorrow or contact your admin.",429); }
+  if(!r.ok){ let d; try{d=await r.json()}catch{d={detail:r.statusText}}; const m=typeof d.detail==="string"?d.detail:JSON.stringify(d.detail); throw new ApiError(r.status>=500?"Something went wrong on our side. Please try again.":m, r.status); }
   return r.json();
 }
+// Only ever inject a validated hex color into a style attribute — brand colors are
+// scraped from third-party websites, so an unvalidated value is an XSS sink.
+function safeColor(c, fb="#6366f1"){ return /^#[0-9a-fA-F]{3,8}$/.test(String(c||""))?c:fb; }
 function toast(msg, err=false){
   const t=document.createElement("div"); t.className="toast"+(err?" err":""); t.textContent=msg;
   document.getElementById("toasts").appendChild(t); setTimeout(()=>t.remove(), err?7000:4000);
@@ -59,8 +70,8 @@ function renderSidebar(){
   for(const [g,list] of Object.entries(groups)){
     h+=`<div class="navsec">${g?("📁 "+esc(g)):"Brands"}</div>`;
     list.forEach(b=>{
-      const col=(((b.profile||{}).brand_kit||{}).colors||[])[0]||"#6366f1";
-      h+=`<div class="navitem ${state.brand&&state.brand.id===b.id?'on':''}" onclick="openBrand('${b.id}')"><span class="bdot" style="background:${col}"></span>${esc(b.name)}</div>`;
+      const col=safeColor((((b.profile||{}).brand_kit||{}).colors||[])[0]);
+      h+=`<div class="navitem ${state.brand&&state.brand.id===b.id?'on':''}" onclick="openBrand('${esc(b.id)}')"><span class="bdot" style="background:${col}"></span>${esc(b.name)}</div>`;
     });
   }
   $("sidenav").innerHTML=h;
@@ -325,12 +336,12 @@ function renderBrand(){
   const subnav = sec ? `<div class="subnav">${SUBS[sec].map(([t,l])=>`<button class="${state.tab===t?'on':''}" onclick="state.tab='${t}';renderBrand()">${esc(l)}</button>`).join("")}</div>` : "";
   $("main").innerHTML=`
     <div class="brandhd">
-      ${logoUrl(b)?`<img class="brandlogo" alt="${esc(b.name)} logo" src="${logoUrl(b)}">`:""}
+      ${logoUrl(b)?`<img class="brandlogo" alt="${esc(b.name)} logo" src="${esc(logoUrl(b))}">`:""}
       <div style="min-width:0">
         <h1 style="font-size:20px;margin:0">${esc(b.name)}</h1>
         <p class="sub" style="margin:2px 0 0">${esc(b.website||"")}${b.grp?` · 📁 ${esc(b.grp)}`:""}${(b.setup&&b.setup.channels&&b.setup.channels.length)?` · ${esc(b.setup.channels.join(" · "))}`:""}</p>
       </div>
-      ${(k.colors||[]).slice(0,4).map(c=>`<span class="swatch" style="width:16px;height:16px;background:${c}" title="${c}"></span>`).join("")}
+      ${(k.colors||[]).slice(0,4).map(c=>`<span class="swatch" style="width:16px;height:16px;background:${safeColor(c)}" title="${esc(c)}"></span>`).join("")}
       <span style="flex:1"></span>
       <button class="ghost sm" onclick="state.tab='coach';renderBrand()">💬 Coach</button>
       <button class="grn sm" onclick="runAutopilot(this)">🤖 Autopilot</button>
@@ -370,10 +381,10 @@ async function tabKit(){
     <div class="card"><h2>🎨 Brand kit</h2>
       <p class="sub">These colors and this logo are injected into every AI prompt and composited onto generated visuals.</p>
       <h3>Palette</h3>
-      <p>${(k.colors||[]).map(c=>`<span class="swatch" style="background:${c}" title="${c}"></span>`).join("")||'<span class="sub">no colors set</span>'}</p>
+      <p>${(k.colors||[]).map(c=>`<span class="swatch" style="background:${safeColor(c)}" title="${esc(c)}"></span>`).join("")||'<span class="sub">no colors set</span>'}</p>
       <label>Colors (hex, comma separated)</label>
       <input id="kitColors" value="${esc((k.colors||scraped.slice(0,4)).join(", "))}">
-      ${scraped.length?`<p class="sub">Found on your website: ${scraped.map(c=>`<span class="swatch" style="width:16px;height:16px;background:${c}" title="${c}"></span>`).join("")} <button class="sm ghost" onclick="$('kitColors').value='${scraped.slice(0,4).join(", ")}'">use these</button></p>`:""}
+      ${scraped.length?`<p class="sub">Found on your website: ${scraped.map(c=>`<span class="swatch" style="width:16px;height:16px;background:${safeColor(c)}" title="${esc(c)}"></span>`).join("")} <button class="sm ghost" onclick="$('kitColors').value='${esc(scraped.slice(0,4).map(c=>safeColor(c,'')).filter(Boolean).join(", "))}'">use these</button></p>`:""}
       <label>Visual style notes (optional — e.g. "minimal, airy, premium; flat illustration; no stock photos")</label>
       <textarea id="kitStyle" rows="2">${esc(k.style||"")}</textarea>
       <button onclick="saveKit(this)">Save brand kit</button>
@@ -629,7 +640,7 @@ async function pollReelJob(jid,btn){
       (j.state==="done"&&j.creative_id?`<div class="row" style="margin-top:10px"><button class="grn" onclick="state.tab='creatives';renderBrand()">Open in Creatives \u2192 Build video</button></div>`:"");
     if(j.state==="running"){ RS_TIMER=setTimeout(()=>pollReelJob(jid,btn),4000); }
     else { busy(btn,false); if(j.state==="done") toast("Reel generated \u2014 scenes + voiceover ready"); }
-  }catch(e){ busy(btn,false); toast(e.message,true); }
+  }catch(e){ busy(btn,false); toast(e.status===404?"This reel job is no longer available (the server may have restarted). Please start it again.":e.message,true); }
 }
 async function tabCalendar(){
   const b=state.brand; const cal=await api(`/brands/${b.id}/calendar`);
@@ -1300,8 +1311,9 @@ async function proceed(cid,btn){
     (async function poll(){
       while(Date.now()-t0<12*60*1000){
         await new Promise(r=>setTimeout(r,6000));
-        let crs; try{crs=await api(`/brands/${state.brand.id}/creatives`);}catch(e){continue;}
-        const c=crs.find(x=>x.id===cid); const gs=(((c||{}).payload)||{}).gen_status||"";
+        let crs; try{crs=await api(`/brands/${state.brand.id}/creatives`);}catch(e){ if(e.status===401||e.status===404){toast(e.status===401?"Session expired — sign in to keep watching this generation.":"This job is no longer available (the server may have restarted).",true); break;} continue;}
+        const c=crs.find(x=>x.id===cid); if(!c){ toast("This creative is no longer available.",true); break; }
+        const gs=(((c||{}).payload)||{}).gen_status||"";
         if(REVIEW_CID===cid) await openReview(cid);
         if(gs.indexOf("done")===0||gs.indexOf("error")===0) break;
       }
@@ -1320,8 +1332,9 @@ async function pollBrain(cid){
   const t0=Date.now();
   while(Date.now()-t0<10*60*1000){
     await new Promise(r=>setTimeout(r,5000));
-    let crs; try{crs=await api(`/brands/${state.brand.id}/creatives`);}catch(e){continue;}
-    const c=crs.find(x=>x.id===cid); const st=(((c||{}).payload)||{}).brain_status||"";
+    let crs; try{crs=await api(`/brands/${state.brand.id}/creatives`);}catch(e){ if(e.status===401||e.status===404){ toast(e.status===401?"Session expired — sign in to keep watching.":"This job is no longer available (the server may have restarted).",true); break;} continue;}
+    const c=crs.find(x=>x.id===cid); if(!c){ toast("This creative is no longer available.",true); break; }
+    const st=(((c||{}).payload)||{}).brain_status||"";
     if(REVIEW_CID===cid) await openReview(cid);
     if(st.indexOf("done")===0||st.indexOf("error")===0) break;
   }

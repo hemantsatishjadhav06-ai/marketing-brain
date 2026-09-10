@@ -607,6 +607,17 @@ def list_users():
     return [dict(r) for r in rows]
 
 
+def get_user(uid):
+    if not uid:
+        return None
+    if IS_REST:
+        rows = _rest("GET", "users", params={"id": f"eq.{uid}"})
+        return dict(rows[0]) if rows else None
+    with _conn() as c:
+        r = c.execute("SELECT id,email,role,brand_id,created_at FROM users WHERE id=?", (uid,)).fetchone()
+    return dict(r) if r else None
+
+
 def delete_user(uid):
     if IS_REST:
         _rest("DELETE", "users", params={"id": f"eq.{uid}"})
