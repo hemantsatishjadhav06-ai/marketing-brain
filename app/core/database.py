@@ -240,6 +240,49 @@ CREATE TABLE IF NOT EXISTS jobs (
     updated_at REAL,
     PRIMARY KEY (kind, job_key)
 );
+CREATE TABLE IF NOT EXISTS campaigns (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    network TEXT NOT NULL,            -- meta | google
+    objective TEXT,
+    status TEXT DEFAULT 'draft',      -- draft|pending_approval|approved|live|paused|failed
+    daily_budget REAL DEFAULT 0,
+    currency TEXT DEFAULT 'INR',
+    external_id TEXT,
+    payload TEXT,
+    created_at REAL
+);
+CREATE TABLE IF NOT EXISTS email_campaigns (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    provider TEXT NOT NULL,           -- mailchimp | smartlead
+    kind TEXT DEFAULT 'broadcast',    -- broadcast | sequence
+    status TEXT DEFAULT 'draft',      -- draft|pending_approval|approved|sent|failed
+    external_id TEXT,
+    payload TEXT,
+    created_at REAL
+);
+CREATE TABLE IF NOT EXISTS seo_audits (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    url TEXT,
+    score INTEGER DEFAULT 0,
+    payload TEXT,
+    created_at REAL
+);
+CREATE TABLE IF NOT EXISTS spend_log (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    action TEXT,                      -- launch|budget_change|pause|resume
+    amount REAL DEFAULT 0,
+    actor TEXT,
+    payload TEXT,
+    created_at REAL
+);
+CREATE INDEX IF NOT EXISTS idx_campaigns_brand ON campaigns(brand_id, status);
+CREATE INDEX IF NOT EXISTS idx_emailcampaigns_brand ON email_campaigns(brand_id, status);
+CREATE INDEX IF NOT EXISTS idx_seoaudits_brand ON seo_audits(brand_id);
+CREATE INDEX IF NOT EXISTS idx_spendlog_brand ON spend_log(brand_id);
 CREATE INDEX IF NOT EXISTS idx_ideas_brand ON ideas(brand_id);
 CREATE INDEX IF NOT EXISTS idx_calendar_brand ON calendar_items(brand_id);
 CREATE INDEX IF NOT EXISTS idx_creatives_brand ON creatives(brand_id);

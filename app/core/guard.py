@@ -95,6 +95,45 @@ def daily_cap() -> int:
         return 300
 
 
+def ad_spend_enabled() -> bool:
+    """Global kill-switch for anything that can move ad money."""
+    return os.environ.get("AD_SPEND_DISABLED", "").strip().lower() not in {"1", "true", "yes", "on"}
+
+
+def max_daily_budget() -> float:
+    """Hard ceiling on a single campaign's daily budget (brand-currency units).
+    An AI agent can NEVER exceed this, and a human still approves every change."""
+    try:
+        return float(os.environ.get("MAX_DAILY_AD_BUDGET", "5000"))
+    except ValueError:
+        return 5000.0
+
+
+def check_ad_action(new_daily_budget: float = 0.0, approved: bool = False, by_autopilot: bool = False):
+    """Gate every money-moving ad action (launch / budget change). Returns (ok, msg).
+
+    Rules (CTO spend-safety): the kill-switch must be off; autopilot may NEVER
+    launch or raise budget (it can only recommend or pause elsewhere); a human
+    approval is required; and the daily budget can never exceed the configured
+    ceiling. Pausing spends nothing and is handled separately."""
+    if not ad_spend_enabled():
+        return False, "Ad spend is disabled on this deployment (AD_SPEND_DISABLED)."
+    if by_autopilot:
+        return False, "Autopilot cannot launch campaigns or change budgets — this needs a human approval."
+    if not approved:
+        return False, "This spends real money and must be approved by a human first."
+    cap = max_daily_budget()
+    try:
+        b = float(new_daily_budget or 0)
+    except (TypeError, ValueError):
+        return False, "Invalid budget."
+    if b <= 0:
+        return False, "Daily budget must be greater than zero."
+    if b > cap:
+        return False, f"Daily budget {b:g} exceeds the configured ceiling of {cap:g}. Raise MAX_DAILY_AD_BUDGET or lower the budget."
+    return True, ""
+
+
 def check_generation(brand_id: str):
     """Call before a paid generation. Returns (ok, message). Enforces the global
     kill-switch and a per-brand daily cap (best-effort; skipped if the counter
