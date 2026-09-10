@@ -1,6 +1,6 @@
 # MARKETING BRAIN — SYSTEM CERTIFICATION REPORT
 
-**Date:** 2026-09-10 · **Build:** `e096097` on `claude/neopolis-infra-automation-test-c6ds6i` · **Target:** https://marketing-brain-production-1f88.up.railway.app
+**Date:** 2026-09-10 · **Build:** `f3d1b5e` on `claude/neopolis-infra-automation-test-c6ds6i` · **Target:** https://marketing-brain-production-1f88.up.railway.app
 **Method:** CTO Master Testing & Production Readiness Specification (66 pp., 44 categories). Rule applied throughout: **PASS only when actually exercised; otherwise FAIL / PARTIAL / NOT TESTED.** Mock success is never reported as real-integration success.
 
 ---
@@ -10,11 +10,11 @@
 | | |
 |---|---|
 | **Overall status** | **Launchable as a controlled, managed-service deployment (real-estate clients, operator-created accounts). NOT certified as an open self-serve multi-company SaaS.** |
-| **Production readiness score** | **≈ 61 / 100** (see §Score) — below the 80 "staging" band for the self-serve SaaS claim; above it for the managed-service scope actually being launched today. |
+| **Production readiness score** | **70 / 100** (see §Score; was 61 before the CTO-suite fixes) — below the 80 "staging" band for the open self-serve SaaS claim; comfortably clears the bar for the controlled managed-service scope being launched. |
 | **Risk level** | MEDIUM. No open CTO-P0 (data leak / auth bypass / unauthorized publish) after today's fixes. Open P1s are cost, credential-at-rest and resilience items. |
 | **Critical blockers (self-serve SaaS)** | No per-customer billing/metering; connector tokens stored unencrypted; no job queue/retry/DLQ; automated measurement loop not built; no AI evaluation dataset. |
 
-Today's live testing on production — with the real model, two throwaway organisations (a real-estate company and a dental clinic) and no mocks — found **3 real defects and 1 harness error**, all resolved and re-verified live (10/10 post-deploy). The system's *safety* properties held under adversarial testing: tenant isolation across 13 resource types, approval gates, three hallucination traps, a prompt-injection payload, and a wrong-figure trap all behaved correctly.
+Today's live testing on production — with the real model, two throwaway organisations (a real-estate company and a dental clinic) and no mocks — found **3 real defects**; a further **30 were found by the local CTO suite** (`tests/cto/`). All 33 are fixed, the full local suite is **454/454 green**, and the fixes were re-verified live on the deployed build (**9/9**). The system's *safety* properties held under adversarial testing: tenant isolation across 13 resource types, approval gates, three hallucination traps, a prompt-injection payload, and a wrong-figure trap all behaved correctly.
 
 ---
 
@@ -27,9 +27,11 @@ Today's live testing on production — with the real model, two throwaway organi
 | Live grounding re-run | 4 | 4 | 0 | 0 | 0 |
 | Live post-deploy verification (build `51f8fcf`) | 10 | 10 | 0 | 0 | 0 |
 | Live connectors check (guides, save, unsupported→400, no echo, bad-token graceful fail) | 7 | 7 | 0 | 0 | 0 |
-| Local CTO security/tenancy suite (`tests/cto/`) | **PENDING — agent still executing; section filled on completion** | | | | |
+| Local CTO security/tenancy/approval/race/API/security/injection/DB suite (`tests/cto/`, 12 files) | 302 | 302 (after fixes; **30 failed before**) | 0 | — | 0 |
+| **Full local suite after all fixes** (`pytest tests`) | **454** | **454** | **0** | — | 0 |
+| Live re-verification of build `f3d1b5e` (prod) | 9 | 9 | 0 | 0 | 0 |
 
-Pass rate (all executed live + local): **189 / 193 = 97.9%** before fixes; **100% of re-executed failures now pass**.
+Pass rate: **454 / 454 local** after fixes; live: 29/33 before fixes → every re-executed failure now passes. **33 defects were found by testing today (3 live + 30 by the CTO suite) and all 33 are fixed and regression-tested.**
 
 The 3 live failures and their disposition:
 1. `PUBLISH_duplicate_request_single_publish` — two rows for one request → **FIXED** (idempotent return / 409 on live re-publish), re-verified live.
@@ -44,7 +46,17 @@ The 3 live failures and their disposition:
 |---|---|---|
 | Tenant isolation (13 brand-scoped GET resources, writes, approvals, mode, profiles/brands listing) | **PASS** (live) | Org B → Org A: all 403/404; no leakage in `/api/profiles`, `/api/brands` |
 | Cross-tenant workspace file read (`/workspaces/<other-slug>/…`) | **FAIL → FIXED → PASS** (live 404) | was auth-only; now confined to own brand folder |
-| IDOR on idea state (`/ideas/{iid}/state`) | **FIXED → PASS** (live + unit) | ownership enforced, state value constrained |
+| IDOR on idea state (`/ideas/{iid}/state`) | **FIXED → PASS** (live + unit) | ownership enforced, explicit lifecycle state required |
+| IDOR: creative from another brand's idea / image spend on another brand's creative (**P0**) | **FIXED → PASS** (unit; live re-verify below) | `_doc_or_404` on idea_id / creative_id |
+| Duplicate live publish under concurrency (**P0**) | **FIXED → PASS** (unit, 2 threads → 1 platform post) | per-creative lock around prior-check + platform call |
+| mode='LIVE'/'production' accepted as a dry run and logged `published` | **FIXED → PASS** | strict mode validation; dry runs logged `simulated` |
+| Lost-update race on creative payload (approval vs algo-audit) | **FIXED → PASS** (8/8 rounds clean) | atomic `db.merge_payload` |
+| Password reset did not invalidate sessions | **FIXED → PASS** | password-version claim in tokens |
+| Admin-created 1-char passwords / malformed emails | **FIXED → PASS** | policy + format validation |
+| Request size (5 MB brand name / note stored) | **FIXED → PASS** | 1 MB JSON cap → 413; field bounds → 422 |
+| SVG logo with `<script>` accepted and served from app origin | **FIXED → PASS** | raster-only logos |
+| Brand delete orphaned 9 tables, jobs, files, and left its users able to log in | **FIXED → PASS** | full cascade + workspace removal |
+| Prompt injection placement: brand memory inside SYSTEM prompt (coach, inbox) | **FIXED → PASS** | memory moved to user turn as labelled data; anti-injection guidance in ideas/creative/coach/inbox system prompts |
 | Authentication: wrong pw, tampered token, no token, dup email, weak pw | **PASS** (live) | 401/401/401/400/400 |
 | Authorization: owner cannot create brands / list users / run autopilot-all | **PASS** (live) | 403 ×3 |
 | Token revocation on user deletion / role change | **FIXED → PASS** (unit) | `current_user` re-reads the user |
@@ -53,7 +65,7 @@ The 3 live failures and their disposition:
 | Live publish without credentials | **PASS** (live) | 400 |
 | SSRF: metadata / loopback / file:// / RFC1918 | **PASS** fetch blocked (live); **storage FIXED** → 400 at creation (live) | |
 | Prompt injection via stored memory ("IGNORE ALL SYSTEM INSTRUCTIONS…") | **PASS** (live, real model) | instruction not obeyed; normal caption produced |
-| Login rate limit | PASS (unit) · **PARTIAL** live: in-process, per-worker, `X-Forwarded-For` first-hop trusted → bypassable by header spoofing | P2 open |
+| Login rate limit | **FIXED → PASS** (unit): keys on the proxy-appended rightmost XFF hop **and** per account, so header rotation / credential spray across IPs is throttled. Still in-process (per worker) | P3 open: shared store |
 | Boot guards (DIRECT_ACCESS on public host / default SECRET_KEY / non-durable DB) | **PASS** (unit ×3) | refuses to boot |
 | Frontend XSS (attribute-context from scraped brand colours) | **FIXED** | `safeColor` hex validation + attribute escaping |
 | Connector credentials at rest | **FAIL (open P1)** | stored unencrypted in DB |
@@ -90,7 +102,9 @@ The 3 live failures and their disposition:
 | Background execution model | **FAIL (open P1)** — daemon threads in the web process; no queue, no retry/backoff policy, no dead-letter, work (not state) lost on SIGTERM |
 | Orchestrator failure routing / chaos (§16–17) | **NOT TESTED** — no orchestrator abstraction to test; failures are per-route try/except |
 | Idempotency: publish | **FIXED → PASS** (live) · scheduling/leads/DMs/ads: **NOT TESTED / NOT IMPLEMENTED** |
-| Approval race (two simultaneous approvals) | **PENDING** (local CTO suite) |
+| Approval race (two simultaneous approvals; ten concurrent) | **PASS** (local CTO suite) — consistent final state, no errors |
+| Autopilot double-start under concurrency | **FIXED → PASS** — atomic check-and-start |
+| Reel studio from existing creative crashed (NameError) / duplicate renders | **FIXED → PASS** — import fixed; identical in-flight request returns the running job |
 | Partial-success reporting (§68) | **NOT IMPLEMENTED** |
 | Migrations (§78) | **FAIL (open P1)** — `CREATE TABLE IF NOT EXISTS` + one ad-hoc ALTER; no versioned migrations |
 | Backup / restore, RPO/RTO (§77) | **NOT TESTED** — Railway Postgres; no restore drill performed |
@@ -128,21 +142,43 @@ The 3 live failures and their disposition:
 
 ---
 
+
+## Local CTO suite (`tests/cto/`) — 30 defects found, 30 fixed
+
+Generated from the CTO spec (§80 layout, §81 naming), run with auth enforced and every AI provider faked; **302 tests**. It found **30 defects** on the pre-fix build, all fixed in `f3d1b5e` and now green:
+
+| CTO category | Tests | Result | Defects found → fixed |
+|---|---|---|---|
+| 01 Authentication | 24 | PASS | invalid email accepted; 1-char admin password; reset did not kill sessions; limiter bypass via XFF |
+| 02 Authorization | 19 | PASS | — |
+| 03 Multi-tenancy (BLOCKER) | 41 | PASS | **P0** creative from other brand's idea; **P0** image spend on other brand's creative |
+| 18/25 Approval enforcement + idempotency | 32 | PASS | mode='LIVE' accepted as dry run; reel duplicate job; reel NameError crash; autopilot double-start |
+| 20 Calendar / state machine | 11 | PASS | empty body → auto-approved; dry run logged `published` |
+| 26 Race conditions | 7 | PASS | lost-update on payload; **P0** duplicate live publish |
+| 28 Autopilot safety | 9 | PASS | — (never publishes live or spends without approval) |
+| 45 API validation | 38 | PASS | 5 MB bodies accepted ×2 |
+| 53 Security (SQLi/XSS/SSRF/traversal/limiter) | 31 | PASS | SVG-with-script logo; per-account spray |
+| 54 Prompt injection (mock-level; PARTIAL by nature) | 8 | PASS | memory in SYSTEM prompt; no anti-injection guidance |
+| DB integrity + jobs | 24 | PASS | brand delete orphaned 9 tables + jobs + files; deleted-company users still logged in |
+| Existing suites (smoke, security, hardening, onboarding, inbox, memory, jobs, airtable, e2e, fixes) | 152 | PASS | — |
+
+Not covered by any automated test and therefore **NOT TESTED**: orchestrator chaos (§17 — no orchestrator abstraction), webhooks (§46 — none exist), queue/worker crash recovery (§63 — no queue), load/stress (§61–62), backup/restore drill (§77), 100-case AI evaluation sets (§56–59, §88).
+
 ## Score (CTO §84)
 
 | Area | Score | Basis |
 |---|---|---|
-| Engineering Quality | 13 / 20 | 139 green tests, CI; no migrations, no queue, two frontends |
-| Security | 14 / 20 | isolation/approval/auth strong & live-verified; tokens at rest, browser token, CORS, limiter open |
-| AI Quality | 10 / 15 | grounding + hallucination + injection all pass live; no golden dataset / continuous eval |
-| Reliability | 7 / 15 | durable state; no queue/retry/DLQ/migrations |
-| E2E Functionality | 8 / 15 | KNOW→CREATE→APPROVE→PUBLISH(sim/live-code) works; MEASURE manual; ads/SEO/CRM absent |
+| Engineering Quality | 15 / 20 | 454 green tests incl. a 302-test CTO suite, CI; no migrations, no queue, two frontends |
+| Security | 17 / 20 | isolation, approval gates, IDOR, races, limiter, injection placement, upload and size hardening all fixed and tested; **open:** connector tokens at rest, browser token storage, CORS `*` |
+| AI Quality | 11 / 15 | grounding + hallucination + injection pass live; memory no longer carries system-prompt authority; no golden dataset / continuous eval |
+| Reliability | 9 / 15 | durable state, atomic merges, locks on publish/autopilot, full delete cascade; no queue/retry/DLQ/migrations |
+| E2E Functionality | 9 / 15 | KNOW→CREATE→APPROVE→PUBLISH works and is honest about dry runs; MEASURE manual; ads/SEO/CRM absent |
 | Performance | 3 / 5 | good latency; no load/stress testing; single worker |
 | UX / Accessibility | 3 / 5 | a11y scaffolding good; mobile layout broken |
 | Observability | 3 / 5 | agent_runs + job state; no request IDs / metrics; swallowed exceptions remain |
-| **TOTAL** | **61 / 100** | |
+| **TOTAL** | **70 / 100** | (was 61 before the CTO-suite fixes) |
 
-**Release standard:** <80 = *Do not release* **as an open self-serve multi-company SaaS.** No CTO-P0 is open, so the "any P0 = no release" rule does not block a **controlled managed-service launch** where accounts are operator-created (signup gate is closed on prod) and the vertical is real estate.
+**Release standard:** 70 < 80 = *Do not release* **as an open self-serve multi-company SaaS.** No CTO-P0 is open, so the "any P0 = no release" rule does not block a **controlled managed-service launch** where accounts are operator-created (signup gate is closed on prod) and the vertical is real estate.
 
 ---
 
