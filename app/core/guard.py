@@ -75,7 +75,10 @@ def rate_ok(key: str, limit: int, window_s: int) -> bool:
 def client_ip(request) -> str:
     xff = request.headers.get("x-forwarded-for", "")
     if xff:
-        return xff.split(",")[0].strip()
+        # The RIGHTMOST hop is the one appended by our own edge proxy; the first
+        # hop is whatever the client chose to send, so keying on it made the
+        # limiter bypassable with a rotating header.
+        return xff.split(",")[-1].strip()
     return getattr(getattr(request, "client", None), "host", "") or "unknown"
 
 

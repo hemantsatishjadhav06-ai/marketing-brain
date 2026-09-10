@@ -195,10 +195,12 @@ def _generate(brand, convo, transcript):
         "guarantees, availability, or legal claims, and always keep the door open to "
         "connect with the team. Be concise, warm and specific — one short paragraph "
         "suitable for a direct message.\n\n"
-        f"Brand context: {engine._brand_context(brand)}"
+        f"{engine.ANTI_INJECTION}\n\n"
+        f"Brand context: {engine._brand_context(brand, with_memory=False)}"
     )
     reply = engine._chat(
-        [{"role": "system", "content": system}, {"role": "user", "content": convo_text}],
+        [{"role": "system", "content": system},
+         {"role": "user", "content": convo_text + engine._memory_block(brand)}],
         max_tokens=400, temperature=0.6,
     )
     return _clean(reply)

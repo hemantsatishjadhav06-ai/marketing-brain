@@ -30,12 +30,31 @@ def _public_asset_url(brand, asset_path):
 def publish(bid: str, body: PublishIn, user=Depends(current_user)):
     b = _brand_or_404(bid, user)
     c = _doc_or_404("creatives", body.creative_id, bid)
+    if body.mode not in ("simulated", "live"):
+        # 'LIVE', 'production', ' live' used to fall through as a dry run and then be
+        # logged verbatim as status='published' — a post that never left the building.
+        raise HTTPException(400, "mode must be exactly 'simulated' or 'live'")
     channel = body.channel or c["channel"]
+    # One publish at a time per creative: the prior-row check and the platform
+    # call must be atomic or two concurrent clicks post twice.
+    with _publish_lock(body.creative_id):
+        return _publish_locked(b, c, bid, body, channel)
+
+
+_PUB_LOCKS: dict = {}
+_PUB_GUARD = threading.Lock()
+
+
+def _publish_lock(key):
+    with _PUB_GUARD:
+        return _PUB_LOCKS.setdefault(key, threading.Lock())
+
+
+def _publish_locked(b, c, bid, body, channel):
     caption = c["payload"].get("caption", "")
     ht = c["payload"].get("hashtags") or {}
-    tags = " ".join("#" + h.lstrip("#") for group in ht.values() for h in group)
+    tags = " ".join("#" + h.lstrip("#") for group in (ht.values() if isinstance(ht, dict) else []) if isinstance(group, (list, tuple)) for h in group)
     full_caption = (caption + "\n\n" + tags).strip()
-
     # Idempotency (CTO: "ONE published post, not two"). A live re-publish of a
     # creative that already went out on this channel is refused; an identical
     # simulated request within a minute returns the existing row instead of
@@ -67,7 +86,8 @@ def publish(bid: str, body: PublishIn, user=Depends(current_user)):
     else:
         result = {"simulated": True, "rendered_caption": full_caption,
                   "manual_checklist": connectors.manual_checklist(channel, c["payload"])}
-        status = "published" if not body.scheduled_for else "queued"
+        # A dry run is never "published": the log must not claim a post went out.
+        status = "simulated" if not body.scheduled_for else "queued"
 
     pid = db.insert_doc("publish_queue", bid, result, creative_id=body.creative_id, channel=channel,
                         scheduled_for=body.scheduled_for, mode=body.mode, status=status)

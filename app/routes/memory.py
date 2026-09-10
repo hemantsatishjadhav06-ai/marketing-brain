@@ -3,6 +3,7 @@
 Exposes what the system has learned about a brand so it can be inspected and
 corrected by a human, plus the audit trail behind every generated asset.
 """
+from pydantic import Field
 from fastapi import APIRouter
 from ._shared import *  # noqa: F401,F403
 from ..services import memory as mem
@@ -11,7 +12,7 @@ router = APIRouter()
 
 
 class MemoryIn(BaseModel):
-    content: str
+    content: str = Field(min_length=1, max_length=5000)
     kind: str = "rule"
     weight: float = 3.0
 

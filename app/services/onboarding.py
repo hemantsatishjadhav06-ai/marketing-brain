@@ -32,6 +32,9 @@ RESET_TTL = 3600            # 1 hour
 ROLES = ("admin", "owner", "client")
 
 
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]{2,}$")
+
+
 def signups_open() -> bool:
     return os.environ.get("SIGNUPS_OPEN", "").strip().lower() in {"1", "true", "yes", "on"}
 
@@ -65,14 +68,17 @@ def signup(company_name, website, email, password):
     email = (email or "").strip().lower()
     if not company_name or not email or not password:
         raise ValueError("company_name, email and password are required")
+    if not EMAIL_RE.match(email):
+        raise ValueError("enter a valid email address")
     if len(password) < 8:
         raise ValueError("password must be at least 8 characters")
     if db.get_user_by_email(email):
         raise ValueError("a user with this email already exists")
 
     bid = db.create_brand(company_name, _unique_slug(company_name), (website or "").strip(), {})
-    uid = db.create_user(email, auth.hash_pw(password), role="owner", brand_id=bid)
-    token = auth.make_token(uid, "owner", bid)
+    pw_hash = auth.hash_pw(password)
+    uid = db.create_user(email, pw_hash, role="owner", brand_id=bid)
+    token = auth.make_token(uid, "owner", bid, pwv=auth.pw_version(pw_hash))
     return {"brand_id": bid, "user_id": uid, "role": "owner", "email": email, "token": token}
 
 
@@ -118,10 +124,11 @@ def accept_invite(token, password):
     if db.get_user_by_email(email):
         db.update_doc(INVITE_TABLE, inv["id"], status="accepted")
         raise ValueError("a user with this email already exists")
-    uid = db.create_user(email, auth.hash_pw(password), role=inv.get("role") or "client",
+    pw_hash = auth.hash_pw(password)
+    uid = db.create_user(email, pw_hash, role=inv.get("role") or "client",
                          brand_id=inv.get("brand_id"))
     db.update_doc(INVITE_TABLE, inv["id"], status="accepted")
-    token_out = auth.make_token(uid, inv.get("role") or "client", inv.get("brand_id"))
+    token_out = auth.make_token(uid, inv.get("role") or "client", inv.get("brand_id"), pwv=auth.pw_version(pw_hash))
     return {"user_id": uid, "email": email, "role": inv.get("role"),
             "brand_id": inv.get("brand_id"), "token": token_out}
 

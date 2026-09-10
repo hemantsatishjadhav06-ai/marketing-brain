@@ -54,6 +54,21 @@ def create_app() -> FastAPI:
     app = FastAPI(title="Marketing Brain", version="3.0.0")
     app.add_middleware(CORSMiddleware, allow_origins=["*"],
                        allow_methods=["*"], allow_headers=["*"])
+
+    @app.middleware("http")
+    async def _limit_body_size(request, call_next):
+        # A 5 MB brand name or memory note was accepted and stored. Uploads
+        # (multipart) get a generous cap; JSON bodies a tight one.
+        try:
+            length = int(request.headers.get("content-length") or 0)
+        except ValueError:
+            length = 0
+        ctype = request.headers.get("content-type", "")
+        cap = 12 * 1024 * 1024 if ctype.startswith("multipart/") else 1024 * 1024
+        if length > cap:
+            from fastapi.responses import JSONResponse
+            return JSONResponse({"detail": "Request body too large"}, status_code=413)
+        return await call_next(request)
     for module in ROUTERS:
         app.include_router(module.router)
     ws_root = os.path.abspath(_shared.ws.WORKSPACES_ROOT)

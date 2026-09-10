@@ -2,15 +2,25 @@ from fastapi import APIRouter
 from ._shared import *  # noqa: F401,F403
 
 router = APIRouter()
+_AP_START = threading.Lock()
+
+
+def _start_autopilot(bid, body):
+    """Check-and-start under one lock: two simultaneous clicks used to both pass
+    the 'already running' test and launch two overlapping runs."""
+    with _AP_START:
+        if (_ap_get(bid) or {}).get("state") == "running":
+            return False
+        _ap_set(bid, state="running", log=[], started=time.time())
+        threading.Thread(target=_run_autopilot, args=(bid, body), daemon=True).start()
+        return True
 
 
 @router.post("/api/brands/{bid}/autopilot")
 def autopilot(bid: str, body: AutopilotIn, user=Depends(current_user)):
     b = _brand_or_404(bid, user)
-    if (_ap_get(bid) or {}).get("state") == "running":
+    if not _start_autopilot(bid, body):
         raise HTTPException(400, "Autopilot already running for this brand")
-    t = threading.Thread(target=_run_autopilot, args=(bid, body), daemon=True)
-    t.start()
     return {"ok": True, "started": bid}
 
 
@@ -19,8 +29,7 @@ def autopilot_all(body: AutopilotIn, user=Depends(current_user)):
     _admin_only(user)
     started = []
     for b in db.list_brands():
-        if b.get("status") == "ready" and (_ap_get(b["id"]) or {}).get("state") != "running":
-            threading.Thread(target=_run_autopilot, args=(b["id"], body), daemon=True).start()
+        if b.get("status") == "ready" and _start_autopilot(b["id"], body):
             started.append(b["name"])
             time.sleep(1)
     return {"ok": True, "started": started}

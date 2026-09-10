@@ -18,10 +18,7 @@ class BlueprintIn(BaseModel):
 
 
 def _patch(cid, **fields):
-    c = db.get_doc("creatives", cid) or {}
-    p = c.get("payload") or {}
-    p.update(fields)
-    db.update_doc("creatives", cid, payload=p)
+    db.merge_payload("creatives", cid, fields)
 
 
 def _run_brain(cid, b, topic, perspective, style):

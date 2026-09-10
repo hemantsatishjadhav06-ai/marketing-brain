@@ -1,3 +1,6 @@
+import hashlib
+import json
+
 from fastapi import APIRouter
 from ._shared import *  # noqa: F401,F403
 
@@ -29,8 +32,14 @@ def brand(bid: str, user=Depends(current_user)):
 @router.delete("/api/brands/{bid}")
 def remove_brand(bid: str, user=Depends(current_user)):
     _admin_only(user)
-    _brand_or_404(bid)
+    b = _brand_or_404(bid)
     db.delete_brand(bid)
+    # Tenant data includes the files on disk (profiles, scrapes, generated assets).
+    import shutil
+    root = os.path.realpath(ws.WORKSPACES_ROOT)
+    target = os.path.realpath(os.path.join(root, _wslug(b)))
+    if target != root and target.startswith(root + os.sep) and os.path.isdir(target):
+        shutil.rmtree(target, ignore_errors=True)
     return {"ok": True}
 
 
@@ -43,8 +52,19 @@ def reel_studio(bid: str, body: ReelStudioIn, user=Depends(current_user)):
         source = json.dumps({k: c["payload"].get(k) for k in ("title", "script", "caption")}, ensure_ascii=False)
     if len(source) < 10:
         raise HTTPException(400, "Describe the video idea, or pick an existing reel creative")
+    # Idempotency: an identical request while the same reel is still rendering
+    # returns the running job instead of spending a second render.
+    fp = hashlib.sha256(f"{bid}|{source}|{body.style}|{body.voice}".encode()).hexdigest()[:24]
+    running = dict(REEL_JOBS)
+    try:
+        running.update({k: v for k, v in db.list_jobs("reel").items() if k not in running})
+    except Exception:
+        pass
+    for jid, j in running.items():
+        if j.get("state") == "running" and j.get("brand_id") == bid and j.get("fingerprint") == fp:
+            return {"job_id": jid, "deduplicated": True}
     job_id = db.new_id()
-    _reel_set(job_id, state="running", creative_id=None, brand_id=bid)
+    _reel_set(job_id, state="running", creative_id=None, brand_id=bid, fingerprint=fp)
     threading.Thread(target=_run_reel_studio, args=(job_id, bid, source, body), daemon=True).start()
     return {"job_id": job_id}
 

@@ -76,9 +76,8 @@ def slides(bid: str, cid: str, user=Depends(current_user)):
         assets.append(_save_asset(b, rel, blob))
     if not assets:
         raise HTTPException(502, "Slide generation failed: " + ", ".join(errors))
-    payload = c["payload"]
-    payload["slide_assets"] = assets
-    db.update_doc("creatives", cid, payload=payload, asset_path=assets[0])
+    db.merge_payload("creatives", cid, {"slide_assets": assets})
+    db.update_doc("creatives", cid, asset_path=assets[0])
     return {"ok": True, "slides": [a if a.startswith("http") else f"/workspaces/{_wslug(b)}/{a}" for a in assets], "failed": errors}
 
 
@@ -99,10 +98,7 @@ def voiceover(bid: str, cid: str, user=Depends(current_user)):
         raise HTTPException(502, f"Voiceover failed: {e}")
     rel = f"{c['channel']}/assets/{cid}-vo.wav"
     ref = _save_asset(b, rel, audio)
-    payload = c["payload"]
-    payload["vo_asset"] = ref
-    payload["vo_text"] = vo_text[:500]
-    db.update_doc("creatives", cid, payload=payload)
+    db.merge_payload("creatives", cid, {"vo_asset": ref, "vo_text": vo_text[:500]})
     return {"ok": True, "vo_url": ref if ref.startswith("http") else f"/workspaces/{_wslug(b)}/{ref}", "vo_text": vo_text[:300]}
 
 
@@ -115,9 +111,7 @@ def algo_audit(bid: str, cid: str, user=Depends(current_user)):
         audit = ai_engine.algo_audit(b, c["payload"])
     except Exception as e:
         raise HTTPException(502, f"Algo audit failed: {e}")
-    payload = c["payload"]
-    payload["algo_audit"] = audit
-    db.update_doc("creatives", cid, payload=payload)
+    db.merge_payload("creatives", cid, {"algo_audit": audit})
     return audit
 
 
@@ -127,10 +121,8 @@ def set_approval(bid: str, cid: str, body: ApprovalIn, user=Depends(current_user
     c = _doc_or_404("creatives", cid, bid)
     if body.state not in ("approved", "changes_requested"):
         raise HTTPException(400, "state must be approved or changes_requested")
-    payload = c["payload"]
-    payload["approval"] = {"state": body.state, "comment": body.comment[:1000],
-                           "by": user.get("uid"), "role": user.get("role"), "at": time.time()}
-    db.update_doc("creatives", cid, payload=payload)
+    db.merge_payload("creatives", cid, {"approval": {"state": body.state, "comment": body.comment[:1000],
+                                                     "by": user.get("uid"), "role": user.get("role"), "at": time.time()}})
     # An approve/reject is the strongest signal the system gets — record it so the
     # next brief already knows, instead of repeating a correction the operator
     # has already made.

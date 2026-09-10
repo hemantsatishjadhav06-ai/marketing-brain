@@ -44,6 +44,12 @@ def check_pw(pw, stored):
     return hmac.compare_digest(hashlib.sha256((salt + pw).encode()).hexdigest(), h)
 
 
+def pw_version(pw_hash):
+    """Short fingerprint of the stored hash. Embedded in tokens so a password
+    change/reset invalidates every session issued before it."""
+    return hashlib.sha256((pw_hash or "").encode()).hexdigest()[:12]
+
+
 def needs_rehash(stored):
     return not (stored or "").startswith(f"pbkdf2${PBKDF2_ITERS}$")
 
@@ -52,8 +58,10 @@ def _sign(raw):
     return hmac.new(SECRET.encode(), raw.encode(), hashlib.sha256).hexdigest()[:40]
 
 
-def make_token(uid, role, brand_id=""):
+def make_token(uid, role, brand_id="", pwv=""):
     payload = {"uid": uid, "role": role, "brand_id": brand_id or "", "exp": time.time() + TOKEN_TTL}
+    if pwv:
+        payload["pwv"] = pwv
     raw = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode().rstrip("=")
     return raw + "." + _sign(raw)
 

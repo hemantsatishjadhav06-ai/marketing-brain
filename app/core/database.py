@@ -326,16 +326,25 @@ def list_brands():
     return [_brand_row(r) for r in rows]
 
 
+BRAND_SCOPED_TABLES = ("ideas", "calendar_items", "creatives", "publish_queue", "metrics",
+                       "connector_settings", "competitors", "brand_memory", "agent_runs",
+                       "conversations", "messages", "invites", "password_resets", "gen_usage", "users")
+
+
 def delete_brand(bid):
+    """Delete a company and everything scoped to it. Only 6 of 15 brand-scoped tables
+    used to be cleaned, leaving memory, conversations, runs, invites and — worst — the
+    company's users (who could still log in) pointing at a brand that no longer existed."""
     if IS_REST:
-        for t in ("ideas", "calendar_items", "creatives", "publish_queue", "metrics", "connector_settings"):
+        for t in BRAND_SCOPED_TABLES:
             _rest("DELETE", t, params={"brand_id": f"eq.{bid}"})
+        _rest("DELETE", "jobs", params={"job_key": f"eq.{bid}"})
         _rest("DELETE", "brands", params={"id": f"eq.{bid}"})
         return
     with _lock, _conn() as c:
-        for t in ("ideas", "calendar_items", "creatives", "publish_queue", "metrics"):
+        for t in BRAND_SCOPED_TABLES:
             c.execute(f"DELETE FROM {t} WHERE brand_id=?", (bid,))
-        c.execute("DELETE FROM connector_settings WHERE brand_id=?", (bid,))
+        c.execute("DELETE FROM jobs WHERE job_key=? OR extra LIKE ?", (bid, f'%"brand_id": "{bid}"%'))
         c.execute("DELETE FROM brands WHERE id=?", (bid,))
 
 
@@ -527,6 +536,24 @@ def update_doc(table, did, **fields):
         c.execute(f"UPDATE {table} SET {','.join(keys)} WHERE id=?", vals)
 
 
+def merge_payload(table, did, patch):
+    """Atomically merge keys into a document's JSON payload. Route handlers used to
+    read the payload, mutate it and write it back — two concurrent writers (an
+    approval and an algo-audit) each erased the other's field."""
+    if IS_REST:
+        rows = _rest("GET", table, params={"id": f"eq.{did}", "select": "payload"})
+        cur = json.loads(rows[0]["payload"] or "{}") if rows else {}
+        cur.update(patch)
+        _rest("PATCH", table, params={"id": f"eq.{did}"}, body={"payload": json.dumps(cur)})
+        return cur
+    with _lock, _conn() as c:
+        r = c.execute(f"SELECT payload FROM {table} WHERE id=?", (did,)).fetchone()
+        cur = json.loads((dict(r)["payload"] if r else None) or "{}")
+        cur.update(patch)
+        c.execute(f"UPDATE {table} SET payload=? WHERE id=?", (json.dumps(cur), did))
+    return cur
+
+
 def delete_docs(table, brand_id, **where):
     if IS_REST:
         params = {"brand_id": f"eq.{brand_id}"}
@@ -614,7 +641,7 @@ def get_user(uid):
         rows = _rest("GET", "users", params={"id": f"eq.{uid}"})
         return dict(rows[0]) if rows else None
     with _conn() as c:
-        r = c.execute("SELECT id,email,role,brand_id,created_at FROM users WHERE id=?", (uid,)).fetchone()
+        r = c.execute("SELECT id,email,role,brand_id,pw_hash,created_at FROM users WHERE id=?", (uid,)).fetchone()
     return dict(r) if r else None
 
 

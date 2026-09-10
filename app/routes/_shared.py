@@ -142,6 +142,8 @@ def current_user(authorization: str = Header(default="")):
     u = db.get_user(payload.get("uid", ""))
     if not u:
         raise HTTPException(401, "This account no longer exists")
+    if payload.get("pwv") and payload["pwv"] != auth.pw_version(u.get("pw_hash", "")):
+        raise HTTPException(401, "Your password changed — please sign in again")
     payload["role"] = u.get("role") or payload.get("role")
     payload["brand_id"] = u.get("brand_id") or ""
     payload["email"] = u.get("email") or payload.get("email", "")
