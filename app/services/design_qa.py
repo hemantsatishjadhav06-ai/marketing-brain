@@ -238,7 +238,7 @@ def fix(brand, creative, review_result: dict | None = None, max_regens: int = 1)
     # 1. mechanical
     if "crop_to_target" in (rv.get("checks") or {}).get("fixes", []) and cur_blob:
         cur_blob = crop_to_target(cur_blob, channel, fmt)
-        rel = f"{channel}/assets/{cid}-qa.png"
+        rel = f"{channel}/assets/{cid}-qa{int(time.time())}.png"   # never overwrite an earlier version
         cur_asset = sh._save_asset(brand, rel, cur_blob)
         applied.append("cropped/resized to the platform ratio")
         rv2 = review(brand, {**creative, "asset_path": cur_asset}, cur_blob)
@@ -255,7 +255,7 @@ def fix(brand, creative, review_result: dict | None = None, max_regens: int = 1)
             # The regenerated file must also be the platform's ratio.
             if new_blob and "crop_to_target" in checks(new_blob, channel, fmt)["fixes"]:
                 new_blob = crop_to_target(new_blob, channel, fmt)
-                new_asset = sh._save_asset(brand, f"{channel}/assets/{cid}-qa2.png", new_blob)
+                new_asset = sh._save_asset(brand, f"{channel}/assets/{cid}-qa{int(time.time())}r.png", new_blob)
                 db.update_doc("creatives", cid, asset_path=new_asset)
                 new_creative = db.get_doc("creatives", cid)
                 applied.append("regenerated file cropped/resized to the platform ratio")
@@ -266,7 +266,11 @@ def fix(brand, creative, review_result: dict | None = None, max_regens: int = 1)
                 cur_blob, cur_asset, cur_score, rv = new_blob, new_creative.get("asset_path"), rv_new.get("score"), rv_new
             else:
                 applied.append("regeneration scored lower — kept the previous version")
-                db.update_doc("creatives", cid, asset_path=cur_asset)
+                # the raw regenerate overwrote {cid}.png; if that was the version we are keeping, restore it from the snapshot
+                keep = cur_asset if (cur_asset and not str(cur_asset).endswith(f"{cid}.png")) else (snapshot or cur_asset)
+                cur_asset = keep
+                db.update_doc("creatives", cid, asset_path=keep)
+                regen["discarded_asset"] = new_creative.get("asset_path")
         except Exception as e:
             regen = {"error": str(getattr(e, "detail", e))[:200]}
     elif cur_asset != before_asset:

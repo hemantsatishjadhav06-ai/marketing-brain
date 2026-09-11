@@ -15,6 +15,7 @@ import pytest
 os.environ.setdefault("DB_PATH", os.path.join(tempfile.mkdtemp(), "dqa.db"))
 os.environ.setdefault("WORKSPACES_ROOT", tempfile.mkdtemp())
 os.environ.pop("DIRECT_ACCESS", None)
+os.environ["BG_SYNC"] = "1"   # design-fix runs as a pool job; inline in tests
 
 from fastapi.testclient import TestClient  # noqa: E402
 from PIL import Image  # noqa: E402
@@ -93,9 +94,9 @@ def test_FIX_mechanical_only_when_score_is_good(vision):
     b = _brand(); c = _creative(b, png(1600, 900))
     out = design_qa.fix(b, c)
     assert out["ok"] and "cropped/resized to the platform ratio" in out["applied"]
-    assert out["after"]["asset"].endswith("-qa.png") and out["after"]["score"] == 90
+    assert "-qa" in out["after"]["asset"] and out["after"]["score"] == 90
     c2 = db.get_doc("creatives", c["id"])
-    assert c2["asset_path"].endswith("-qa.png") and c2["payload"]["design_qa"]["publish_ready"]
+    assert "-qa" in c2["asset_path"] and c2["payload"]["design_qa"]["publish_ready"]
     assert c2["payload"]["asset_history"][0]["asset"].split("-v")[0].endswith(c["id"])   # snapshot of the original pixels
     assert out["before"]["asset"] == c2["payload"]["asset_history"][0]["asset"] and out["before"]["score"] == 74
     assert Image.open(io.BytesIO(design_qa.load_asset(b, c2["asset_path"]))).size == (1080, 1350)
@@ -122,8 +123,9 @@ def test_FIX_keeps_original_when_regeneration_is_worse(vision, monkeypatch):
                                                                                "regenerate": True, "revised_image_prompt": "np"})
     out = design_qa.fix(b, c)
     assert "kept the previous version" in " ".join(out["applied"])
-    assert db.get_doc("creatives", c["id"])["asset_path"] == c["asset_path"]
-    assert db.get_doc("creatives", c["id"])["payload"]["asset_history"] == []   # nothing replaced, nothing to keep
+    kept = db.get_doc("creatives", c["id"])["asset_path"]
+    assert "-v" in kept and design_qa.load_asset(b, kept) == png(1080, 1350)   # the original pixels, restored from the snapshot
+    assert out["regen"]["discarded_asset"] and db.get_doc("creatives", c["id"])["payload"]["asset_history"] == []
     assert out["publish_ready"] is False
 
 
@@ -133,7 +135,7 @@ def test_ROUTES_review_and_fix(vision):
     assert r.status_code == 200 and r.json()["score"] == 74
     assert db.get_doc("creatives", c["id"])["payload"]["design_review"]["score"] == 74
     r = client.post(f"/api/brands/{b['id']}/creatives/{c['id']}/design-fix", headers=h)
-    assert r.status_code == 200 and r.json()["applied"]
+    assert r.status_code == 200 and r.json()["applied"] and r.json()["job_id"] and r.json()["state"] == "done"
     # no visual → 400; other brand's creative → 404
     bare = db.insert_doc("creatives", b["id"], {"title": "x"}, channel="instagram", format="post")
     assert client.post(f"/api/brands/{b['id']}/creatives/{bare}/design-review", headers=h).status_code == 400
@@ -164,7 +166,7 @@ def test_FIX_recrops_regenerated_square_and_forbids_text(vision, monkeypatch):
     assert "regenerated file cropped/resized to the platform ratio" in out["applied"]
     assert seen["prompt"].startswith("PURELY VISUAL") and "sunlit balcony" in seen["prompt"] and seen["aspect"] == "4:5"
     final = db.get_doc("creatives", c["id"])
-    assert final["asset_path"].endswith("-qa2.png")
+    assert final["asset_path"].endswith("r.png") and "-qa" in final["asset_path"]
     assert Image.open(io.BytesIO(design_qa.load_asset(b, final["asset_path"]))).size == (1080, 1350)
     assert out["after"]["score"] == 90 and out["publish_ready"]
 

@@ -135,16 +135,28 @@ def design_review(bid: str, cid: str, user=Depends(current_user)):
 def design_fix(bid: str, cid: str, user=Depends(current_user)):
     """Review, then fix: mechanical crop/resize, one regenerate with the revised
     art direction if needed, keep the better version. Before/after kept."""
-    from ..services import design_qa
+    from ..services import agency_pool, design_qa
     b = _brand_or_404(bid, user)
     c = _doc_or_404("creatives", cid, bid)
     if not c.get("asset_path"):
         raise HTTPException(400, "This creative has no visual yet — generate one first")
     _gen_guard(bid)
-    out = design_qa.fix(b, c)
-    if not out.get("ok"):
-        raise HTTPException(400, out.get("error", "fix failed"))
-    return out
+    # Review + regenerate + review again takes 1–3 minutes — longer than an edge
+    # proxy allows — so it runs as a pool job; poll /api/agency/jobs/{job_id}.
+    def run(log):
+        log("art director reviewing")
+        out = design_qa.fix(b, c)
+        if not out.get("ok"):
+            raise RuntimeError(out.get("error", "fix failed"))
+        log(f"done: {(out.get('after') or {}).get('score')} · {', '.join(out.get('applied') or []) or 'no change'}")
+        return out
+    j = agency_pool.POOL.submit(bid, "design_fix", run, meta={"creative_id": cid})
+    resp = {"job_id": j["id"], "state": j["state"], "creative_id": cid}
+    if j.get("state") == "done" and j.get("result"):
+        resp.update(j["result"])
+    elif j.get("state") == "failed":
+        raise HTTPException(400, j.get("error") or "fix failed")
+    return resp
 
 
 @router.post("/api/brands/{bid}/creatives/{cid}/approval")

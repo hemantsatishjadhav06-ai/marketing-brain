@@ -1343,7 +1343,10 @@ function renderDesignQA(b,q){
 }
 async function designFix(cid,btn){
   busy(btn,true,"Art director reviewing…");
-  try{ const r=await api(`/brands/${state.brand.id}/creatives/${cid}/design-fix`,"POST"); toast(r.publish_ready?`Design ${r.after.score}/100 — publish-ready`:`Design ${r.after.score??"—"}/100 — see issues`, !r.publish_ready); openReview(cid); }
+  try{ let r=await api(`/brands/${state.brand.id}/creatives/${cid}/design-fix`,"POST");
+    let n=0; while(r.job_id && !["done","failed"].includes(r.state) && n<90){ await new Promise(x=>setTimeout(x,3000)); const j=await api(`/agency/jobs/${r.job_id}`); r={...r,state:j.state,...(j.result||{}),error:j.error}; if(btn&&j.log&&j.log.length) btn.innerHTML='<span class="spinner"></span>'+esc(j.log[j.log.length-1].slice(9,60)); n++; }
+    if(r.state==="failed") throw new Error(r.error||"Design fix failed");
+    const sc=(r.after||{}).score; toast(r.publish_ready?`Design ${sc}/100 — publish-ready`:`Design ${sc??"—"}/100 — see issues`, !r.publish_ready); openReview(cid); }
   catch(e){ toast(e.message,true); busy(btn,false); }
 }
 async function openReview(cid){
