@@ -179,3 +179,11 @@ def test_REGEN_PROMPT_never_asks_for_text_or_charts():
     rv2 = {"revised_image_prompt": "infographic", "scene_prompt": "A young couple receiving keys on a sunlit balcony in Kokapet, navy and orange accents"}
     body2 = design_qa.regen_prompt(rv2).split("the caption carries the message. ", 1)[1]
     assert "sunlit balcony" in body2 and "infographic" not in body2
+
+
+def test_REGEN_PROMPT_anchors_the_scene_to_the_client_market():
+    from app.services import brand_config
+    b = _brand()
+    brand_config.set(b["id"], {"vertical": "real_estate", "market_brief": {"location": "Kokapet, Hyderabad", "offer": "landlord-share flats", "audience": "first-home buyers"}})
+    p = design_qa.regen_prompt({"scene_prompt": "a family at home at dusk"}, db.get_brand(b["id"]))
+    assert "Kokapet, Hyderabad" in p and "landlord-share flats" in p and "never a detached suburban house" in p

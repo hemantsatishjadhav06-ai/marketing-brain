@@ -200,14 +200,32 @@ _TEXTY = re.compile(r"\b(infographic|chart|graph|diagram|table|breakdown|compari
                     r"headline|text|numbers?|percentages?|statistics|data visuali[sz]ation|bar[- ]chart|pie[- ]chart)\b", re.I)
 
 
-def regen_prompt(rv: dict) -> str:
+def regen_prompt(rv: dict, brand: dict | None = None) -> str:
     """The prompt we actually regenerate with. Generated images cannot be trusted to
     render text, so the regeneration NEVER asks for text, charts or labels: prefer
     the reviewer's text-free scene, strip chart/infographic language from any
-    fallback, and state the rule up front. The caption carries the message."""
+    fallback, and state the rule up front. The caption carries the message.
+
+    The scene is anchored to the client's market: image models default to a
+    generic Western setting (a clapboard house for a Hyderabad apartment brand),
+    so the location, the product and the people must be named explicitly."""
     base = (rv.get("scene_prompt") or "").strip() or _TEXTY.sub("scene", (rv.get("revised_image_prompt") or "").strip())
+    anchor = ""
+    if brand:
+        cfg = brand_config.get(brand)
+        mb = cfg.get("market_brief") or {}
+        bits = []
+        if mb.get("location"):
+            bits.append(f"Setting: {mb['location']} — architecture, streets, light and people must look authentically local to {mb['location'].split(',')[0]}")
+        if mb.get("offer"):
+            bits.append(f"Product shown: {mb['offer']}")
+        if mb.get("audience"):
+            bits.append(f"People: {mb['audience']}")
+        if cfg.get("vertical") == "real_estate":
+            bits.append("Show apartments/high-rise living, never a detached suburban house")
+        anchor = (" " + ". ".join(bits) + ".") if bits else ""
     return ("PURELY VISUAL scene — ABSOLUTELY NO text, numbers, labels, charts, infographics, diagrams or UI of any kind; "
-            "the caption carries the message. " + base)
+            "the caption carries the message. " + base + anchor)
 
 
 def fix(brand, creative, review_result: dict | None = None, max_regens: int = 1) -> dict:
@@ -248,7 +266,7 @@ def fix(brand, creative, review_result: dict | None = None, max_regens: int = 1)
     regen = None
     if (rv.get("regenerate") or (cur_score is not None and cur_score < min_score)) and (rv.get("revised_image_prompt") or rv.get("scene_prompt")) and max_regens > 0:
         try:
-            prompt = regen_prompt(rv)
+            prompt = regen_prompt(rv, brand)
             sh._generate_image(brand, cid, prompt_override=prompt)
             new_creative = db.get_doc("creatives", cid)
             new_blob = load_asset(brand, new_creative.get("asset_path") or "")
