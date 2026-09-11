@@ -148,7 +148,7 @@ ol,ul{{max-width:80ch}}li{{margin-bottom:8px}}
 <tr><td>Channels set up</td><td>{esc(", ".join((brand.get("setup") or {}).get("channels", [])))}</td></tr></table></div>
 
 <h2>2 · The journey, step by step</h2>
-<p>Each row is a real API call against production. FAIL rows in the first pass were traced and fixed (section 6); this is the final run.</p>
+<p>Each row is a real API call against production. FAIL rows in the first pass were traced and fixed (section 6); this is the final run. Onboarding ran in the first pass — scrape <span class="mono">done</span>, AI analysis <span class="mono">done</span>, workspace <span class="mono">done</span>, brand <span class="mono">ready</span> — and later passes reused that ready client, which is why step 01 reads "reusing".</p>
 <div class="tw"><table><tr><th>#</th><th>Step</th><th>Result</th><th>Evidence</th></tr>{step_rows()}</table></div>
 
 <h2>3 · Paid promotion: what the planner produces</h2>
@@ -206,7 +206,7 @@ open(OUT_HTML, "w").write(HTML)
 md = [f"# Neopolis Infra — CTO launch-readiness run ({E['run']})", "",
       f"Production: {E['base']} · client site: {E['site']} · brand kept: `{E.get('brand_id')}`", "",
       f"**Result: {E['pass']}/{E['pass']+E['fail']} steps passed.** Nothing published live and no money moved — every live action was refused with a clear reason because no client account is connected yet.", "",
-      "## Steps", "", "| # | Step | Result | Evidence |", "|---|---|---|---|"]
+      "Onboarding ran in the first pass (scrape done, AI analysis done, workspace done, brand ready); later passes reused the ready client.", "", "## Steps", "", "| # | Step | Result | Evidence |", "|---|---|---|---|"]
 md += [f"| {s['step'][:2]} | {s['step'][3:]} | {s['status']} | {s['detail'][:140].replace('|','/')} |" for s in steps]
 md += ["", "## Paid promotion (Meta)", "", f"Campaign: {mp.get('campaign',{}).get('name')} · ₹{b.get('daily_total')}/day (cap ₹{b.get('cap')}) · special category {comp.get('special_ad_category')}", "",
        "| Ad set | Location | Age | Gender | Interests | Placements | Budget |", "|---|---|---|---|---|---|---|"]
