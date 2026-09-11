@@ -66,8 +66,17 @@ try:
     rec("10 branded visual generated (logo composited)", r.status_code == 200 and r.json().get("ok"), r.json() if r.status_code == 200 else r.text[:200]); art["asset_url"] = (r.json() if r.status_code == 200 else {}).get("asset_url")
     r = c.post(f"/api/brands/{bid}/creatives/{cid}/algo-audit", headers=H)
     rec("11 Instagram algo audit (7 ranking signals, weighted score)", r.status_code == 200 and isinstance(r.json().get("algo_score"), (int, float)), {"algo_score": r.json().get("algo_score"), "signals": [(x.get("signal"), x.get("score")) for x in r.json().get("signals", [])], "verdict": str(r.json().get("verdict"))[:100]} if r.status_code == 200 else r.text[:200]); art["algo_audit"] = r.json() if r.status_code == 200 else None
-    q = c.get("/api/approvals", headers=H).json()
-    rec("12 creative waiting in approval centre", any(i["id"] == cid for i in q["waiting_for_approval"]), q["counts"])
+    q = {}
+    for _ in range(3):  # a redeploy swap can answer 502 for a few seconds
+        rq = c.get("/api/approvals", headers=H)
+        try:
+            q = rq.json()
+        except Exception:
+            q = {}
+        if "waiting_for_approval" in q:
+            break
+        time.sleep(5)
+    rec("12 creative waiting in approval centre", any(i["id"] == cid for i in q.get("waiting_for_approval", [])), q.get("counts", rq.status_code))
     r = c.post(f"/api/brands/{bid}/creatives/{cid}/approval", headers=H, json={"state": "approved", "comment": "ok"})
     rec("13 human approval captured → memory", r.status_code == 200 and r.json()["payload"]["approval"]["state"] == "approved")
     mem = c.get(f"/api/brands/{bid}/memory", headers=H).json(); rec("14 brand memory learned from approval", mem["count"] >= 1, [m.get("content", "")[:80] for m in mem["memory"][:2]])
