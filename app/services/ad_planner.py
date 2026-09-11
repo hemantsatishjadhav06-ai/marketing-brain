@@ -173,10 +173,23 @@ def apply_special_category(adset: dict, category: str) -> list:
     if t.get("exclusions"):
         notes.append("detailed-targeting exclusions removed (HOUSING)")
     t["exclusions"] = []
-    if t.get("lookalike"):
+    if t.get("lookalike") and not str(t["lookalike"]).startswith("Special Ad Audience"):
         notes.append("lookalike replaced by Special Ad Audience (HOUSING)")
         t["lookalike"] = "Special Ad Audience (from " + str(t["lookalike"]) + ")"
     return notes
+
+
+def _fix_schedule(sched: dict) -> dict:
+    """Models like to propose dates in the past; a schedule never starts before today."""
+    sched = dict(sched or {})
+    today = time.strftime("%Y-%m-%d")
+    start = str(sched.get("start") or "")
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", start) or start < today:
+        sched["start"] = today
+    end = sched.get("end")
+    if end and (not re.match(r"^\d{4}-\d{2}-\d{2}$", str(end)) or str(end) <= sched["start"]):
+        sched["end"] = None
+    return sched
 
 
 def normalize_meta(plan: dict, brand: dict, budget: float, currency: str, objective: str) -> dict:
@@ -206,7 +219,7 @@ def normalize_meta(plan: dict, brand: dict, budget: float, currency: str, object
         t["age_max"] = int(max(t["age_min"], min(65, _num(t.get("age_max"), 65))))
         for k in ("interests", "behaviors", "custom_audiences", "exclusions", "languages", "genders"):
             t[k] = [str(x) for x in (t.get(k) or [])][:25]
-        s.setdefault("schedule", {"start": time.strftime("%Y-%m-%d"), "end": None, "dayparting": "all day"})
+        s["schedule"] = _fix_schedule(s.get("schedule") or {"dayparting": "all day"})
         for n in apply_special_category(s, category):
             notes.append(f"{s['name']}: {n}")
     _split(total, sets)

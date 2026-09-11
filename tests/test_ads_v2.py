@@ -8,6 +8,7 @@ connect validates fields, test-connection is read-only and records status.
 """
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 import uuid
@@ -322,3 +323,17 @@ def test_HUB_manual_channel_probe_needs_no_network():
     r = channel_catalog.probe("youtube", {"channel_id": "UC123"})
     assert r["ok"] and "manual" in r["detail"]
     assert channel_catalog.probe("webhook", {"url": "http://127.0.0.1/x"})["ok"] is False
+
+
+def test_PLAN_schedule_never_in_the_past_and_lookalike_not_double_wrapped():
+    import time as _t
+    b = db.get_brand(_brand("real_estate"))
+    raw = json.loads(json.dumps(META_RAW)) if False else __import__("copy").deepcopy(META_RAW)
+    raw["ad_sets"][0]["schedule"] = {"start": "2023-10-01", "end": "2023-09-01", "dayparting": "9am-10pm"}
+    p = ad_planner.normalize_meta(raw, b, 1000, "INR", "OUTCOME_LEADS")
+    today = _t.strftime("%Y-%m-%d")
+    assert p["ad_sets"][0]["schedule"]["start"] == today and p["ad_sets"][0]["schedule"]["end"] is None
+    assert p["ad_sets"][0]["schedule"]["dayparting"] == "9am-10pm"
+    # an operator edit re-normalises: the Special Ad Audience wrapper must not nest
+    p2 = ad_planner.apply_edit(p, {"ad_sets": p["ad_sets"]}, b, "meta")
+    assert p2["ad_sets"][0]["targeting"]["lookalike"].count("Special Ad Audience") == 1

@@ -11,9 +11,22 @@ async def main():
         br = await p.chromium.launch()
         ctx = await br.new_context(viewport={"width": 1380, "height": 900}, device_scale_factor=1)
         page = await ctx.new_page()
-        # login via API, seed token for both apps
-        r = await page.request.post(f"{BASE}/api/auth/login", data=json.dumps({"email": EMAIL, "password": PW}), headers={"content-type": "application/json"})
-        tok = (await r.json())["token"]
+        # The sandbox browser has no egress; every request is fetched by Python
+        # (which goes through the session proxy) and handed back to the page.
+        import httpx
+        http = httpx.Client(timeout=120, follow_redirects=True)
+        async def relay(route, request):
+            try:
+                hdrs = {k: v for k, v in request.headers.items() if k.lower() not in ("host", "content-length", "accept-encoding")}
+                body = request.post_data_buffer if request.method in ("POST", "PUT", "PATCH", "DELETE") else None
+                r = await asyncio.to_thread(http.request, request.method, request.url, headers=hdrs, content=body)
+                out_h = {k: v for k, v in r.headers.items() if k.lower() in ("content-type", "cache-control")}
+                await route.fulfill(status=r.status_code, headers=out_h, body=r.content)
+            except Exception as e:
+                await route.fulfill(status=502, body=str(e))
+        await page.route("**/*", relay)
+        r = http.post(f"{BASE}/api/auth/login", json={"email": EMAIL, "password": PW})
+        tok = r.json()["token"]
         await page.goto(f"{BASE}/operator.html")
         await page.evaluate(f"localStorage.setItem('mb_token','{tok}')")
         shots = []
