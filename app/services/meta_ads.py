@@ -62,24 +62,37 @@ def launch(creds, plan: dict, status: str = "PAUSED") -> dict:
             r.raise_for_status()
             return r.json()
 
+        category = ((plan.get("campaign") or {}).get("special_ad_category")
+                    or (plan.get("compliance") or {}).get("special_ad_category") or "NONE")
         camp = post(f"{acct}/campaigns", {
             "name": plan.get("name", "Marketing Brain campaign")[:120],
             "objective": plan.get("objective", "OUTCOME_LEADS"),
             "status": "PAUSED",
-            "special_ad_categories": "[]",
+            # HOUSING / CREDIT / EMPLOYMENT must be declared or Meta rejects/limits the campaign.
+            "special_ad_categories": _json([category] if category and category != "NONE" else []),
         })
         out["campaign_id"] = camp["id"]
-        adset = post(f"{acct}/adsets", {
-            "name": (plan.get("name", "Ad set") + " — set")[:120],
-            "campaign_id": camp["id"],
-            "daily_budget": _minor_units(plan.get("daily_budget", 0), cur),
-            "billing_event": "IMPRESSIONS",
-            "optimization_goal": plan.get("optimization_goal", "LEAD_GENERATION"),
-            "bid_strategy": "LOWEST_COST_WITHOUT_CAP",
-            "targeting": _json(plan.get("targeting") or {"geo_locations": {"countries": ["IN"]}}),
-            "status": "PAUSED",
-        })
-        out["adset_id"] = adset["id"]
+        # v2 plans carry several ad sets (audiences); v1 plans carry one flat targeting spec.
+        sets = plan.get("ad_sets") or [{"name": plan.get("name", "Ad set") + " — set",
+                                        "daily_budget": plan.get("daily_budget", 0),
+                                        "optimization_goal": plan.get("optimization_goal", "LEAD_GENERATION"),
+                                        "targeting_spec": plan.get("targeting")}]
+        out["adset_ids"] = []
+        for s in sets:
+            spec = s.get("targeting_spec") or _spec_from_plan(s, category)
+            adset = post(f"{acct}/adsets", {
+                "name": s.get("name", "Ad set")[:120],
+                "campaign_id": camp["id"],
+                "daily_budget": _minor_units(s.get("daily_budget", plan.get("daily_budget", 0)), cur),
+                "billing_event": "IMPRESSIONS",
+                "optimization_goal": s.get("optimization_goal", "LEAD_GENERATION"),
+                "bid_strategy": s.get("bid_strategy", "LOWEST_COST_WITHOUT_CAP"),
+                "targeting": _json(spec),
+                "status": "PAUSED",
+            })
+            out["adset_ids"].append(adset["id"])
+        out["adset_id"] = out["adset_ids"][0]
+        adset = {"id": out["adset_id"]}
         if creds.get("page_id") and plan.get("creative"):
             cr = plan["creative"]
             creative = post(f"{acct}/adcreatives", {
@@ -102,6 +115,23 @@ def launch(creds, plan: dict, status: str = "PAUSED") -> dict:
             out["ad_id"] = ad["id"]
     out["status"] = "created_paused"
     return out
+
+
+def _spec_from_plan(adset: dict, category: str) -> dict:
+    """Readable v2 targeting → Graph targeting spec. Cities need Meta location keys
+    (looked up in Ads Manager), so they are passed as a hint and the country as the
+    hard geo; special-category limits are re-applied here as the last line."""
+    t = adset.get("targeting") or {}
+    geo = t.get("geo") or {}
+    spec = {"geo_locations": {"countries": geo.get("countries") or ["IN"]},
+            "age_min": int(t.get("age_min") or 18), "age_max": int(t.get("age_max") or 65)}
+    if category == "HOUSING":
+        spec["age_min"], spec["age_max"] = 18, 65
+    elif t.get("genders"):
+        spec["genders"] = [1 if str(g).lower().startswith("m") else 2 for g in t["genders"]]
+    plats = sorted({p.split("_")[0] for p in (adset.get("placements") or [])} or {"facebook", "instagram"})
+    spec["publisher_platforms"] = plats
+    return spec
 
 
 def _activate(cli, tok, obj_id, active=True):

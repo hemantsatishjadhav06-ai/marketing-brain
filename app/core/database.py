@@ -665,6 +665,14 @@ def set_connector(brand_id, platform, credentials):
             )
 
 
+def delete_connector(brand_id, platform):
+    if IS_REST:
+        _rest("DELETE", "connector_settings", params={"brand_id": f"eq.{brand_id}", "platform": f"eq.{platform}"})
+        return
+    with _lock, _conn() as c:
+        c.execute("DELETE FROM connector_settings WHERE brand_id=? AND platform=?", (brand_id, platform))
+
+
 # ---------- users ----------
 
 def create_user(email, pw_hash, role="client", brand_id=""):

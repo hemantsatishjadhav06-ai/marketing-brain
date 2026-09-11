@@ -12,6 +12,7 @@ from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
 from ._shared import *  # noqa: F401,F403
+from ..services import ad_planner, channel_catalog
 from ..core import guard
 from ..services import meta_ads, google_ads, email_marketing, seo_tools, whatsapp
 
@@ -93,20 +94,68 @@ def channels_status(bid: str, user=Depends(current_user)):
     out = {}
     for ch, meta in CHANNELS.items():
         out[ch] = {"label": meta["label"], "kind": meta["kind"],
-                   "connected": ch in saved, "setup_guide": meta["guide"]}
+                   "connected": ch in saved, "setup_guide": meta["guide"],
+                   "last_test": (saved.get(ch) or {}).get("_status")}
     out["_limits"] = {"max_daily_ad_budget": guard.max_daily_budget(),
                       "ad_spend_enabled": guard.ad_spend_enabled()}
     return out
+
+
+@router.get("/api/channels/catalog")
+def channel_catalog_public(user=Depends(current_user)):
+    """Every channel the product can connect, what it can do today, and how."""
+    return {"groups": channel_catalog.GROUPS, "channels": channel_catalog.public()}
+
+
+@router.get("/api/brands/{bid}/channels/hub")
+def channel_hub(bid: str, user=Depends(current_user)):
+    """The catalogue merged with this brand's connection + last test status."""
+    _brand_or_404(bid, user)
+    saved = db.get_connectors(bid)
+    rows = channel_catalog.public(saved)
+    return {"groups": channel_catalog.GROUPS, "channels": rows,
+            "connected": sorted(saved.keys()),
+            "limits": {"max_daily_ad_budget": guard.max_daily_budget(), "ad_spend_enabled": guard.ad_spend_enabled()}}
+
+
+@router.post("/api/brands/{bid}/channels/{channel}/test")
+def channel_test(bid: str, channel: str, user=Depends(current_user)):
+    """Read-only verification of saved credentials. Never publishes, sends or spends."""
+    _brand_or_404(bid, user)
+    if channel not in channel_catalog.CATALOG:
+        raise HTTPException(404, "Unknown channel")
+    creds = _creds(bid, channel)
+    if not creds:
+        raise HTTPException(400, f"{channel_catalog.CATALOG[channel]['label']} is not connected for this brand")
+    res = channel_catalog.probe(channel, creds)
+    status = {"ok": bool(res.get("ok")), "account": res.get("account"), "detail": res.get("detail"), "at": time.time()}
+    try:
+        db.set_connector(bid, channel, {**creds, "_status": status})
+    except Exception:
+        pass
+    return {"channel": channel, **status}
+
+
+@router.delete("/api/brands/{bid}/channels/{channel}")
+def channel_disconnect(bid: str, channel: str, user=Depends(current_user)):
+    _brand_or_404(bid, user)
+    _admin_or_owner(user, bid)
+    db.delete_connector(bid, channel)
+    return {"ok": True, "disconnected": channel}
 
 
 @router.post("/api/brands/{bid}/channels/connect")
 def connect_channel(bid: str, body: ChannelConnectIn, user=Depends(current_user)):
     _brand_or_404(bid, user)
     _admin_or_owner(user, bid)
-    if body.channel not in CHANNELS:
-        raise HTTPException(400, f"Unknown channel. Supported: {list(CHANNELS)}")
-    db.set_connector(bid, body.channel, body.credentials)
-    return {"ok": True, "connected": body.channel}
+    if body.channel not in channel_catalog.CATALOG:
+        raise HTTPException(400, f"Unknown channel. Supported: {list(channel_catalog.CATALOG)}")
+    creds = {k: v for k, v in (body.credentials or {}).items() if not str(k).startswith("_")}
+    missing = [k for k in channel_catalog.required_fields(body.channel) if not str(creds.get(k) or "").strip()]
+    if missing:
+        raise HTTPException(400, f"Missing credential field(s): {', '.join(missing)}")
+    db.set_connector(bid, body.channel, creds)
+    return {"ok": True, "connected": body.channel, "fields": sorted(creds.keys())}
 
 
 def _admin_or_owner(user, bid):
@@ -136,28 +185,58 @@ def ad_plan(bid: str, network: str, body: AdPlanIn, user=Depends(current_user)):
     _gen_guard(bid)
     cap = guard.max_daily_budget()
     budget = min(body.daily_budget or cap / 2, cap)
-    sys = (f"You are a senior performance marketer planning a {network.upper()} ads campaign. "
-           "Return STRICT JSON only. Never invent prices, RERA numbers or guarantees — "
-           "use only facts in the brand context.")
-    usr = (f"Brand: {ai_engine._brand_context(b, with_memory=False)}\n"
-           f"Objective: {body.objective}. Daily budget: {budget} {body.currency}. "
-           f"Extra direction: {body.prompt[:500]}\n\n"
-           "Return JSON: {\"name\":\"campaign name\",\"objective\":\"" + body.objective + "\","
-           "\"audience\":\"one-line target audience\",\"targeting_summary\":\"geo/age/interests\","
-           "\"optimization_goal\":\"LEAD_GENERATION|LINK_CLICKS|...\","
-           "\"creative\":{\"primary_text\":\"...\",\"headline\":\"<=40 chars\",\"description\":\"...\",\"cta\":\"...\",\"link\":\"\"},"
-           + ("\"keywords\":[{\"text\":\"...\",\"match\":\"PHRASE\"}],\"negative_keywords\":[\"...\"],\"rsa\":{\"headlines\":[\"<=30 chars\"],\"descriptions\":[\"<=90 chars\"]}" if network == "google" else "\"placements\":\"feed, reels, stories\"")
-           + "}")
+    currency = (body.currency or "INR")[:3].upper()
+    from ..services import brand_config
+    cfg = brand_config.prompt_block(b)
+    ctx = ai_engine._brand_context(b, with_memory=False)
+    if network == "meta":
+        objective = body.objective if body.objective in ad_planner.META_OBJECTIVES else "OUTCOME_LEADS"
+        sys, usr = ad_planner.prompt_meta(ctx, objective, budget, currency, body.prompt, cfg)
+    else:
+        objective = "SEARCH"
+        sys, usr = ad_planner.prompt_google(ctx, budget, currency, body.prompt, cfg)
     try:
-        plan = _plan_json(sys, usr)
+        raw = _plan_json(sys, usr)
     except Exception as e:
         raise HTTPException(502, f"Ad planning failed: {e}")
-    plan["daily_budget"] = budget
-    plan["currency"] = body.currency
-    cid = db.insert_doc("campaigns", bid, plan, network=network, objective=body.objective,
-                        status="draft", daily_budget=budget, currency=body.currency)
+    # The model proposes; the planner owns budgets, compliance and estimates.
+    plan = (ad_planner.normalize_meta(raw, b, budget, currency, objective) if network == "meta"
+            else ad_planner.normalize_google(raw, b, budget, currency))
+    plan["summary"] = ad_planner.summary_lines(plan)
+    cid = db.insert_doc("campaigns", bid, plan, network=network, objective=objective,
+                        status="draft", daily_budget=plan["daily_budget"], currency=currency)
     return {"campaign_id": cid, "status": "draft", "plan": plan,
-            "note": "Draft only — nothing is live and no money has moved. Launch creates it PAUSED; activating it requires your approval."}
+            "note": "Draft only — nothing is live and no money has moved. Edit anything, then Launch creates it PAUSED; activating it requires your approval."}
+
+
+@router.get("/api/brands/{bid}/ads/{network}/campaigns/{campaign_id}")
+def ad_campaign(bid: str, network: str, campaign_id: str, user=Depends(current_user)):
+    _brand_or_404(bid, user)
+    _ads_mod(network)
+    return _doc_or_404("campaigns", campaign_id, bid)
+
+
+class AdEditIn(BaseModel):
+    plan: dict
+
+
+@router.put("/api/brands/{bid}/ads/{network}/campaigns/{campaign_id}")
+def ad_edit(bid: str, network: str, campaign_id: str, body: AdEditIn, user=Depends(current_user)):
+    """Manual leverage: edit audiences, budgets, copy. Re-capped and re-checked for
+    compliance on every save; a draft that is already live cannot be edited here."""
+    b = _brand_or_404(bid, user)
+    _ads_mod(network)
+    if user["role"] == "client":
+        raise HTTPException(403, "Client logins cannot edit paid-media plans")
+    c = _doc_or_404("campaigns", campaign_id, bid)
+    if c.get("status") in ("live",):
+        raise HTTPException(409, "Pause the campaign before editing its plan")
+    plan = ad_planner.apply_edit(c["payload"], body.plan or {}, b, network)
+    plan["summary"] = ad_planner.summary_lines(plan)
+    plan["platform_ids"] = (c["payload"] or {}).get("platform_ids")
+    db.update_doc("campaigns", campaign_id, payload=plan, daily_budget=plan["daily_budget"],
+                  currency=plan["currency"], status="draft" if c.get("status") == "draft" else c.get("status"))
+    return {"ok": True, "campaign_id": campaign_id, "plan": plan}
 
 
 @router.get("/api/brands/{bid}/ads/{network}/campaigns")

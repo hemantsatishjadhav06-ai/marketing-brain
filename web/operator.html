@@ -193,6 +193,7 @@ input:focus{outline:none;border-color:var(--accent)}
   </main>
 </div>
 
+<script src="js/growth-ui.js?v=20260911"></script>
 <script>
 "use strict";
 const API = "/api";
@@ -424,17 +425,22 @@ async function viewAutopilot(){
 }
 async function startAP(bid,btn){ btn.disabled=true; btn.textContent="Starting…"; try{ await api(`/brands/${bid}/autopilot`,"POST",{}); toast("Autopilot started"); setTimeout(()=>render(),800); }catch(e){ toast(e.message,true); btn.disabled=false; btn.textContent="Start"; } }
 
+let CONN_BID=null;
 async function viewConnections(){
-  let h=`<div class="pagehd"><h1>Connections</h1><p>Publishing channels per company. Live posting uses each company's own platform credentials.</p></div>`;
-  h+=`<div class="card"><div class="list">`;
-  for(const b of BRANDS){
-    let cfg=[]; try{ const c=await api(`/brands/${b.id}/connectors`); cfg=c.configured||[]; }catch{}
-    h+=`<div class="row"><div><div class="ti">${esc(b.name)}</div><div class="mt">${cfg.length?("connected: "+cfg.map(esc).join(", ")):"no channels connected"}</div></div>
-      <div class="rt">${cfg.length?'<span class="chip live">'+cfg.length+' live</span>':'<span class="chip plan">none</span>'} <a class="btn sm ghost" href="/#brand=${encodeURIComponent(b.id)}">Manage ↗</a></div></div>`;
-  }
-  h+=`</div></div>`;
-  h+=`<div class="card" style="margin-top:16px"><h2>Supported today</h2><p class="sub">Instagram & Facebook publish live via the Meta Graph API using each company's own long-lived token. LinkedIn is supported; X and analytics pull-back are on the roadmap.</p></div>`;
+  let h=`<div class="pagehd"><h1>Connections</h1><p>Every distribution channel, per client: what it can do today, how to connect it, and a read-only test that proves the token works.</p></div>`;
+  if(!BRANDS.length){ h+=`<div class="card empty">Add a client first.</div>`; $("#main").innerHTML=h; return; }
+  const b=BRANDS.find(x=>x.id===CONN_BID)||BRANDS[0]; CONN_BID=b.id;
+  h+=`<div class="card" style="margin-bottom:14px"><label for="cBrand">Client</label><select id="cBrand" onchange="CONN_BID=this.value;render()" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--ink)">${BRANDS.map(x=>`<option value="${esc(x.id)}" ${x.id===b.id?"selected":""}>${esc(x.name)}</option>`).join("")}</select>
+    <div id="connSummary" class="mt" style="margin-top:8px"></div></div><div id="hub"><span class="spin"></span></div>`;
   $("#main").innerHTML=h;
+  await loadHub(b.id);
+}
+async function loadHub(bid){
+  try{ const hub=await api(`/brands/${bid}/channels/hub`); GrowthUI.brandId=bid; GrowthUI.onHubChange=()=>loadHub(bid);
+    const canEdit=ME.role==="admin"||ME.role==="manager"||ME.role==="owner";
+    $("#hub").innerHTML=GrowthUI.renderHub(hub,{canEdit});
+    const live=hub.channels.filter(c=>c.status==="live").length; $("#connSummary").innerHTML=`${hub.connected.length} connected · ${live} channels with live APIs · ad ceiling ${hub.limits.max_daily_ad_budget}/day${hub.limits.ad_spend_enabled?"":" · <b>AD SPEND DISABLED</b>"}`;
+  }catch(e){ $("#hub").innerHTML=`<div class="warnbox">${esc(e.message)}</div>`; }
 }
 
 async function viewSystem(){
@@ -578,12 +584,32 @@ async function runSeo(bid,btn){ const url=$("#seoUrl").value.trim(); if(!url)ret
 }
 async function planAd(bid,net,btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>'; $("#adOut").innerHTML='<span class="spin"></span> Drafting…';
   try{ const r=await api(`/brands/${bid}/ads/${net}/plan`,"POST",{objective:$("#adObj").value,daily_budget:parseFloat($("#adBudget").value||0),prompt:$("#adPrompt").value});
-    $("#adOut").innerHTML=`<div class="card" style="background:var(--surface-2)"><b>${esc(r.plan.name||"Campaign")}</b><div class="mt">${esc(r.plan.audience||"")}</div><div class="cap" style="margin-top:8px;max-height:180px">${esc(JSON.stringify(r.plan,null,1))}</div><div class="warnbox" style="margin-top:8px">${esc(r.note)}</div></div>`;
+    showPlan(bid,net,{id:r.campaign_id,status:"draft",payload:r.plan});
     loadCampaigns(bid,net);
   }catch(e){ $("#adOut").innerHTML=`<div class="warnbox">${esc(e.message)}</div>`; }
   btn.disabled=false; btn.textContent="Draft campaign";
 }
-async function loadCampaigns(bid,net){ try{ const cs=await api(`/brands/${bid}/ads/${net}/campaigns`); const el=document.getElementById("adCamps"); const html=`<div class="card" id="adCamps" style="margin-top:12px"><h3>Campaigns</h3>`+(cs.length?`<div class="list">`+cs.map(c=>`<div class="row"><div><b>${esc((c.payload&&c.payload.name)||"Campaign")}</b><div class="mt">${esc(c.status)} · ${esc(String(c.daily_budget||0))} ${esc(c.currency||"")}/day</div></div><div class="rt">${adButtons(bid,net,c)}</div></div>`).join("")+`</div>`:`<p class="sub">No campaigns yet.</p>`)+`</div>`; if(el)el.outerHTML=html; else $("#adOut").insertAdjacentHTML("beforeend",html);}catch{} }
+async function loadCampaigns(bid,net){ try{ const cs=await api(`/brands/${bid}/ads/${net}/campaigns`); const el=document.getElementById("adCamps"); const html=`<div class="card" id="adCamps" style="margin-top:12px"><h3>Campaigns</h3>`+(cs.length?`<div class="list">`+cs.map(c=>`<div class="row"><div><b>${esc((c.payload&&c.payload.name)||"Campaign")}</b><div class="mt">${esc(c.status)} · ${esc(String(c.daily_budget||0))} ${esc(c.currency||"")}/day · ${((c.payload||{}).ad_sets||(c.payload||{}).ad_groups||[]).length} audience(s)${(c.payload&&c.payload.compliance&&c.payload.compliance.special_ad_category&&c.payload.compliance.special_ad_category!=="NONE")?" · "+esc(c.payload.compliance.special_ad_category):""}</div></div><div class="rt"><button class="btn sm ghost" onclick="openCampaign('${bid}','${net}','${c.id}')">Open plan</button> ${adButtons(bid,net,c)}</div></div>`).join("")+`</div>`:`<p class="sub">No campaigns yet.</p>`)+`</div>`; if(el)el.outerHTML=html; else $("#adOut").insertAdjacentHTML("beforeend",html);}catch{} }
+let CUR_PLAN=null;
+function showPlan(bid,net,c){
+  CUR_PLAN={bid,net,c};
+  const editable=c.status==="draft"||c.status==="approved"||c.status==="paused";
+  $("#adOut").innerHTML=GrowthUI.renderPlan(c.payload,{campaignId:c.id,status:c.status,editable,network:net});
+  const acts=document.getElementById("gpActs"); if(!acts) return;
+  let h=`<div class="fl" style="display:flex;flex-direction:column;gap:3px"><label style="font-size:11px;font-weight:700;color:var(--muted)">Total daily budget</label><input data-budget type="number" min="0" value="${Number(c.daily_budget||c.payload.daily_budget||0)}" style="width:150px;padding:7px 9px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--ink)" ${editable?"":"disabled"}></div>`;
+  if(editable) h+=`<button class="btn" onclick="savePlanEdits()">Save edits</button>`;
+  h+=adButtons(bid,net,c);
+  if(c.status!=="draft") h+=` <button class="btn ghost sm" onclick="adInsights('${bid}','${net}','${c.id}')">Insights</button>`;
+  acts.innerHTML=h;
+}
+async function savePlanEdits(){
+  const {bid,net,c}=CUR_PLAN; const root=document.querySelector("#adOut .gp");
+  const plan=GrowthUI.collectEdits(root,c.payload,net);
+  try{ const r=await api(`/brands/${bid}/ads/${net}/campaigns/${c.id}`,"PUT",{plan}); toast("Plan saved — budget re-capped, compliance re-applied"); showPlan(bid,net,{...c,payload:r.plan,daily_budget:r.plan.daily_budget}); loadCampaigns(bid,net); }
+  catch(e){ toast(e.message,true); }
+}
+async function openCampaign(bid,net,cid){ try{ const c=await api(`/brands/${bid}/ads/${net}/campaigns/${cid}`); showPlan(bid,net,c); window.scrollTo({top:0,behavior:"smooth"}); }catch(e){ toast(e.message,true); } }
+async function adInsights(bid,net,cid){ try{ const r=await api(`/brands/${bid}/ads/${net}/insights/${cid}`); alert(JSON.stringify(r,null,1).slice(0,1500)); }catch(e){ toast(e.message,true); } }
 function adButtons(bid,net,c){ const id=c.id; if(c.status==="draft")return `<button class="btn sm" onclick="adAct('${bid}','${net}','launch','${id}',this)">Launch (PAUSED)</button>`; if(c.status==="approved"||c.status==="paused")return `<button class="btn sm accent" onclick="adAct('${bid}','${net}','activate','${id}',this)">Activate (spends)</button>`; if(c.status==="live")return `<button class="btn sm ghost" onclick="adAct('${bid}','${net}','pause','${id}',this)">Pause</button> <span class="chip live">live</span>`; return `<span class="chip plan">${esc(c.status)}</span>`; }
 async function adAct(bid,net,action,cid,btn){ const spends=(action==="launch"||action==="activate"); if(spends && !confirm(action==="activate"?"Activate this campaign? This starts real ad spend within your daily budget ceiling.":"Create this campaign on the platform (PAUSED, no spend yet)?"))return; btn.disabled=true;
   try{ await api(`/brands/${bid}/ads/${net}/${action}`,"POST",{campaign_id:cid,approve:spends}); toast(action==="activate"?"Campaign live":action==="launch"?"Created (paused)":"Paused"); loadCampaigns(bid,net); }
