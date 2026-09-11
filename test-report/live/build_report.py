@@ -32,7 +32,7 @@ CAPTIONS = {
 }
 
 def img_uri(name, width=1100, q=68):
-    p = os.path.join(SHOTS, name + ".png")
+    p = os.path.join(SHOTS, name + ".jpg")
     if not os.path.exists(p):
         return None
     im = Image.open(p).convert("RGB")
@@ -43,7 +43,7 @@ def img_uri(name, width=1100, q=68):
     buf = io.BytesIO(); im.save(buf, "JPEG", quality=q, optimize=True)
     return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
 
-shots = [n for n in sorted(os.listdir(SHOTS)) if n.endswith(".png")] if os.path.isdir(SHOTS) else []
+shots = [n for n in sorted(os.listdir(SHOTS)) if n.endswith(".jpg")] if os.path.isdir(SHOTS) else []
 shots = [s[:-4] for s in shots]
 
 # ---------- derived content ----------

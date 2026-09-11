@@ -1,0 +1,1489 @@
+{
+ "run": "2026-09-11 05:29 UTC",
+ "base": "https://marketing-brain-production-1f88.up.railway.app",
+ "site": "https://www.neopolisinfra.com",
+ "brand_id": "af4c0bd6fbbd",
+ "kept": true,
+ "pass": 32,
+ "fail": 3,
+ "steps": [
+  {
+   "step": "00 admin login",
+   "status": "PASS",
+   "detail": "200",
+   "t": 0.7
+  },
+  {
+   "step": "01 onboard",
+   "status": "PASS",
+   "detail": "reusing ready client Neopolis Infra LLP (af4c0bd6fbbd)",
+   "t": 0.9
+  },
+  {
+   "step": "03 scrape captured real site data",
+   "status": "PASS",
+   "detail": "{'title': 'Landlord Share Flats in Hyderabad | Neopolis Infra', 'colors': ['#ff6600', '#ff8534', '#081d4a'], 'socials': ['instagram']}",
+   "t": 1.0
+  },
+  {
+   "step": "04 AI brand analysis",
+   "status": "PASS",
+   "detail": "{'voice': \"{'tone': 'Honest and straightforward', 'personality': ['Trustworthy', 'Customer-centric', 'Informative'], 'words_we_use'\", 'audience': \"[{'persona': 'First-time homebuyers in Hyderabad', 'age': '25-40', 'pains': ['High real estate prices', 'Complex buying \", 'pillars': [{'name': 'Educational Content', 'description': 'Guides and articles explaining the landlord-share model and real estat",
+   "t": 1.0
+  },
+  {
+   "step": "05 client config seeded (real_estate \u2192 HOUSING, triggers, caps)",
+   "status": "PASS",
+   "detail": "{'gen_daily': 40, 'creatives_per_cycle': 2, 'images_per_cycle': 1}",
+   "t": 1.0
+  },
+  {
+   "step": "06 brand ready",
+   "status": "PASS",
+   "detail": "ready",
+   "t": 1.0
+  },
+  {
+   "step": "07 ideas generated",
+   "status": "PASS",
+   "detail": "[\"Unlocking Hyderabad's Hidden Gems\", 'Your Guide to Renting vs. Buying in Hyderabad', 'Customer Spotlight: Success Stories', 'What Makes Landlord-Share Flats Unique?']",
+   "t": 12.5
+  },
+  {
+   "step": "08 14-day calendar",
+   "status": "PASS",
+   "detail": "[('2026-09-12', \"Unlocking Hyderabad's Hidden Gems\"), ('2026-09-13', 'Your Guide to Renting vs. Buying in Hyderabad'), ('2026-09-14', 'Customer Spotlight: Success Stories'), ('2026-09-15', 'What Makes Landlord-Share Flats Unique?')]",
+   "t": 18.1
+  },
+  {
+   "step": "09 creative produced",
+   "status": "PASS",
+   "detail": "{'title': \"Unlocking Hyderabad's Hidden Gems\", 'caption': \"\ud83c\udfe1 Unlock Hyderabad's Hidden Gems! \u2728 \\n\\nDid you know you can save 8-14% on your next home? \\nDirect from landowners, zero broker fees! \\nExplore stunning landlord-s\"}",
+   "t": 32.0
+  },
+  {
+   "step": "10 branded visual generated (logo composited)",
+   "status": "PASS",
+   "detail": "{'ok': True, 'asset_url': '/workspaces/neopolis-infra-llp/instagram/assets/78b0a70e7577.png'}",
+   "t": 69.1
+  },
+  {
+   "step": "11 Instagram algo audit (7 ranking signals, weighted score)",
+   "status": "PASS",
+   "detail": "{'algo_score': 45, 'signals': [('watch_time', 5), ('send_trigger', 2), ('save_value', 3), ('comment_spark', 4), ('originality', 6), ('seo_keywords', 5), ('loop_design', 7)], 'verdict': 'This reel needs significant improvements to maximize engagement and reach.'}",
+   "t": 78.4
+  },
+  {
+   "step": "12 creative waiting in approval centre",
+   "status": "PASS",
+   "detail": "{'waiting': 2, 'changes_requested': 0}",
+   "t": 78.7
+  },
+  {
+   "step": "13 human approval captured \u2192 memory",
+   "status": "PASS",
+   "detail": "",
+   "t": 79.0
+  },
+  {
+   "step": "14 brand memory learned from approval",
+   "status": "PASS",
+   "detail": "['Approved this reel: \"Unlocking Hyderabad\\'s Hidden Gems\". That angle and treatmen', 'Approved this reel: \"Your Path to Affordable Living\". That angle and treatment w']",
+   "t": 79.2
+  },
+  {
+   "step": "15 dry-run publish + manual checklist",
+   "status": "PASS",
+   "detail": "['Open instagram (mobile app recommended for reels).', 'Tap + \u2192 Reel. Shoot/upload clips following the shot list in the production package.', 'Add on-screen text at the listed timestamps; pick a trending audio matching the described style.']",
+   "t": 79.5
+  },
+  {
+   "step": "16 live publish blocked without connected channel",
+   "status": "PASS",
+   "detail": "No credentials saved for instagram. Save connector settings first, or use simulated mode.",
+   "t": 79.7
+  },
+  {
+   "step": "17 SEO audit of neopolisinfra.com (live fetch)",
+   "status": "PASS",
+   "detail": "{'score': 88, 'fails': ['Exactly one H1', 'Description length 70\u2013160']}",
+   "t": 80.6
+  },
+  {
+   "step": "18 Meta media plan: audiences + budget + placements",
+   "status": "PASS",
+   "detail": "['Neopolis Infra Lead Generation Campaign \u00b7 OUTCOME_LEADS \u00b7 special category HOUSING', '  First-time Homebuyers in Hyderabad: Hyderabad +25km \u00b7 age 18\u201365 \u00b7 Real estate investing, Home buying, Property management, Affordable housing \u00b7 instagram_feed, facebook_feed \u00b7 \u20b91000.0/day', '  NRI Investors in Hyderabad: Hyderabad +25km \u00b7 age 18\u201365 \u00b7 Real estate investment, NRI services, Property investment, ",
+   "t": 89.7
+  },
+  {
+   "step": "19 HOUSING compliance enforced",
+   "status": "PASS",
+   "detail": "['First-time Homebuyers in Hyderabad: age reset to 18\u201365+ (HOUSING)', 'First-time Homebuyers in Hyderabad: detailed-targeting exclusions removed (HOUSING)', 'First-time Homebuyers in Hyderabad: lookalike replaced by Special Ad Audience (HOUSING)', 'NRI Investors in Hyderabad: age reset to 18\u201365+ (HOUSING)', 'NRI Investors in Hyderabad: detailed-targeting exclusions removed (HOUSING)', 'NRI Investo",
+   "t": 89.7
+  },
+  {
+   "step": "20 benchmark estimates present",
+   "status": "PASS",
+   "detail": "{'impressions': [7692, 16666], 'clicks': [69, 300], 'leads': [2.8, 27.0]}",
+   "t": 89.7
+  },
+  {
+   "step": "21 manual edit re-split budget, re-applied HOUSING",
+   "status": "FAIL",
+   "detail": "None",
+   "t": 89.9
+  },
+  {
+   "step": "22 launch blocked: Meta Ads not connected (no spend possible)",
+   "status": "FAIL",
+   "detail": "None",
+   "t": 90.0
+  },
+  {
+   "step": "23 activate blocked without approval",
+   "status": "FAIL",
+   "detail": "None",
+   "t": 105.1
+  },
+  {
+   "step": "24 Google Search plan: ad groups + keywords + RSA",
+   "status": "PASS",
+   "detail": "['Neopolis Infra Landlord Share Flats \u00b7 SEARCH \u00b7 MAXIMIZE_CONVERSIONS', '  Landlord Share Flats: 3 keywords \u00b7 \u20b9500.0/day', '  NRI Investors: 3 keywords \u00b7 \u20b9500.0/day']",
+   "t": 117.0
+  },
+  {
+   "step": "25 connections hub lists every channel",
+   "status": "PASS",
+   "detail": "{'instagram': 'live', 'facebook': 'live', 'linkedin': 'live', 'twitter': 'manual', 'youtube': 'manual', 'google_business': 'manual', 'meta_ads': 'live', 'google_ads': 'partial', 'mailchimp': 'live', 'smartlead': 'live', 'whatsapp': 'live', 'airtable': 'live', 'webhook': 'live'}",
+   "t": 117.2
+  },
+  {
+   "step": "26 connect instagram (test token) stored",
+   "status": "PASS",
+   "detail": "{'ok': True, 'connected': 'instagram', 'fields': ['access_token', 'ig_user_id']}",
+   "t": 117.4
+  },
+  {
+   "step": "27 test-connection reports invalid token honestly (read-only)",
+   "status": "PASS",
+   "detail": "Invalid OAuth access token - Cannot parse access token",
+   "t": 117.6
+  },
+  {
+   "step": "28 disconnect",
+   "status": "PASS",
+   "detail": "",
+   "t": 117.8
+  },
+  {
+   "step": "29 email campaign drafted (send needs approval)",
+   "status": "PASS",
+   "detail": "{'subject': 'Join Us for a Weekend Site Visit in Kokapet!'}",
+   "t": 123.5
+  },
+  {
+   "step": "30 email send blocked: Mailchimp not connected",
+   "status": "PASS",
+   "detail": "mailchimp is not connected.",
+   "t": 123.7
+  },
+  {
+   "step": "31 WhatsApp inbound webhook accepted (no brand mapped \u2192 ignored safely)",
+   "status": "PASS",
+   "detail": "{'ok': True}",
+   "t": 124.0
+  },
+  {
+   "step": "32 WhatsApp send blocked: not connected",
+   "status": "PASS",
+   "detail": "WhatsApp is not connected.",
+   "t": 124.2
+  },
+  {
+   "step": "33 monthly white-label report",
+   "status": "PASS",
+   "detail": "{'ideas': 12, 'creatives': 2, 'approved': 2, 'published': 0, 'published_by_channel': {}, 'simulated': 2, 'metrics_logged': 0, 'metric_totals': {}, 'ad_campaigns': 6, 'ad_spend_actions': 0, 'ad_spend_total': 0, 'email_campaigns': 3, 'seo_audits': 3, 'seo_best_score': 88, 'conversations': 0, 'top_creatives': [{'id': '78b0a70e7577', 'title': \"Unlocking Hyderabad's Hidden Gems\", 'channel': 'instagram'",
+   "t": 126.9
+  },
+  {
+   "step": "34 portfolio health row",
+   "status": "PASS",
+   "detail": "{'score': 80, 'grade': 'green', 'alerts': ['no_connectors', 'cycle_due']}",
+   "t": 127.9
+  },
+  {
+   "step": "35 audit trail (agent runs)",
+   "status": "PASS",
+   "detail": "0",
+   "t": 128.1
+  }
+ ],
+ "artefacts": {
+  "brand": {
+   "id": "af4c0bd6fbbd",
+   "name": "Neopolis Infra LLP",
+   "website": "https://www.neopolisinfra.com",
+   "status": "ready",
+   "setup": {
+    "channels": [
+     "instagram",
+     "facebook",
+     "whatsapp"
+    ],
+    "cadence": "4 posts/week",
+    "goals": [
+     "site visits",
+     "leads"
+    ],
+    "language": "English",
+    "mode": "auto"
+   }
+  },
+  "profile": {
+   "brand_voice": {
+    "tone": "Honest and straightforward",
+    "personality": [
+     "Trustworthy",
+     "Customer-centric",
+     "Informative"
+    ],
+    "words_we_use": [
+     "Direct",
+     "Honest pricing",
+     "Verified"
+    ],
+    "words_we_avoid": [
+     "Broker",
+     "Markup",
+     "Inflated prices"
+    ]
+   },
+   "target_audience": [
+    {
+     "persona": "First-time homebuyers in Hyderabad",
+     "age": "25-40",
+     "pains": [
+      "High real estate prices",
+      "Complex buying process",
+      "Lack of trust in brokers"
+     ],
+     "desires": [
+      "Affordable housing options",
+      "Transparent pricing",
+      "Direct communication with sellers"
+     ],
+     "where_they_hang_out": [
+      "Real estate forums",
+      "Social media platforms like Instagram",
+      "Local community groups"
+     ]
+    }
+   ],
+   "positioning": "Neopolis Infra offers transparent and affordable landlord-share flats in West Hyderabad, eliminating broker fees and providing verified titles.",
+   "content_pillars": [
+    {
+     "name": "Educational Content",
+     "description": "Guides and articles explaining the landlord-share model and real estate trends in West Hyderabad.",
+     "share_pct": 30
+    },
+    {
+     "name": "Property Listings",
+     "description": "Showcasing available landlord-share flats with detailed descriptions and pricing.",
+     "share_pct": 40
+    },
+    {
+     "name": "Customer Testimonials",
+     "description": "Sharing stories and feedback from satisfied customers who purchased through Neopolis Infra.",
+     "share_pct": 30
+    }
+   ],
+   "brand_kit": {
+    "colors": [
+     "#ff6600",
+     "#ff8534",
+     "#081d4a",
+     "#9fb0d6"
+    ],
+    "style": ""
+   }
+  },
+  "ideas": [
+   {
+    "title": "Unlocking Hyderabad's Hidden Gems",
+    "format": "reel",
+    "hook": "Did you know you can save 8-14% on your next home?",
+    "concept": "Showcase a montage of stunning landlord-share flats in West Hyderabad, highlighting unique features and neighborhoods. Use on-screen text to emphasize savings and the absence of broker fees, ending with a direct call to action for site visits.",
+    "pillar": "Property Listings",
+    "funnel_stage": "consideration",
+    "effort": "medium",
+    "why_it_works": "Visually engaging content captures attention quickly, while the financial benefit hooks viewers to reconsider their home-buying options.",
+    "audience": "First-time homebuyers in Hyderabad, aged 25-40, looking for affordable options.",
+    "pain_point": "The high cost of real estate and distrust in brokers.",
+    "objective": "site visits",
+    "cta": "Book a site visit \u2014 reply VISIT",
+    "source": "none",
+    "priority_score": 80,
+    "virality": {
+     "score": 75,
+     "hook_strength": 8,
+     "flow": 7,
+     "trend_fit": 7,
+     "share_trigger": "awe at discovering hidden value in housing"
+    }
+   },
+   {
+    "title": "Your Guide to Renting vs. Buying in Hyderabad",
+    "format": "carousel",
+    "hook": "Renting or buying: which is better for you?",
+    "concept": "Create a visually appealing carousel comparing the pros and cons of renting versus buying landlord-share flats, with a focus on affordability and transparency. Each slide will feature engaging graphics and brief insights, leading to a final slide inviting viewers to consider buying instead of renting.",
+    "pillar": "Educational Content",
+    "funnel_stage": "consideration",
+    "effort": "medium",
+    "why_it_works": "This addresses common financial dilemmas, encourages saves for reference, and positions Neopolis as a thought leader in affordable living.",
+    "audience": "First-time homebuyers in Hyderabad concerned about finances.",
+    "pain_point": "Confusion over whether to rent or buy in a high-priced market.",
+    "objective": "saves",
+    "cta": "Save this post for your home-buying journey!",
+    "source": "none",
+    "priority_score": 75,
+    "virality": {
+     "score": 72,
+     "hook_strength": 7,
+     "flow": 8,
+     "trend_fit": 6,
+     "share_trigger": "value in making informed financial decisions"
+    }
+   },
+   {
+    "title": "Customer Spotlight: Success Stories",
+    "format": "story",
+    "hook": "Meet Priya, a first-time buyer like you!",
+    "concept": "Feature a short video interview with a satisfied customer who recently purchased a landlord-share flat through Neopolis. Discuss their journey, the savings they experienced, and their overall happiness with the process, with engaging visuals of their new home.",
+    "pillar": "Customer Testimonials",
+    "funnel_stage": "consideration",
+    "effort": "high",
+    "why_it_works": "Personal stories create emotional connections and build trust, while video format boosts engagement and watch time.",
+    "audience": "First-time homebuyers hesitant due to past experiences with brokers.",
+    "pain_point": "Lack of trust in the home-buying process.",
+    "objective": "leads",
+    "cta": "DM us to start your own success story!",
+    "source": "none",
+    "priority_score": 85,
+    "virality": {
+     "score": 78,
+     "hook_strength": 9,
+     "flow": 8,
+     "trend_fit": 7,
+     "share_trigger": "inspiration from relatable success"
+    }
+   },
+   {
+    "title": "What Makes Landlord-Share Flats Unique?",
+    "format": "post",
+    "hook": "Ever heard of landlord-share flats? Here's why they matter.",
+    "concept": "Design an informative post breaking down the concept of landlord-share flats with bullet points on benefits like zero broker fees, direct owner interaction, and title verification. Use vibrant visuals to maintain engagement and encourage viewers to learn more.",
+    "pillar": "Educational Content",
+    "funnel_stage": "consideration",
+    "effort": "low",
+    "why_it_works": "Simplicity and clarity in explaining a unique concept can generate curiosity and prompt saves for future reference.",
+    "audience": "First-time homebuyers in Hyderabad seeking straightforward information.",
+    "pain_point": "Complexity of the real estate market and the buying process.",
+    "objective": "saves",
+    "cta": "Save this post to learn more about your future home!",
+    "source": "none",
+    "priority_score": 70,
+    "virality": {
+     "score": 67,
+     "hook_strength": 6,
+     "flow": 6,
+     "trend_fit": 5,
+     "share_trigger": "curiosity about alternative housing options"
+    }
+   }
+  ],
+  "creative": {
+   "title": "Unlocking Hyderabad's Hidden Gems",
+   "format": "reel",
+   "script": {
+    "duration_seconds": 30,
+    "hook_options": [
+     "Did you know you can save 8-14% on your next home?",
+     "Why pay full price when you can get it direct from the landowner?",
+     "Unlock the door to smarter home-buying in Hyderabad!"
+    ],
+    "shots": [
+     {
+      "t": "0-3s",
+      "camera": "wide shot, slow zoom in",
+      "action": "Aerial view of a beautiful neighborhood in West Hyderabad.",
+      "dialogue_or_vo": "Discover hidden value in Hyderabad's real estate!",
+      "on_screen_text": "Save 8-14% on your next home!",
+      "broll": "Footage of the city and vibrant neighborhoods."
+     },
+     {
+      "t": "3-10s",
+      "camera": "medium shot, steady",
+      "action": "Showcase a stunning living room of a landlord-share flat.",
+      "dialogue_or_vo": "These landlord-share flats are title-verified and direct from the owner.",
+      "on_screen_text": "Zero broker fees, Honest pricing!",
+      "broll": "Panning shot of the flat's features."
+     },
+     {
+      "t": "10-20s",
+      "camera": "close-up, pan",
+      "action": "Highlight unique features like modern kitchens and spacious balconies.",
+      "dialogue_or_vo": "Experience the luxury of living in West Hyderabad.",
+      "on_screen_text": "Affordable options await you!",
+      "broll": "Footage of the kitchen and balcony."
+     },
+     {
+      "t": "20-30s",
+      "camera": "wide shot, slow zoom out",
+      "action": "Return to the neighborhood view with people enjoying the area.",
+      "dialogue_or_vo": "Book a site visit today!",
+      "on_screen_text": "Reply VISIT to learn more!",
+      "broll": "Happy families and individuals exploring the community."
+     }
+    ],
+    "audio": {
+     "style": "upbeat, trending instrumental with a catchy rhythm",
+     "voiceover": true
+    },
+    "transitions": [
+     "fade in/out",
+     "quick cuts between shots"
+    ],
+    "loop_trick": "The end zooms out to the neighborhood view, which matches the opening shot."
+   },
+   "filming_guide": {
+    "location": "Various landlord-share flats and vibrant neighborhoods in West Hyderabad",
+    "props": [
+     "Stylish furniture, plants, home decor for staging",
+     "Real estate brochures or flyers"
+    ],
+    "lighting": "Natural light preferred; shoot during golden hour for best results.",
+    "phone_or_camera_settings": "Use 4K resolution; stabilize with a gimbal if using a phone.",
+    "editing_app_steps": [
+     "Import footage into CapCut.",
+     "Trim unnecessary clips, focusing on the hook first.",
+     "Add text overlays with key points.",
+     "Incorporate upbeat music and adjust volume.",
+     "Finish with a title card for the call-to-action."
+    ]
+   },
+   "thumbnail_concept": "Create a visually striking thumbnail featuring a stunning landlord-share flat with warm lighting. Use #ff6600 and #081d4a as dominant colors. Include bold text: 'Unlock Hidden Gems!' Leave clean negative space in the bottom-right corner for a logo.",
+   "caption": "\ud83c\udfe1 Unlock Hyderabad's Hidden Gems! \u2728 \n\nDid you know you can save 8-14% on your next home? \nDirect from landowners, zero broker fees! \nExplore stunning landlord-share flats in West Hyderabad today! \nBook a site visit \u2014 reply VISIT! \n\n#RealEstate #HyderabadHomes #AffordableLiving",
+   "hashtags": {
+    "broad": [
+     "#RealEstate",
+     "#Homes",
+     "#Hyderabad"
+    ],
+    "niche": [
+     "#LandlordShare",
+     "#AffordableHousing",
+     "#DirectFromOwner"
+    ],
+    "branded": [
+     "#NeopolisInfra"
+    ]
+   },
+   "cta": "Book a site visit \u2014 reply VISIT",
+   "best_time_hint": "Post on Wednesdays and Saturdays around 6 PM for optimal engagement.",
+   "accessibility": {
+    "alt_text": "A beautiful landlord-share flat showcasing a spacious living room with natural light.",
+    "captions_required": true
+   },
+   "kpis_to_watch": [
+    "Watch time",
+    "Sends per reach",
+    "Saves",
+    "Engagement rate"
+   ],
+   "image_prompt": "Create an image of a spacious landlord-share flat interior with modern decor. Use #ff6600, #ff8534, #081d4a, and #9fb0d6 as dominant colors. Include natural light streaming through the windows, showcasing the warmth and inviting atmosphere. Leave clean negative space in the bottom-right corner for a logo."
+  },
+  "asset_url": "/workspaces/neopolis-infra-llp/instagram/assets/78b0a70e7577.png",
+  "algo_audit": {
+   "signals": [
+    {
+     "signal": "watch_time",
+     "score": 5,
+     "issue": "The hook is decent but could be more compelling to grab attention immediately.",
+     "fix": "Change the hook to 'Unlock 8-14% savings on your next home purchase in Hyderabad!'"
+    },
+    {
+     "signal": "send_trigger",
+     "score": 2,
+     "issue": "Lacks a clear trigger for viewers to share the content with friends.",
+     "fix": "Add 'Tag a friend who needs to find their dream home!' at the end of the video."
+    },
+    {
+     "signal": "save_value",
+     "score": 3,
+     "issue": "No clear reason for viewers to save the video.",
+     "fix": "Include a checklist of '5 Tips for Buying Landlord-Share Flats' in the caption."
+    },
+    {
+     "signal": "comment_spark",
+     "score": 4,
+     "issue": "The content does not encourage comments or engagement.",
+     "fix": "Add 'What feature do you value most in a home? Comment below!' at the end."
+    },
+    {
+     "signal": "originality",
+     "score": 6,
+     "issue": "Content is somewhat original but could be more unique.",
+     "fix": "Use original footage of specific landlord-share flats instead of generic neighborhood shots."
+    },
+    {
+     "signal": "seo_keywords",
+     "score": 5,
+     "issue": "Keywords are present but could be optimized for better searchability.",
+     "fix": "Rewrite caption to include 'landlord-share flats in Hyderabad' and 'affordable housing options' prominently."
+    },
+    {
+     "signal": "loop_design",
+     "score": 7,
+     "issue": "The loop is present but could be more seamless.",
+     "fix": "Make the end zoom out transition match the beginning shot more fluidly by using a fade effect."
+    }
+   ],
+   "algo_score": 45,
+   "source_lock_pass": true,
+   "unsupported_claims": [],
+   "verdict": "This reel needs significant improvements to maximize engagement and reach.",
+   "optimized_hook": "Unlock 8-14% savings on your next home purchase in Hyderabad!",
+   "optimized_caption_opening": "\ud83c\udfe1 Discover landlord-share flats in Hyderabad at unbeatable prices! \u2728",
+   "send_trigger_line": "Tag a friend who needs to find their dream home!",
+   "save_reason_addition": "Save this for our '5 Tips for Buying Landlord-Share Flats' checklist!",
+   "score": 45
+  },
+  "seo": {
+   "url": "https://neopolisinfra.com/",
+   "status": 200,
+   "score": 88,
+   "summary": {
+    "words": 2583,
+    "internal_links": 3,
+    "images": 4,
+    "title": "Landlord Share Flats in Hyderabad | Neopolis Infra",
+    "h1": [
+     "The landlord's share,delivered direct.",
+     "The landlord's share, explained",
+     "Six corridors we know cold"
+    ]
+   },
+   "checks": [
+    {
+     "category": "technical",
+     "name": "HTTPS",
+     "pass": true,
+     "level": "pass",
+     "detail": "Served over HTTPS",
+     "weight": 2
+    },
+    {
+     "category": "technical",
+     "name": "200 OK",
+     "pass": true,
+     "level": "pass",
+     "detail": "HTTP 200",
+     "weight": 2
+    },
+    {
+     "category": "technical",
+     "name": "Mobile viewport",
+     "pass": true,
+     "level": "pass",
+     "detail": "width=device-width, initial-scale=1.0",
+     "weight": 2
+    },
+    {
+     "category": "technical",
+     "name": "Canonical tag",
+     "pass": true,
+     "level": "pass",
+     "detail": "https://www.neopolisinfra.com/",
+     "weight": 1
+    },
+    {
+     "category": "technical",
+     "name": "Not noindex",
+     "pass": true,
+     "level": "pass",
+     "detail": "index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1",
+     "weight": 2
+    },
+    {
+     "category": "technical",
+     "name": "Structured data (schema.org)",
+     "pass": true,
+     "level": "pass",
+     "detail": "JSON-LD present",
+     "weight": 1
+    },
+    {
+     "category": "on-page",
+     "name": "Title tag",
+     "pass": true,
+     "level": "pass",
+     "detail": "Landlord Share Flats in Hyderabad | Neopolis Infra",
+     "weight": 3
+    },
+    {
+     "category": "on-page",
+     "name": "Title length 30\u201360",
+     "pass": true,
+     "level": "pass",
+     "detail": "50 chars",
+     "weight": 1
+    },
+    {
+     "category": "on-page",
+     "name": "Meta description",
+     "pass": true,
+     "level": "pass",
+     "detail": "Buy landlord-share flats in West Hyderabad 8\u201314% below resale \u2014 direct from the landowner, title-verified, zero broker c",
+     "weight": 2
+    },
+    {
+     "category": "on-page",
+     "name": "Description length 70\u2013160",
+     "pass": false,
+     "level": "warn",
+     "detail": "162 chars",
+     "weight": 1
+    },
+    {
+     "category": "on-page",
+     "name": "Exactly one H1",
+     "pass": false,
+     "level": "fail",
+     "detail": "5 H1 tags",
+     "weight": 2
+    },
+    {
+     "category": "on-page",
+     "name": "Has H2 subheadings",
+     "pass": true,
+     "level": "pass",
+     "detail": "25 H2 tags",
+     "weight": 1
+    },
+    {
+     "category": "on-page",
+     "name": "Content depth",
+     "pass": true,
+     "level": "pass",
+     "detail": "2583 words",
+     "weight": 2
+    },
+    {
+     "category": "on-page",
+     "name": "Image alt text",
+     "pass": true,
+     "level": "pass",
+     "detail": "0/4 images missing alt",
+     "weight": 1
+    },
+    {
+     "category": "on-page",
+     "name": "Internal links",
+     "pass": true,
+     "level": "pass",
+     "detail": "3 internal links",
+     "weight": 1
+    },
+    {
+     "category": "social",
+     "name": "Open Graph title",
+     "pass": true,
+     "level": "pass",
+     "detail": "Landlord Share Flats in Hyderabad | Neopolis Infra",
+     "weight": 1
+    },
+    {
+     "category": "social",
+     "name": "Open Graph image",
+     "pass": true,
+     "level": "pass",
+     "detail": "https://www.neopolisinfra.com/assets/img/og-cover.jpg",
+     "weight": 1
+    }
+   ],
+   "fix_first": [
+    {
+     "category": "on-page",
+     "name": "Exactly one H1",
+     "pass": false,
+     "level": "fail",
+     "detail": "5 H1 tags",
+     "weight": 2
+    },
+    {
+     "category": "on-page",
+     "name": "Description length 70\u2013160",
+     "pass": false,
+     "level": "warn",
+     "detail": "162 chars",
+     "weight": 1
+    }
+   ],
+   "counts": {
+    "pass": 15,
+    "fail": 2,
+    "total": 17
+   }
+  },
+  "meta_plan": {
+   "campaign": {
+    "name": "Neopolis Infra Lead Generation Campaign",
+    "objective": "OUTCOME_LEADS",
+    "buying_type": "AUCTION",
+    "why": "Targeting first-time homebuyers and NRI investors in Hyderabad.",
+    "special_ad_category": "HOUSING"
+   },
+   "ad_sets": [
+    {
+     "name": "First-time Homebuyers in Hyderabad",
+     "audience_label": "First-time homebuyers and NRI investors",
+     "rationale": "Focus on first-time homebuyers looking for affordable housing.",
+     "targeting": {
+      "geo": {
+       "countries": [
+        "IN"
+       ],
+       "cities": [
+        {
+         "name": "Hyderabad",
+         "radius_km": 25
+        }
+       ],
+       "regions": []
+      },
+      "age_min": 18,
+      "age_max": 65,
+      "genders": [],
+      "languages": [
+       "English",
+       "Telugu"
+      ],
+      "interests": [
+       "Real estate investing",
+       "Home buying",
+       "Property management",
+       "Affordable housing"
+      ],
+      "behaviors": [
+       "Newly married",
+       "Recently moved",
+       "NRI expats"
+      ],
+      "custom_audiences": [
+       "website visitors 90d"
+      ],
+      "lookalike": "Special Ad Audience (from 1% of leads)",
+      "exclusions": []
+     },
+     "placements": [
+      "instagram_feed",
+      "facebook_feed"
+     ],
+     "budget_share": 0.5,
+     "schedule": {
+      "start": "2023-10-01",
+      "end": null,
+      "dayparting": "9am-10pm"
+     },
+     "optimization_goal": "LEAD_GENERATION",
+     "bid_strategy": "LOWEST_COST_WITHOUT_CAP",
+     "ad_ids": [
+      "A",
+      "B"
+     ],
+     "daily_budget": 1000.0
+    },
+    {
+     "name": "NRI Investors in Hyderabad",
+     "audience_label": "NRI Investors",
+     "rationale": "Targeting NRIs interested in investing in real estate.",
+     "targeting": {
+      "geo": {
+       "countries": [
+        "IN"
+       ],
+       "cities": [
+        {
+         "name": "Hyderabad",
+         "radius_km": 25
+        }
+       ],
+       "regions": []
+      },
+      "age_min": 18,
+      "age_max": 65,
+      "genders": [],
+      "languages": [
+       "English",
+       "Telugu"
+      ],
+      "interests": [
+       "Real estate investment",
+       "NRI services",
+       "Property investment",
+       "Foreign exchange"
+      ],
+      "behaviors": [
+       "Traveling abroad",
+       "High income",
+       "Financial planning"
+      ],
+      "custom_audiences": [
+       "website visitors 90d"
+      ],
+      "lookalike": "Special Ad Audience (from 1% of leads)",
+      "exclusions": []
+     },
+     "placements": [
+      "instagram_feed",
+      "facebook_feed"
+     ],
+     "budget_share": 0.5,
+     "schedule": {
+      "start": "2023-10-01",
+      "end": null,
+      "dayparting": "9am-10pm"
+     },
+     "optimization_goal": "LEAD_GENERATION",
+     "bid_strategy": "LOWEST_COST_WITHOUT_CAP",
+     "ad_ids": [
+      "C",
+      "D"
+     ],
+     "daily_budget": 1000.0
+    }
+   ],
+   "ads": [
+    {
+     "id": "A",
+     "format": "single_image",
+     "primary_text": "Discover affordable landlord-share flats in West Hyderabad. No broker fees and verified titles!",
+     "headline": "Affordable Flats in Hyderabad",
+     "description": "Direct from landowners, 8-14% ",
+     "cta": "WHATSAPP_MESSAGE",
+     "link": "",
+     "visual_direction": "Bright images showcasing the properties and neighborhoods."
+    },
+    {
+     "id": "B",
+     "format": "carousel",
+     "primary_text": "Explore verified landlord-share flats without the hassle of brokers.",
+     "headline": "Your New Home Awaits",
+     "description": "Transparent pricing and direct",
+     "cta": "LEARN_MORE",
+     "link": "",
+     "visual_direction": "Visuals of interior and exterior of flats."
+    },
+    {
+     "id": "C",
+     "format": "reel",
+     "primary_text": "Invest in Hyderabad's real estate with confidence. Title-verified flats await!",
+     "headline": "Invest Smart in Hyderabad",
+     "description": "Secure your future with no bro",
+     "cta": "SIGN_UP",
+     "link": "",
+     "visual_direction": "Engaging video showcasing the flats and the benefits of investing."
+    },
+    {
+     "id": "D",
+     "format": "single_image",
+     "primary_text": "Join countless satisfied customers who found their home with Neopolis Infra.",
+     "headline": "Customer Satisfaction Guaranteed",
+     "description": "Real stories from our happy ho",
+     "cta": "WHATSAPP_MESSAGE",
+     "link": "",
+     "visual_direction": "Testimonials displayed with property images."
+    }
+   ],
+   "lead_capture": {
+    "method": "whatsapp",
+    "questions": [
+     "What type of property are you interested in?",
+     "What is your budget range?",
+     "When are you looking to purchase?"
+    ],
+    "follow_up": "Connect with our team for a personalized consultation."
+   },
+   "tracking": {
+    "pixel_events": [
+     "Lead"
+    ],
+    "utm": {
+     "source": "meta",
+     "medium": "paid_social",
+     "campaign": "Neopolis Infra Lead Generation Campaign"
+    }
+   },
+   "kpis": {
+    "primary": "cost per lead",
+    "target": "500 INR",
+    "secondary": [
+     "number of leads",
+     "engagement rate"
+    ]
+   },
+   "tests": [
+    "Test different visuals for ad A in week 1.",
+    "A/B test headline variations for ad B."
+   ],
+   "risks": [
+    "Low engagement rates may lead to higher costs per lead.",
+    "Market fluctuations could affect interest in real estate."
+   ],
+   "budget": {
+    "currency": "INR",
+    "daily_total": 2000.0,
+    "cap": 5000.0,
+    "split": [
+     {
+      "ad_set": "First-time Homebuyers in Hyderabad",
+      "daily": 1000.0,
+      "share": 0.5
+     },
+     {
+      "ad_set": "NRI Investors in Hyderabad",
+      "daily": 1000.0,
+      "share": 0.5
+     }
+    ],
+    "monthly_estimate": 60000.0
+   },
+   "estimates": {
+    "basis": "benchmark ranges for real_estate (India, INR); not a forecast",
+    "daily": {
+     "impressions": [
+      7692,
+      16666
+     ],
+     "clicks": [
+      69,
+      300
+     ],
+     "leads": [
+      2.8,
+      27.0
+     ]
+    },
+    "period_days": 30,
+    "period": {
+     "spend": 60000.0,
+     "leads": [
+      83,
+      810
+     ]
+    },
+    "cpl_range": [
+     250,
+     900
+    ],
+    "cpm_range": [
+     120,
+     260
+    ],
+    "ctr_range_pct": [
+     0.9,
+     1.8
+    ]
+   },
+   "compliance": {
+    "special_ad_category": "HOUSING",
+    "rules": [
+     "Age locked to 18\u201365+ (no narrower range).",
+     "No gender targeting.",
+     "No ZIP/PIN-code targeting; location radius must be at least 15 miles (~24 km).",
+     "No detailed-targeting exclusions; lookalikes replaced by Special Ad Audiences.",
+     "Creative must not imply preference for or against a protected class."
+    ],
+    "applied": [
+     "First-time Homebuyers in Hyderabad: age reset to 18\u201365+ (HOUSING)",
+     "First-time Homebuyers in Hyderabad: detailed-targeting exclusions removed (HOUSING)",
+     "First-time Homebuyers in Hyderabad: lookalike replaced by Special Ad Audience (HOUSING)",
+     "NRI Investors in Hyderabad: age reset to 18\u201365+ (HOUSING)",
+     "NRI Investors in Hyderabad: detailed-targeting exclusions removed (HOUSING)",
+     "NRI Investors in Hyderabad: lookalike replaced by Special Ad Audience (HOUSING)"
+    ],
+    "human_approval_required": true,
+    "created_paused": true
+   },
+   "network": "meta",
+   "daily_budget": 2000.0,
+   "currency": "INR",
+   "name": "Neopolis Infra Lead Generation Campaign",
+   "objective": "OUTCOME_LEADS",
+   "creative": {
+    "id": "A",
+    "format": "single_image",
+    "primary_text": "Discover affordable landlord-share flats in West Hyderabad. No broker fees and verified titles!",
+    "headline": "Affordable Flats in Hyderabad",
+    "description": "Direct from landowners, 8-14% ",
+    "cta": "WHATSAPP_MESSAGE",
+    "link": "",
+    "visual_direction": "Bright images showcasing the properties and neighborhoods."
+   },
+   "targeting": {
+    "geo_locations": {
+     "countries": [
+      "IN"
+     ],
+     "cities_hint": [
+      {
+       "name": "Hyderabad",
+       "radius_miles": 15.5
+      }
+     ]
+    },
+    "age_min": 18,
+    "age_max": 65,
+    "publisher_platforms": [
+     "facebook",
+     "instagram"
+    ],
+    "flexible_spec_hint": {
+     "interests": [
+      "Real estate investing",
+      "Home buying",
+      "Property management",
+      "Affordable housing"
+     ],
+     "behaviors": [
+      "Newly married",
+      "Recently moved",
+      "NRI expats"
+     ]
+    }
+   },
+   "summary": [
+    "Neopolis Infra Lead Generation Campaign \u00b7 OUTCOME_LEADS \u00b7 special category HOUSING",
+    "  First-time Homebuyers in Hyderabad: Hyderabad +25km \u00b7 age 18\u201365 \u00b7 Real estate investing, Home buying, Property management, Affordable housing \u00b7 instagram_feed, facebook_feed \u00b7 \u20b91000.0/day",
+    "  NRI Investors in Hyderabad: Hyderabad +25km \u00b7 age 18\u201365 \u00b7 Real estate investment, NRI services, Property investment, Foreign exchange \u00b7 instagram_feed, facebook_feed \u00b7 \u20b91000.0/day"
+   ]
+  },
+  "google_plan": {
+   "campaign": {
+    "name": "Neopolis Infra Landlord Share Flats",
+    "type": "SEARCH",
+    "networks": [
+     "google_search"
+    ],
+    "why": "Targeting first-time homebuyers in Hyderabad for landlord-share flats"
+   },
+   "locations": [
+    {
+     "name": "Hyderabad, Telangana",
+     "radius_km": 30
+    }
+   ],
+   "languages": [
+    "English"
+   ],
+   "bidding": {
+    "strategy": "MAXIMIZE_CONVERSIONS",
+    "target_cpa": null
+   },
+   "schedule": {
+    "days": "Mon-Sun",
+    "hours": "8am-10pm"
+   },
+   "ad_groups": [
+    {
+     "name": "Landlord Share Flats",
+     "theme": "Landlord share flats in Hyderabad",
+     "budget_share": 0.5,
+     "keywords": [
+      {
+       "text": "landlord share flats hyderabad",
+       "match": "EXACT",
+       "intent": "transactional"
+      },
+      {
+       "text": "landlord share flats kokapet",
+       "match": "PHRASE",
+       "intent": "transactional"
+      },
+      {
+       "text": "flats below resale Hyderabad",
+       "match": "BROAD",
+       "intent": "transactional"
+      }
+     ],
+     "negative_keywords": [
+      "free",
+      "jobs"
+     ],
+     "rsa": {
+      "headlines": [
+       "Affordable Landlord Share Flat",
+       "Direct from Owners in Hyderaba",
+       "Save 8-14% Below Resale",
+       "Title-Verified Properties",
+       "Zero Broker Fees",
+       "Transparent Pricing",
+       "Book Your Site Visit Today",
+       "Find Your Dream Home in Kokape"
+      ],
+      "descriptions": [
+       "Discover landlord-share flats in Hyderabad with verified titles.",
+       "Buy directly from landowners and save on broker fees.",
+       "Explore available properties in Kokapet, Narsingi, and more."
+      ],
+      "final_url": "https://www.neopolisinfra.com",
+      "path": [
+       "landlord-share",
+       "hyderabad"
+      ]
+     },
+     "extensions": {
+      "sitelinks": [
+       {
+        "text": "View Listings",
+        "url": "https://www.neopolisinfra.com/properties"
+       },
+       {
+        "text": "Customer Testimonials",
+        "url": "https://www.neopolisinfra.com/testimonials"
+       }
+      ],
+      "callouts": [
+       "Title-Verified",
+       "Direct Communication",
+       "No Hidden Fees"
+      ],
+      "call": "+91 95336 86567"
+     },
+     "daily_budget": 500.0
+    },
+    {
+     "name": "NRI Investors",
+     "theme": "Investment Opportunities in Hyderabad",
+     "budget_share": 0.5,
+     "keywords": [
+      {
+       "text": "investment flats hyderabad",
+       "match": "EXACT",
+       "intent": "transactional"
+      },
+      {
+       "text": "real estate investment kokapet",
+       "match": "PHRASE",
+       "intent": "transactional"
+      },
+      {
+       "text": "NRI property investment",
+       "match": "BROAD",
+       "intent": "transactional"
+      }
+     ],
+     "negative_keywords": [
+      "free",
+      "jobs"
+     ],
+     "rsa": {
+      "headlines": [
+       "Invest in Landlord Share Flats",
+       "Secure Your Future in Hyderaba",
+       "Affordable Investment Options",
+       "Properties 8-14% Below Resale",
+       "Direct Deals with Owners",
+       "Explore NRI Investment Opportu",
+       "Trusted Real Estate Solutions",
+       "Book a Site Visit Now"
+      ],
+      "descriptions": [
+       "Invest in verified landlord-share flats in Hyderabad.",
+       "Explore transparent and affordable options for NRI buyers.",
+       "Direct from owners, eliminating broker fees."
+      ],
+      "final_url": "https://www.neopolisinfra.com",
+      "path": [
+       "nri-investment",
+       "hyderabad"
+      ]
+     },
+     "extensions": {
+      "sitelinks": [
+       {
+        "text": "NRI Investment Guide",
+        "url": "https://www.neopolisinfra.com/nri-guide"
+       },
+       {
+        "text": "View Available Properties",
+        "url": "https://www.neopolisinfra.com/properties"
+       }
+      ],
+      "callouts": [
+       "Zero Broker Commission",
+       "Title-Verified Properties",
+       "Transparent Pricing"
+      ],
+      "call": "+91 95336 86567"
+     },
+     "daily_budget": 500.0
+    }
+   ],
+   "tracking": {
+    "conversion_actions": [
+     "Lead form",
+     "Call"
+    ],
+    "utm": {
+     "source": "google",
+     "medium": "cpc",
+     "campaign": "Neopolis Infra Landlord Share Flats"
+    }
+   },
+   "kpis": {
+    "primary": "cost per lead",
+    "target": "to be determined"
+   },
+   "tests": [
+    "A/B testing of ad copy variations",
+    "Landing page performance tests"
+   ],
+   "risks": [
+    "High competition in real estate market",
+    "Economic fluctuations affecting buyer interest"
+   ],
+   "budget": {
+    "currency": "INR",
+    "daily_total": 1000.0,
+    "cap": 5000.0,
+    "split": [
+     {
+      "ad_group": "Landlord Share Flats",
+      "daily": 500.0,
+      "share": 0.5
+     },
+     {
+      "ad_group": "NRI Investors",
+      "daily": 500.0,
+      "share": 0.5
+     }
+    ],
+    "monthly_estimate": 30000.0
+   },
+   "estimates": {
+    "basis": "benchmark ranges for real_estate (India, INR); not a forecast",
+    "daily": {
+     "impressions": [
+      3846,
+      8333
+     ],
+     "clicks": [
+      34,
+      150
+     ],
+     "leads": [
+      1.4,
+      13.5
+     ]
+    },
+    "period_days": 30,
+    "period": {
+     "spend": 30000.0,
+     "leads": [
+      41,
+      405
+     ]
+    },
+    "cpl_range": [
+     250,
+     900
+    ],
+    "cpm_range": [
+     120,
+     260
+    ],
+    "ctr_range_pct": [
+     0.9,
+     1.8
+    ]
+   },
+   "compliance": {
+    "policy_notes": [
+     "Real-estate ads: no misleading price/availability claims; RERA number where required."
+    ],
+    "human_approval_required": true,
+    "created_paused": true
+   },
+   "network": "google",
+   "daily_budget": 1000.0,
+   "currency": "INR",
+   "name": "Neopolis Infra Landlord Share Flats",
+   "keywords": [
+    {
+     "text": "landlord share flats hyderabad",
+     "match": "EXACT",
+     "intent": "transactional"
+    },
+    {
+     "text": "landlord share flats kokapet",
+     "match": "PHRASE",
+     "intent": "transactional"
+    },
+    {
+     "text": "flats below resale Hyderabad",
+     "match": "BROAD",
+     "intent": "transactional"
+    },
+    {
+     "text": "investment flats hyderabad",
+     "match": "EXACT",
+     "intent": "transactional"
+    },
+    {
+     "text": "real estate investment kokapet",
+     "match": "PHRASE",
+     "intent": "transactional"
+    },
+    {
+     "text": "NRI property investment",
+     "match": "BROAD",
+     "intent": "transactional"
+    }
+   ],
+   "negative_keywords": [
+    "free",
+    "jobs"
+   ],
+   "rsa": {
+    "headlines": [
+     "Affordable Landlord Share Flat",
+     "Direct from Owners in Hyderaba",
+     "Save 8-14% Below Resale",
+     "Title-Verified Properties",
+     "Zero Broker Fees",
+     "Transparent Pricing",
+     "Book Your Site Visit Today",
+     "Find Your Dream Home in Kokape"
+    ],
+    "descriptions": [
+     "Discover landlord-share flats in Hyderabad with verified titles.",
+     "Buy directly from landowners and save on broker fees.",
+     "Explore available properties in Kokapet, Narsingi, and more."
+    ],
+    "final_url": "https://www.neopolisinfra.com",
+    "path": [
+     "landlord-share",
+     "hyderabad"
+    ]
+   },
+   "summary": [
+    "Neopolis Infra Landlord Share Flats \u00b7 SEARCH \u00b7 MAXIMIZE_CONVERSIONS",
+    "  Landlord Share Flats: 3 keywords \u00b7 \u20b9500.0/day",
+    "  NRI Investors: 3 keywords \u00b7 \u20b9500.0/day"
+   ]
+  },
+  "email": {
+   "subject": "Join Us for a Weekend Site Visit in Kokapet!",
+   "preview": "Explore affordable landlord-share flats directly from the landowner this weekend.",
+   "html": "<h1>Discover Your Future Home in Kokapet!</h1><p>Dear Valued Customer,</p><p>We are excited to invite you to a special site-visit weekend at our landlord-share flats in Kokapet. As a past enquiry, we know you are looking for affordable housing options in West Hyderabad, and we want to show you how our properties can meet your needs.</p><p>Our landlord-share flats are title-verified and available at 8-14% below resale prices, all without any broker fees. This is a wonderful opportunity to explore the properties directly from the landowner and understand the transparent pricing we offer.</p><p><strong>Details of the Site Visit:</strong></p><ul><li><strong>Date:</strong> This weekend</li><li><strong>Location:</strong> Kokapet</li><li><strong>Contact:</strong> +91 95336 86567</li></ul><p>To confirm your attendance, simply reply with <strong>VISIT</strong> and we will reserve your spot. We look forward to welcoming you and helping you find your dream home!</p><p>Best Regards,<br/>The Neopolis Infra Team</p>"
+  },
+  "report": {
+   "period": "2026-09",
+   "brand": "Neopolis Infra LLP",
+   "numbers": {
+    "ideas": 12,
+    "creatives": 2,
+    "approved": 2,
+    "published": 0,
+    "published_by_channel": {},
+    "simulated": 2,
+    "metrics_logged": 0,
+    "metric_totals": {},
+    "ad_campaigns": 6,
+    "ad_spend_actions": 0,
+    "ad_spend_total": 0,
+    "email_campaigns": 3,
+    "seo_audits": 3,
+    "seo_best_score": 88,
+    "conversations": 0,
+    "top_creatives": [
+     {
+      "id": "78b0a70e7577",
+      "title": "Unlocking Hyderabad's Hidden Gems",
+      "channel": "instagram",
+      "format": "reel"
+     },
+     {
+      "id": "61c60f02b506",
+      "title": "Your Path to Affordable Living",
+      "channel": "instagram",
+      "format": "reel"
+     }
+    ]
+   },
+   "narrative": "In September 2026, we generated 12 ideas for marketing initiatives and developed 2 creatives, both of which were approved. We ran 6 ad campaigns and executed 3 email campaigns, alongside conducting 3 SEO audits, achieving a best score of 88. However, no content was published this month, and we did not log any metrics or ad spend.\n\nDespite the lack of published content, the approved creatives included engaging Instagram reels titled \"Unlocking Hyderabad's Hidden Gems\" and \"Your Path to Affordable Living.\" These pieces are designed to resonate with our audience, but without publication, we cannot measure their impact.\n\nMoving forward, we recommend prioritizing the publication of the approved creatives to leverage their potential reach. Additionally, we should consider allocating a budget for ad spend to enhance visibility and engagement, as well as tracking metrics to assess campaign effectiveness.",
+   "generated_at": 1789104542.0391526,
+   "by": "18f3ba8a29e9",
+   "branding": {
+    "agency_name": "Marketing Brain",
+    "logo_url": "",
+    "accent": "#6d5dfc",
+    "footer": "Prepared by your marketing team.",
+    "support_email": "",
+    "report_intro": "Here is what we did for you this month, and what it produced."
+   }
+  },
+  "report_id": "f438a23a1fcc",
+  "portfolio_row": {
+   "brand_id": "af4c0bd6fbbd",
+   "name": "Neopolis Infra LLP",
+   "status": "ready",
+   "vertical": "real_estate",
+   "channels": [
+    "instagram",
+    "facebook",
+    "whatsapp"
+   ],
+   "connectors": [],
+   "score": 80,
+   "grade": "green",
+   "approvals": {
+    "waiting": 0,
+    "changes_requested": 0,
+    "approved": 2,
+    "oldest_wait_hours": 0.0
+   },
+   "content": {
+    "creatives_total": 2,
+    "creatives_7d": 2,
+    "published_7d": 0,
+    "upcoming_7d": 7,
+    "days_since_last_creative": 0.0
+   },
+   "budget": {
+    "gen_today": 0,
+    "gen_cap": 40,
+    "spend_today": 0.0
+   },
+   "cycle": {
+    "last_at": null,
+    "last_summary": null,
+    "active_job": null,
+    "active_state": null
+   },
+   "alerts": [
+    {
+     "level": "warn",
+     "code": "no_connectors",
+     "text": "No channel connected \u2014 nothing can go live"
+    },
+    {
+     "level": "info",
+     "code": "cycle_due",
+     "text": "Weekly cycle is due"
+    }
+   ]
+  }
+ }
+}

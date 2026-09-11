@@ -31,7 +31,7 @@ async def main():
         await page.evaluate(f"localStorage.setItem('mb_token','{tok}')")
         shots = []
         async def shot(name, wait=2500):
-            await page.wait_for_timeout(wait); f = os.path.join(OUT, name + ".png"); await page.screenshot(path=f, full_page=True); shots.append(name); print("shot", name, flush=True)
+            await page.wait_for_timeout(wait); f = os.path.join(OUT, name + ".png"); await page.screenshot(path=f, full_page=True)  # converted to .jpg for the repo by build_report; shots.append(name); print("shot", name, flush=True)
         # console views
         await page.goto(f"{BASE}/operator.html"); await page.wait_for_timeout(3000); await shot("01-portfolio")
         for v in ("approvals", "cycles", "clients"):
