@@ -1,0 +1,345 @@
+{
+ "run": "2026-09-11 08:58 UTC",
+ "brand_id": "af4c0bd6fbbd",
+ "pass": 18,
+ "fail": 0,
+ "steps": [
+  {
+   "step": "01 new idea",
+   "status": "PASS",
+   "detail": "['Price Breakdown: Why Landlord-Share Flats Are Cheaper', 'The Secret Behind Lower Prices in Kokapet']"
+  },
+  {
+   "step": "02 creative produced",
+   "status": "PASS",
+   "detail": "{'title': 'Price Breakdown: Why Landlord-Share Flats Are Cheaper', 'caption': '\ud83c\udfe1 Are you paying too much for your dream home? \\n\\nLet\u2019s break it down! Our landlord-share flats offer 8-14% savings compared to resale prices'}"
+  },
+  {
+   "step": "03 first visual generated",
+   "status": "PASS",
+   "detail": "{'ok': True, 'asset_url': '/workspaces/neopolis-infra-llp/instagram/assets/c63a8499fd8f.png'}"
+  },
+  {
+   "step": "04 art-director review (vision)",
+   "status": "PASS",
+   "detail": "{'score': 60, 'verdict': 'The visual needs significant revisions.', 'issues': [('text', 'high', 'Text is garbled and contains a misspelling'), ('colour', 'medium', 'Brand colors are not fully represented'), ('composition', 'medium', 'Lacks clear focal point and hierarchy'), ('safe_area', 'high', 'Text may be cut off by platform UI'), ('quality', 'high', \"aspect ratio 1024\u00d71024 (1.00) is not the platform's 1080\u00d71350 (0.80)\")], 'file': '1024x1024 target [1080, 1350]'}"
+  },
+  {
+   "step": "05 design fix applied",
+   "status": "PASS",
+   "detail": "{'applied': ['cropped/resized to the platform ratio', 'regenerated with the revised art direction'], 'before': {'asset': 'instagram/assets/c63a8499fd8f.png', 'score': None}, 'after': {'asset': 'instagram/assets/c63a8499fd8f.png', 'score': 65}, 'regen': {'asset': 'instagram/assets/c63a8499fd8f.png', 'score': 65, 'verdict': 'The visual requires significant adjustments.'}, 'publish_ready': False}"
+  },
+  {
+   "step": "06 creative carries design_qa record + asset history",
+   "status": "PASS",
+   "detail": "{'asset': 'instagram/assets/c63a8499fd8f.png', 'history': []}"
+  },
+  {
+   "step": "07 contacts imported (test addresses)",
+   "status": "PASS",
+   "detail": "{'added': 2, 'updated': 0, 'skipped': 0}"
+  },
+  {
+   "step": "08 mail status",
+   "status": "PASS",
+   "detail": "{'smtp_connected': False, 'from': None, 'daily_cap': None, 'sent_today': 0, 'contacts': 2, 'unsubscribed': 0}"
+  },
+  {
+   "step": "09 broadcast drafted by AI",
+   "status": "PASS",
+   "detail": "{'subject': 'Discover Your Dream Home in Kokapet!', 'alt': 'Explore Affordable Flats This Weekend', 'preview': 'Join us for a special weekend site visit in Kokapet.', 'audience': 2}"
+  },
+  {
+   "step": "10 branded preview renders with tracking + unsubscribe",
+   "status": "PASS",
+   "detail": "{'bytes': 1999, 'subject': 'Discover Your Dream Home in Kokapet!'}"
+  },
+  {
+   "step": "11 3\u20134 step sequence drafted",
+   "status": "PASS",
+   "detail": "[(0, 'Ready to Explore Your Future Home?'), (2, 'Your Dream Home Awaits!'), (4, 'Still Thinking About Your Options?')]"
+  },
+  {
+   "step": "12 send blocked: SMTP not connected (nothing sent)",
+   "status": "PASS",
+   "detail": "SMTP is not connected for this client (Settings \u2192 Connections \u2192 SMTP)"
+  },
+  {
+   "step": "13 send blocked without approval",
+   "status": "PASS",
+   "detail": "Sending real mail requires approve=true"
+  },
+  {
+   "step": "14 campaigns listed with stats",
+   "status": "PASS",
+   "detail": "[('broadcast', 'draft', 'Discover Your Dream Home in Kokapet!'), ('sequence', 'draft', 'Ready to Explore Your Future Home?')]"
+  },
+  {
+   "step": "15 airtable status (no PAT on this client yet)",
+   "status": "PASS",
+   "detail": "{'connected': False, 'via_agency_default': False, 'base_id': None, 'url': None, 'can_create': False, 'last_push': None, 'last_pull': None, 'views_howto': [\"Open the base \u2192 Content Calendar \u2192 '+ Create view' \u2192 Calendar \u2192 choose the Date field \u2192 name it 'Calendar'.\", \"'+ Create view' \u2192 Kanban \u2192 stack by Status \u2192 name it 'Board'.\", \"Share \u2192 'Create a shareable view link' on the Calendar view to embed it for the client.\"]}"
+  },
+  {
+   "step": "16 push refuses cleanly without a token",
+   "status": "PASS",
+   "detail": "Airtable is not connected for this client (or as an agency default)"
+  },
+  {
+   "step": "17 hub lists SMTP + Airtable with workspace field",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "step": "18 portfolio after round 2",
+   "status": "PASS",
+   "detail": "{'score': 80, 'waiting': 2, 'creatives_7d': 5}"
+  }
+ ],
+ "artefacts": {
+  "creative": {
+   "title": "Price Breakdown: Why Landlord-Share Flats Are Cheaper",
+   "caption": "\ud83c\udfe1 Are you paying too much for your dream home? \n\nLet\u2019s break it down! Our landlord-share flats offer 8-14% savings compared to resale prices, thanks to direct transactions with landowners. Say goodbye to hidden fees and hello to transparent pricing! \ud83d\udd0d\u2728 \n\nDiscover how affordable homeownership can be with Neopolis Infra. \n\n\ud83d\udcac Learn more about your savings potential! \n\n#NeopolisInfra #AffordableHousing #HyderabadRealEstate #LandlordShare #HomeBuyingTips",
+   "hashtags": {
+    "broad": [
+     "#RealEstate",
+     "#HomeBuying",
+     "#AffordableHousing"
+    ],
+    "niche": [
+     "#LandlordShare",
+     "#HyderabadRealEstate",
+     "#FirstTimeHomeBuyer"
+    ],
+    "branded": [
+     "#NeopolisInfra"
+    ]
+   },
+   "image_prompt": "Create an infographic with a clear breakdown of costs showing landlord-share flats priced 8-14% below resale. Use the brand colors #ff6600, #ff8534, #081d4a, and #9fb0d6. Include simple charts for clarity and leave clean negative space in the bottom-right corner for a logo.",
+   "cta": "Learn more about your savings potential!"
+  },
+  "before_asset": "/workspaces/neopolis-infra-llp/instagram/assets/c63a8499fd8f.png",
+  "review_before": {
+   "ok": true,
+   "score": 60,
+   "verdict": "The visual needs significant revisions.",
+   "vision": {
+    "text_in_image": {
+     "present": true,
+     "legible": false,
+     "transcription": "Resale Flats Landolarf-share",
+     "problems": [
+      "Misspelling of 'Landlord-share'",
+      "Text is not clear against the background"
+     ]
+    },
+    "logo": {
+     "visible": false,
+     "placement_ok": true,
+     "note": "No logo present, but space is available"
+    },
+    "brand_colours": {
+     "ok": false,
+     "note": "The color palette is not fully utilized; some colors are missing"
+    },
+    "composition": {
+     "ok": false,
+     "note": "The layout is cluttered and lacks clear hierarchy"
+    },
+    "safe_areas": {
+     "ok": false,
+     "note": "Text and charts may be cut off in platform UI"
+    },
+    "generic_stock_look": false
+   },
+   "issues": [
+    {
+     "area": "text",
+     "severity": "high",
+     "problem": "Text is garbled and contains a misspelling",
+     "fix": "Correct 'Landolarf-share' to 'Landlord-share' and improve legibility"
+    },
+    {
+     "area": "colour",
+     "severity": "medium",
+     "problem": "Brand colors are not fully represented",
+     "fix": "Incorporate all brand colors into the charts"
+    },
+    {
+     "area": "composition",
+     "severity": "medium",
+     "problem": "Lacks clear focal point and hierarchy",
+     "fix": "Rearrange elements for better clarity and focus"
+    },
+    {
+     "area": "safe_area",
+     "severity": "high",
+     "problem": "Text may be cut off by platform UI",
+     "fix": "Adjust layout to ensure all elements are within safe areas"
+    },
+    {
+     "area": "quality",
+     "severity": "high",
+     "problem": "aspect ratio 1024\u00d71024 (1.00) is not the platform's 1080\u00d71350 (0.80)",
+     "fix": "auto-fixed mechanically"
+    }
+   ],
+   "regenerate": true,
+   "revised_image_prompt": "Create an infographic with a clear breakdown of costs showing landlord-share flats priced 8-14% below resale. Use the brand colors #ff6600, #ff8534, #081d4a, and #9fb0d6. Include simple charts for clarity, ensure text is legible, and leave clean negative space in the bottom-right corner for a logo.",
+   "checks": {
+    "width": 1024,
+    "height": 1024,
+    "target": [
+     1080,
+     1350
+    ],
+    "issues": [
+     "aspect ratio 1024\u00d71024 (1.00) is not the platform's 1080\u00d71350 (0.80)"
+    ],
+    "fixes": [
+     "crop_to_target"
+    ],
+    "mean_luma": 48.6
+   },
+   "at": 1789117043.3466516
+  },
+  "fix": {
+   "ok": true,
+   "before": {
+    "asset": "instagram/assets/c63a8499fd8f.png",
+    "score": null
+   },
+   "after": {
+    "asset": "instagram/assets/c63a8499fd8f.png",
+    "score": 65
+   },
+   "applied": [
+    "cropped/resized to the platform ratio",
+    "regenerated with the revised art direction"
+   ],
+   "regen": {
+    "asset": "instagram/assets/c63a8499fd8f.png",
+    "score": 65,
+    "verdict": "The visual requires significant adjustments."
+   },
+   "review": {
+    "score": 65,
+    "verdict": "The visual requires significant adjustments.",
+    "issues": [
+     {
+      "area": "text",
+      "severity": "high",
+      "problem": "Text is not legible due to poor color contrast.",
+      "fix": "Change text color to improve contrast against background."
+     },
+     {
+      "area": "colour",
+      "severity": "medium",
+      "problem": "Brand colors are not consistently applied.",
+      "fix": "Incorporate all brand colors into the infographic."
+     },
+     {
+      "area": "composition",
+      "severity": "medium",
+      "problem": "Visual feels crowded and lacks clarity.",
+      "fix": "Increase negative space and simplify the layout."
+     },
+     {
+      "area": "safe_area",
+      "severity": "high",
+      "problem": "Does not respect Instagram's safe areas.",
+      "fix": "Adjust layout to ensure critical elements are within safe zones."
+     },
+     {
+      "area": "quality",
+      "severity": "high",
+      "problem": "aspect ratio 1024\u00d71024 (1.00) is not the platform's 1080\u00d71350 (0.80)",
+      "fix": "auto-fixed mechanically"
+     }
+    ],
+    "vision": {
+     "text_in_image": {
+      "present": true,
+      "legible": false,
+      "transcription": "Breakdown of costs, Landlord-share flats",
+      "problems": [
+       "Text is not legible due to color contrast issues."
+      ]
+     },
+     "logo": {
+      "visible": false,
+      "placement_ok": true,
+      "note": "No logo present, but space is left clear."
+     },
+     "brand_colours": {
+      "ok": false,
+      "note": "Colors used do not fully align with brand palette."
+     },
+     "composition": {
+      "ok": false,
+      "note": "Crowded layout with insufficient negative space."
+     },
+     "safe_areas": {
+      "ok": false,
+      "note": "Does not adhere to platform safe areas."
+     },
+     "generic_stock_look": true
+    },
+    "checks": {
+     "width": 1024,
+     "height": 1024,
+     "target": [
+      1080,
+      1350
+     ],
+     "issues": [
+      "aspect ratio 1024\u00d71024 (1.00) is not the platform's 1080\u00d71350 (0.80)"
+     ],
+     "fixes": [
+      "crop_to_target"
+     ],
+     "mean_luma": 46.6
+    }
+   },
+   "publish_ready": false,
+   "min_score": 75,
+   "at": 1789117092.1680415
+  },
+  "after_asset": "instagram/assets/c63a8499fd8f.png",
+  "creative_id": "c63a8499fd8f",
+  "mail": {
+   "goal": "invite 2026 enquiries to a Kokapet site-visit weekend, direct from landowners, 8\u201314% below resale",
+   "segment": {
+    "tags": [
+     "enquiry-2026"
+    ]
+   },
+   "stats": {},
+   "subject": "Discover Your Dream Home in Kokapet!",
+   "preview": "Join us for a special weekend site visit in Kokapet.",
+   "html": "<h1>Join Us for a Special Site Visit in Kokapet!</h1><p>Are you ready to find your new home? We invite you to explore our exclusive landlord-share flats in Kokapet, available at 8\u201314% below resale prices, directly from the landowners.</p><p>Experience the benefits of:</p><ul><li>Title-verified properties</li><li>No broker fees</li><li>Transparent pricing</li></ul><p>Don't miss this opportunity! Schedule your visit and discover the perfect place for you.</p><p><strong>Book your site visit \u2014 reply <a href=\"mailto:?subject=Site Visit Request\">VISIT</a></strong></p>",
+   "text": "Join us for a special site visit in Kokapet! Are you ready to find your new home? We invite you to explore our exclusive landlord-share flats, available at 8\u201314% below resale prices, directly from the landowners. Experience title-verified properties with no broker fees and transparent pricing. Don't miss this opportunity! Book your site visit \u2014 reply VISIT.",
+   "subject_alt": "Explore Affordable Flats This Weekend"
+  },
+  "mail_preview_html": "<!doctype html><html><body style=\"margin:0;background:#f4f5f7;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1a1a1a\">\n<span style=\"display:none;max-height:0;overflow:hidden\">Join us for a special weekend site visit in Kokapet.</span>\n<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\"><tr><td align=\"center\" style=\"padding:24px 12px\">\n<table role=\"presentation\" width=\"600\" style=\"max-width:600px;background:#fff;border-radius:12px;overflow:hidden\">\n<tr><td style=\"background:#ff6600;padding:18px 24px;color:#fff;font-weight:700;font-size:18px\"><img src=\"https://neopolisinfra.com/assets/img/logo.png\" alt=\"\" style=\"height:32px;vertical-align:middle;margin-right:10px\">Neopolis Infra LLP</td></tr>\n<tr><td style=\"padding:24px;font-size:15px;line-height:1.55\"><h1>Join Us for a Special Site Visit in Kokapet!</h1><p>Are you ready to find your new home? We invite you to explore our exclusive landlord-share flats in Kokapet, available at 8\u201314% below resale prices, directly from the landowners.</p><p>Experience the benefits of:</p><ul><li>Title-verified properties</li><li>No broker fees</li><li>Transparent pricing</li></ul><p>Don't miss this opportunity! Schedule your visit and discover the perfect place for you.</p><p><strong>Book your site visit \u2014 reply <a href=\"mailto:?subject=Site Visit Request\">VISIT</a></strong></p></td></tr>\n<tr><td style=\"padding:16px 24px;font-size:12px;color:#6b7280;border-top:1px solid #eee\">Neopolis Infra LLP \u00b7 +91 95336 86567<br>\nYou are receiving this because you asked to hear from us. <a href=\"https://marketing-brain-production-1f88.up.railway.app/m/u/dXxhZjRjMGJkNmZiYmR8ZTgyMDdlMDQxNGU3fHRlc3R8MHx8M2VlZjFkNmNmOTYzMGY0YmRiNGM\" style=\"color:#6b7280\">Unsubscribe</a></td></tr>\n</table></td></tr></table><img src=\"https://marketing-brain-production-1f88.up.railway.app/m/o/b3xhZjRjMGJkNmZiYmR8ZTgyMDdlMDQxNGU3fHRlc3R8MHx8N2UzNGQyMzFmYWI4OGNjMjkzZTM.gif\" width=\"1\" height=\"1\" alt=\"\" style=\"display:block\"></body></html>",
+  "sequence": [
+   {
+    "n": 1,
+    "delay_days": 0,
+    "subject": "Ready to Explore Your Future Home?",
+    "text": "Hi {{first_name}},\n\nI hope this message finds you well! I wanted to check in and see if you\u2019re still interested in exploring landlord-share flats in West Hyderabad. We have some great options that are 8\u201314% below resale, directly from the landowner.\n\nIf you\u2019re ready, just reply with 'VISIT' to book a site visit!\n\nBest,\nThe Neopolis Infra Team"
+   },
+   {
+    "n": 2,
+    "delay_days": 2,
+    "subject": "Your Dream Home Awaits!",
+    "text": "Hi {{first_name}},\n\nJust following up on my last message. If affordable housing with transparent pricing is what you\u2019re looking for, we can help! Our title-verified flats in Kokapet and Narsingi are waiting for you.\n\nLet me know if you\u2019d like to schedule a visit. Just reply with 'VISIT' if you\u2019re interested!\n\nWarm regards,\nThe Neopolis Infra Team"
+   },
+   {
+    "n": 3,
+    "delay_days": 4,
+    "subject": "Still Thinking About Your Options?",
+    "text": "Hi {{first_name}},\n\nI just wanted to touch base one last time. If you have any questions or need more information about our landlord-share flats, I\u2019d love to help. Remember, these options are direct from owners and verified.\n\nReply with 'VISIT' to book a site visit or let me know if there's anything else you need!\n\nTake care,\nThe Neopolis Infra Team"
+   }
+  ]
+ }
+}

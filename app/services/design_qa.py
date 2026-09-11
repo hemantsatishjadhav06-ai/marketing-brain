@@ -203,8 +203,17 @@ def fix(brand, creative, review_result: dict | None = None, max_regens: int = 1)
     rv = review_result or review(brand, creative, blob)
     if not rv.get("ok"):
         return {"ok": False, "error": rv.get("error"), "review": rv}
+    _FIRST_SCORE["v"] = rv.get("score")
     applied = []
     cur_blob, cur_asset, cur_score = blob, before_asset, rv.get("score")
+    # Keep the original pixels: a regenerate writes to the same file name, so the
+    # "before" would otherwise be lost and the before/after comparison meaningless.
+    snapshot = None
+    if blob:
+        try:
+            snapshot = sh._save_asset(brand, f"{channel}/assets/{cid}-v{int(time.time())}.png", blob)
+        except Exception:
+            snapshot = None
     # 1. mechanical
     if "crop_to_target" in (rv.get("checks") or {}).get("fixes", []) and cur_blob:
         cur_blob = crop_to_target(cur_blob, channel, fmt)
@@ -218,9 +227,22 @@ def fix(brand, creative, review_result: dict | None = None, max_regens: int = 1)
     regen = None
     if (rv.get("regenerate") or (cur_score is not None and cur_score < min_score)) and rv.get("revised_image_prompt") and max_regens > 0:
         try:
-            out = sh._generate_image(brand, cid, prompt_override=rv["revised_image_prompt"])
+            prompt = rv["revised_image_prompt"]
+            tii = ((rv.get("vision") or {}).get("text_in_image") or {})
+            if tii.get("present") and not tii.get("legible", True):
+                # The model keeps rendering (garbled) text: take text off the table entirely.
+                prompt = ("PURELY VISUAL scene with ABSOLUTELY NO text, numbers, labels, charts, infographics, "
+                          "diagrams or UI of any kind — the message is carried by the caption. " + prompt)
+            sh._generate_image(brand, cid, prompt_override=prompt)
             new_creative = db.get_doc("creatives", cid)
             new_blob = load_asset(brand, new_creative.get("asset_path") or "")
+            # The regenerated file must also be the platform's ratio.
+            if new_blob and "crop_to_target" in checks(new_blob, channel, fmt)["fixes"]:
+                new_blob = crop_to_target(new_blob, channel, fmt)
+                new_asset = sh._save_asset(brand, f"{channel}/assets/{cid}-qa2.png", new_blob)
+                db.update_doc("creatives", cid, asset_path=new_asset)
+                new_creative = db.get_doc("creatives", cid)
+                applied.append("regenerated file cropped/resized to the platform ratio")
             rv_new = review(brand, new_creative, new_blob)
             regen = {"asset": new_creative.get("asset_path"), "score": rv_new.get("score"), "verdict": rv_new.get("verdict")}
             if rv_new.get("ok") and (cur_score is None or (rv_new.get("score") or 0) >= (cur_score or 0)):
@@ -233,14 +255,27 @@ def fix(brand, creative, review_result: dict | None = None, max_regens: int = 1)
             regen = {"error": str(getattr(e, "detail", e))[:200]}
     elif cur_asset != before_asset:
         db.update_doc("creatives", cid, asset_path=cur_asset)
-    record = {"before": {"asset": before_asset, "score": (review_result or {}).get("score", None) if review_result else None},
+    record = {"before": {"asset": None, "score": None},
               "after": {"asset": cur_asset, "score": cur_score}, "applied": applied, "regen": regen,
               "review": {k: rv.get(k) for k in ("score", "verdict", "issues", "vision", "checks")},
               "publish_ready": (cur_score or 0) >= min_score, "min_score": min_score, "at": time.time()}
-    if record["before"]["score"] is None:
-        record["before"]["score"] = (review_result or {}).get("score") if review_result else None
     hist = list(((db.get_doc("creatives", cid) or {}).get("payload") or {}).get("asset_history") or [])
-    if before_asset and before_asset != cur_asset:
-        hist.append({"asset": before_asset, "replaced_at": time.time(), "reason": "design_qa"})
+    changed = bool(applied) and not (len(applied) == 1 and "kept the previous version" in applied[0])
+    if snapshot and changed:
+        hist.append({"asset": snapshot, "replaced_at": time.time(), "reason": "design_qa", "score": record_before_score(rv, review_result)})
+        record_before_asset = snapshot
+    else:
+        record_before_asset = before_asset
+    record["before"] = {"asset": record_before_asset, "score": record_before_score(rv, review_result)}
     db.merge_payload("creatives", cid, {"design_qa": record, "asset_history": hist[-5:]})
     return {"ok": True, **record}
+
+
+def record_before_score(rv_final, review_result):
+    """The score of the image the operator started with (first review), for the record."""
+    if review_result and review_result.get("score") is not None:
+        return review_result.get("score")
+    return _FIRST_SCORE.get("v")
+
+
+_FIRST_SCORE: dict = {}

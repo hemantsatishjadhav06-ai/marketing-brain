@@ -347,7 +347,11 @@ def _generate_image(b, creative_id, prompt_override=None):
     if not c:
         raise HTTPException(404, "Creative not found")
     prompt = prompt_override or c["payload"].get("image_prompt") or c["payload"].get("title")
-    blob = ai_engine.generate_image(prompt, b["name"], ai_engine.brand_palette(b))
+    # Ask for the platform's own ratio (4:5 for an Instagram post, 9:16 for a reel…)
+    # so the Design QA crop has little to remove.
+    from ..services import design_qa
+    aspect = ai_engine.aspect_for(design_qa.target_for(c.get("channel") or "instagram", c.get("format") or (c["payload"].get("format") or "post")))
+    blob = ai_engine.generate_image(prompt, b["name"], ai_engine.brand_palette(b), aspect=aspect)
     if not blob:
         raise HTTPException(502, "Image generation failed (model returned no image). Retry, or use the visual direction text with any image tool.")
     blob = _composite_logo(b, blob)

@@ -459,11 +459,45 @@ def _art_direct(prompt, brand_name="", colors=None):
     )
 
 
-def _img_from_images_api(model, prompt, references=None, timeout=180):
+ASPECT_FALLBACK = {"4:5": ["4:5", "2:3", "1:1"], "9:16": ["9:16", "2:3", "1:1"], "16:9": ["16:9", "3:2", "1:1"],
+                   "3:2": ["3:2", "16:9", "1:1"], "2:3": ["2:3", "4:5", "1:1"], "1:1": ["1:1"]}
+
+
+def aspect_for(target):
+    """Platform target (w, h) → the closest aspect string the image APIs accept."""
+    try:
+        w, h = target
+        r = w / h
+    except Exception:
+        return "1:1"
+    if abs(r - 0.8) < 0.05:
+        return "4:5"
+    if r < 0.7:
+        return "9:16"
+    if r > 1.6:
+        return "16:9"
+    if r > 1.2:
+        return "3:2"
+    return "1:1"
+
+
+def _img_from_images_api(model, prompt, references=None, timeout=180, aspect="1:1"):
     """Primary path: OpenRouter's dedicated Images API (/api/v1/images). Correct for
     dedicated image models such as openai/gpt-image-1, seedream, flux, recraft and the
-    gemini image models. Returns raw image bytes or None."""
-    payload = {"model": model, "prompt": prompt, "aspect_ratio": "1:1", "resolution": "2K"}
+    gemini image models. Returns raw image bytes or None. Asks for the platform's
+    aspect ratio and steps down through supported ratios if the model rejects it."""
+    for ar in ASPECT_FALLBACK.get(aspect, [aspect, "1:1"]):
+        try:
+            return _img_once(model, prompt, references, timeout, ar)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 400 and ar != "1:1":
+                continue
+            raise
+    return None
+
+
+def _img_once(model, prompt, references, timeout, aspect):
+    payload = {"model": model, "prompt": prompt, "aspect_ratio": aspect, "resolution": "2K"}
     if references:
         payload["input_references"] = [{"type": "image_url", "image_url": {"url": u}} for u in references if u]
     headers = {
@@ -506,7 +540,7 @@ def _img_from_chat_api(model, prompt, timeout=180):
     return None
 
 
-def generate_image(prompt, brand_name="", colors=None, model=None, references=None):
+def generate_image(prompt, brand_name="", colors=None, model=None, references=None, aspect="1:1"):
     """Generate a branded social image via OpenRouter. Tries the dedicated Images API
     first (correct for GPT Image 1 and other image models), then falls back to the
     chat-image path for gemini-style models. Returns PNG/JPEG bytes or None."""
@@ -515,7 +549,7 @@ def generate_image(prompt, brand_name="", colors=None, model=None, references=No
     model = model or IMAGE_MODEL
     brief = _art_direct(prompt, brand_name, colors)
     try:
-        blob = _img_from_images_api(model, brief, references)
+        blob = _img_from_images_api(model, brief, references, aspect=aspect)
         if blob:
             return blob
     except Exception:

@@ -96,7 +96,8 @@ def test_FIX_mechanical_only_when_score_is_good(vision):
     assert out["after"]["asset"].endswith("-qa.png") and out["after"]["score"] == 90
     c2 = db.get_doc("creatives", c["id"])
     assert c2["asset_path"].endswith("-qa.png") and c2["payload"]["design_qa"]["publish_ready"]
-    assert c2["payload"]["asset_history"][0]["asset"] == c["asset_path"]
+    assert c2["payload"]["asset_history"][0]["asset"].split("-v")[0].endswith(c["id"])   # snapshot of the original pixels
+    assert out["before"]["asset"] == c2["payload"]["asset_history"][0]["asset"] and out["before"]["score"] == 74
     assert Image.open(io.BytesIO(design_qa.load_asset(b, c2["asset_path"]))).size == (1080, 1350)
     assert out["regen"] is None
 
@@ -108,7 +109,8 @@ def test_FIX_regenerates_once_when_score_low_and_keeps_better(vision, monkeypatc
                                                                                "regenerate": True, "revised_image_prompt": "np"})
     out = design_qa.fix(b, c)
     assert out["ok"] and "regenerated with the revised art direction" in out["applied"]
-    assert out["before"]["score"] is None or out["before"]["score"] == 50
+    assert out["before"]["score"] == 50 and "-v" in out["before"]["asset"]
+    assert design_qa.load_asset(b, out["before"]["asset"]) == png(1080, 1350)   # original pixels preserved
     assert out["after"]["score"] == 88 and out["regen"]["score"] == 88
     assert db.get_doc("creatives", c["id"])["payload"]["design_qa"]["publish_ready"]
 
@@ -121,6 +123,7 @@ def test_FIX_keeps_original_when_regeneration_is_worse(vision, monkeypatch):
     out = design_qa.fix(b, c)
     assert "kept the previous version" in " ".join(out["applied"])
     assert db.get_doc("creatives", c["id"])["asset_path"] == c["asset_path"]
+    assert db.get_doc("creatives", c["id"])["payload"]["asset_history"] == []   # nothing replaced, nothing to keep
     assert out["publish_ready"] is False
 
 
@@ -143,3 +146,24 @@ def test_REVIEW_survives_vision_outage(monkeypatch):
     monkeypatch.setattr(engine, "_json_chat_vision", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("down")))
     rv = design_qa.review(b, c)
     assert rv["ok"] and rv["score"] is None and "unavailable" in rv["verdict"]
+
+
+def test_ASPECT_for_platform_targets():
+    assert engine.aspect_for((1080, 1350)) == "4:5" and engine.aspect_for((1080, 1920)) == "9:16"
+    assert engine.aspect_for((1200, 1200)) == "1:1" and engine.aspect_for((1600, 900)) == "16:9" and engine.aspect_for(None) == "1:1"
+
+
+def test_FIX_recrops_regenerated_square_and_forbids_text(vision, monkeypatch):
+    b = _brand(); c = _creative(b, png(1080, 1350))
+    seen = {}
+    monkeypatch.setattr(engine, "generate_image", lambda prompt, *a, **k: (seen.setdefault("prompt", prompt), seen.setdefault("aspect", k.get("aspect")), png(1024, 1024, (40, 60, 120)))[-1])
+    scores = iter([50, 90])
+    monkeypatch.setattr(engine, "_json_chat_vision", lambda s, u, blob, **k: {"score": next(scores), "verdict": "v", "issues": [], "regenerate": True,
+                                                                               "revised_image_prompt": "sunlit balcony", "text_in_image": {"present": True, "legible": False}})
+    out = design_qa.fix(b, c)
+    assert "regenerated file cropped/resized to the platform ratio" in out["applied"]
+    assert seen["prompt"].startswith("PURELY VISUAL") and "sunlit balcony" in seen["prompt"] and seen["aspect"] == "4:5"
+    final = db.get_doc("creatives", c["id"])
+    assert final["asset_path"].endswith("-qa2.png")
+    assert Image.open(io.BytesIO(design_qa.load_asset(b, final["asset_path"]))).size == (1080, 1350)
+    assert out["after"]["score"] == 90 and out["publish_ready"]
