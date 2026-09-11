@@ -386,7 +386,38 @@ Return JSON:
  "send_trigger_line": "one line to add that makes people DM this to a friend",
  "save_reason_addition": "one element to add that makes people save it"
 }}"""
-    return _json_chat(system, user, max_tokens=2500, temperature=0.4)
+    out = _json_chat(system, user, max_tokens=2500, temperature=0.4)
+    return _harden_audit(out)
+
+
+def _harden_audit(out):
+    """The model sometimes omits the weighted total or names it differently. Derive
+    it from the per-signal scores so the console and the API always get a number."""
+    if not isinstance(out, dict):
+        return {"signals": [], "algo_score": None, "score": None, "verdict": str(out)[:200]}
+    signals = [s for s in (out.get("signals") or []) if isinstance(s, dict)]
+    total = out.get("algo_score")
+    if total is None:
+        for k in ("score", "overall_score", "total", "total_score"):
+            if isinstance(out.get(k), (int, float)):
+                total = out[k]
+                break
+    if total is None and signals:
+        w = {"watch_time": 2, "send_trigger": 2}
+        num = den = 0.0
+        for sg in signals:
+            try:
+                sc = float(sg.get("score"))
+            except (TypeError, ValueError):
+                continue
+            wt = w.get(sg.get("signal"), 1)
+            num += sc * wt
+            den += 10 * wt
+        total = round(99 * num / den) if den else None
+    out["algo_score"] = total
+    out["score"] = total
+    out.setdefault("verdict", "")
+    return out
 
 
 # ---------------------------------------------------------------- images

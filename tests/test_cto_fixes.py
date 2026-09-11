@@ -160,3 +160,13 @@ def test_SSRF_private_competitor_url_rejected_at_creation(url):
     r = client.post(f"/api/brands/{bid}/competitors", json={"url": url, "name": "x"}, headers=h)
     assert r.status_code == 400
     assert client.get(f"/api/brands/{bid}/competitors", headers=h).json() == []
+
+
+def test_ALGO_audit_score_derived_when_model_omits_it():
+    from app.ai import engine
+    out = engine._harden_audit({"signals": [{"signal": "watch_time", "score": 8}, {"signal": "send_trigger", "score": 4},
+                                            {"signal": "save_value", "score": 6}], "verdict": "ok"})
+    # (8*2 + 4*2 + 6*1) / (10*2 + 10*2 + 10*1) = 30/50 → 59
+    assert out["algo_score"] == 59 and out["score"] == 59
+    assert engine._harden_audit({"overall_score": 42})["algo_score"] == 42
+    assert engine._harden_audit("garbage")["algo_score"] is None
