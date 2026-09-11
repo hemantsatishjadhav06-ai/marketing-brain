@@ -1,0 +1,158 @@
+{
+ "run": "09110018",
+ "base": "https://marketing-brain-production-1f88.up.railway.app",
+ "results": [
+  {
+   "test": "ADMIN_login",
+   "status": "PASS",
+   "detail": "200"
+  },
+  {
+   "test": "PORTFOLIO_loads",
+   "status": "PASS",
+   "detail": "{'clients': 5, 'green': 0, 'amber': 3, 'red': 2, 'approvals_waiting': 1, 'changes_requested': 0, 'published_7d': 3, 'creatives_7d': 9, 'alerts': {'crit': 0, 'warn': 9, 'info': 1}} pool={'max_workers': 3, 'running': 0, 'queued': 0, 'active_brands': [], 'workers_alive': 0, 'sync': False}"
+  },
+  {
+   "test": "TEMPLATES_listed",
+   "status": "PASS",
+   "detail": "['real_estate', 'dental', 'restaurant', 'fitness', 'ecommerce', 'saas', 'education', 'generic']"
+  },
+  {
+   "test": "SETTINGS_readable",
+   "status": "PASS",
+   "detail": "Marketing Brain"
+  },
+  {
+   "test": "BRANDING_public",
+   "status": "PASS",
+   "detail": "{'agency_name': 'Marketing Brain', 'logo_url': '', 'accent': '#6d5dfc'}"
+  },
+  {
+   "test": "ONBOARD_client",
+   "status": "PASS",
+   "detail": "{\"ok\":true,\"brand_id\":\"973b25c03be9\",\"job_id\":\"64300a91716e\",\"job_state\":\"queued\",\"config\":{\"vertical\":\"dental\",\"persona\":{\"tone\":\"calm, reassuring, plain-language\",\"pov\":\"we\",\"avoid\":[\"painless guara"
+  },
+  {
+   "test": "ONBOARD_job_done",
+   "status": "PASS",
+   "detail": "{'brand_id': '973b25c03be9', 'steps': {'scrape': 'skipped', 'analysis': 'skipped', 'workspace': 'done'}}"
+  },
+  {
+   "test": "ONBOARD_brand_ready",
+   "status": "PASS",
+   "detail": "ready"
+  },
+  {
+   "test": "CONFIG_seeded_from_template",
+   "status": "PASS",
+   "detail": "{'gen_daily': 6, 'creatives_per_cycle': 1, 'images_per_cycle': 0}"
+  },
+  {
+   "test": "MANAGER_created",
+   "status": "PASS",
+   "detail": "{\"id\":\"9167a0323c98\",\"email\":\"zz-mgr-09110018@example.com\",\"role\":\"manager\",\"brand_id\":\"\",\"brand_ids\":[\"973b25c03be9\"]}"
+  },
+  {
+   "test": "MANAGER_sees_only_assigned",
+   "status": "PASS",
+   "detail": "['973b25c03be9']"
+  },
+  {
+   "test": "MANAGER_403_on_other_brand",
+   "status": "PASS",
+   "detail": "4ab2df3b05be"
+  },
+  {
+   "test": "MANAGER_bulk_cannot_touch_other",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "MANAGER_cannot_onboard",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "MANAGER_portfolio_scoped",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "CYCLE_started",
+   "status": "PASS",
+   "detail": "{\"id\":\"695265acff00\",\"state\":\"running\",\"brand_ids\":[\"973b25c03be9\"],\"jobs\":{\"973b25c03be9\":\"5e13bf1b3573\"},\"by\":\"9167a0323c98\",\"label\":\"live-verify 09110018\",\"s"
+  },
+  {
+   "test": "CYCLE_done",
+   "status": "PASS",
+   "detail": "{'brand_id': '973b25c03be9', 'brand': 'ZZ Agency Test 09110018', 'ideas': 2, 'calendar': 5, 'creatives': 1, 'images': 0, 'skipped': [], 'errors': []}"
+  },
+  {
+   "test": "CYCLE_respected_caps",
+   "status": "PASS",
+   "detail": "{'brand_id': '973b25c03be9', 'brand': 'ZZ Agency Test 09110018', 'ideas': 2, 'calendar': 5, 'creatives': 1, 'images': 0, 'skipped': [], 'errors': []}"
+  },
+  {
+   "test": "CYCLE_creatives_unapproved",
+   "status": "PASS",
+   "detail": "1"
+  },
+  {
+   "test": "CYCLE_published_nothing",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "QUEUE_shows_client",
+   "status": "PASS",
+   "detail": "{'waiting': 1, 'changes_requested': 0}"
+  },
+  {
+   "test": "BULK_approve",
+   "status": "PASS",
+   "detail": "{'ok': 1, 'failed': 0, 'results': [{'brand_id': '973b25c03be9', 'creative_id': '20d364857cef', 'ok': True, 'state': 'approved'}]}"
+  },
+  {
+   "test": "BULK_dry_run_publish",
+   "status": "PASS",
+   "detail": "{'ok': 1, 'failed': 0, 'results': [{'brand_id': '973b25c03be9', 'creative_id': '20d364857cef', 'ok': True, 'status': 'simulated', 'publish_id': '5e20f3dceb9e', 'channel': 'instagram'}]}"
+  },
+  {
+   "test": "BULK_live_blocked_without_creds",
+   "status": "PASS",
+   "detail": "{'brand_id': '973b25c03be9', 'creative_id': '20d364857cef', 'ok': False, 'error': 'No credentials saved for instagram. Save connector settings first, or use simulated mode.'}"
+  },
+  {
+   "test": "REPORT_built",
+   "status": "PASS",
+   "detail": "{'ideas': 2, 'creatives': 1, 'approved': 1, 'published': 0, 'published_by_channel': {}, 'simulated': 1, 'metrics_logged': 0, 'metric_totals': {}, 'ad_campaigns': 0, 'ad_spend_actions': 0, 'ad_spend_total': 0, 'email_campaigns': 0, 'seo_audits': 0, 'seo_best_score': None, 'conversations': 0, 'top_cre"
+  },
+  {
+   "test": "REPORT_html_whitelabel",
+   "status": "PASS",
+   "detail": "2332"
+  },
+  {
+   "test": "PORTFOLIO_row_after_cycle",
+   "status": "PASS",
+   "detail": "{'score': 80, 'alerts': ['no_connectors']}"
+  },
+  {
+   "test": "CLEANUP_user",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "CLEANUP_brand",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "CLEANUP_brand_gone",
+   "status": "PASS",
+   "detail": ""
+  }
+ ],
+ "pass": 30,
+ "fail": 0
+}
