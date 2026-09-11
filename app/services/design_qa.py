@@ -129,6 +129,11 @@ def crop_to_target(image_bytes: bytes, channel: str, fmt: str) -> bytes:
 VISION_SYSTEM = (
     "You are a senior graphic designer and art director reviewing a social-media visual before it goes to a client. "
     "Be exacting and specific. Score 0-100 (85+ publish-ready, 70-84 minor fixes, <70 redo). "
+    "Calibration: on social, a text-free lifestyle or product scene paired with a caption is the PREFERRED pattern; "
+    "the visual must not CONTRADICT the caption, but it does not have to depict every claim (a family in their new "
+    "flat supports a caption about affordable flats). Brand colours count when they appear in wardrobe, props, "
+    "furniture, light or backgrounds — not only as flat graphic fills. Score the same image the same way every time: "
+    "anchor on concrete defects (garbled text, wrong setting, crowding, off-palette, unsafe areas), not on taste. "
     "Text rendered inside the image is the usual failure: garbled letters, misspellings, placeholder words, "
     "unreadable contrast — call these out precisely. Judge logo placement (clear space, corner, not overlapping "
     "faces/text), brand colour fidelity, focal point and hierarchy, crowding, platform safe areas "
@@ -175,7 +180,7 @@ def review(brand, creative, image_bytes: bytes | None = None) -> dict:
     )
     try:
         v = engine._json_chat_vision(VISION_SYSTEM + " " + engine.ANTI_INJECTION, user, blob,
-                                     mime="image/jpeg" if blob[:3] == b"\xff\xd8\xff" else "image/png")
+                                     mime="image/jpeg" if blob[:3] == b"\xff\xd8\xff" else "image/png", temperature=0.1)
     except Exception as e:
         v = {"score": None, "verdict": f"vision review unavailable: {str(e)[:120]}", "issues": []}
     score = v.get("score")
