@@ -1309,6 +1309,7 @@ function renderCreativeDetail(c){
     ${p.slides?`<button class="sm" onclick="genSlides('${c.id}',this)">🖼 Generate ${p.slides.length} slides</button>`:""}
     ${(p.format==="reel"||p.script)?`<button class="sm" onclick="genVO('${c.id}',this)">🎙 Voiceover</button>`:""}
     ${c.asset_path&&(p.format==="reel"||p.script)?`<button class="sm" onclick="buildVideo('${c.id}',this)">🎬 Build video</button>`:""}
+    ${c.asset_path?`<button class="sm" onclick="designFix('${c.id}',this)">🎨 Design review & fix</button>`:""}
     ${c.channel==="instagram"?`<button class="sm ghost" onclick="algoAudit('${c.id}',this)">📈 IG algo audit</button>`:""}
     <button class="sm grn" onclick="publishCreative('${c.id}','simulated',this)">📤 Publish (simulated)</button>
     <button class="sm ghost" onclick="publishCreative('${c.id}','live',this)">🔴 Publish live</button>
