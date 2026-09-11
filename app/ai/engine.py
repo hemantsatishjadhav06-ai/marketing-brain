@@ -83,6 +83,25 @@ def _json_chat(system, user, max_tokens=4000, temperature=0.8, model=None):
     raise ValueError("Model did not return valid JSON")
 
 
+def _json_chat_vision(system, user_text, image_bytes, mime="image/png", max_tokens=1800, temperature=0.3, model=None):
+    """JSON chat with one image attached (OpenAI-style content parts, which
+    OpenRouter forwards to vision-capable models). Same retry as _json_chat."""
+    data_url = f"data:{mime};base64," + base64.b64encode(image_bytes).decode()
+    msgs = [
+        {"role": "system", "content": system + "\nRespond ONLY with valid JSON. No markdown fences, no commentary."},
+        {"role": "user", "content": [{"type": "text", "text": user_text},
+                                     {"type": "image_url", "image_url": {"url": data_url}}]},
+    ]
+    for attempt in range(2):
+        raw = _chat(msgs, max_tokens=max_tokens, temperature=temperature if attempt == 0 else 0.2, model=model)
+        parsed = _extract_json(raw)
+        if parsed is not None:
+            return parsed
+        msgs.append({"role": "assistant", "content": raw[:2000]})
+        msgs.append({"role": "user", "content": "That was not valid JSON. Return the same content as strictly valid JSON only."})
+    raise ValueError("Model did not return valid JSON")
+
+
 def _extract_json(text):
     text = text.strip()
     fence = re.search(r"```(?:json)?\s*(.*?)```", text, re.S)

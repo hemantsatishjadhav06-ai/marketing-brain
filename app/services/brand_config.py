@@ -34,8 +34,9 @@ DEFAULTS = {
     "cta": {"text": "Message us to know more", "contact": ""},
     "compliance": [],
     "triggers": {"PRICE": "pricing", "PDF": "brochure", "VISIT": "site_visit", "CALL": "callback"},
-    "caps": {"gen_daily": 60, "creatives_per_cycle": 3, "images_per_cycle": 2},
+    "caps": {"gen_daily": 60, "creatives_per_cycle": 3, "images_per_cycle": 2, "mail_daily": 200},
     "cycle": {"ideas_per_channel": 4, "calendar_days": 14, "generate_images": False},
+    "design_qa": {"auto": True, "min_score": 75},
     "pointer_allowed": False,
 }
 

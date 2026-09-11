@@ -64,6 +64,7 @@ class ConfigIn(BaseModel):
 class BrandingIn(BaseModel):
     branding: dict = {}
     defaults: dict = {}
+    airtable: dict | None = None   # agency-wide default: {"api_key": PAT, "workspace_id": "wsp…"}
 
 
 class ReportIn(BaseModel):
@@ -237,12 +238,56 @@ def report_html(bid: str, rid: str, user=Depends(current_user)):
     return HTMLResponse(agency_report.render_html(r, agency_settings.branding()))
 
 
+# ---------- Airtable content calendar ----------
+
+@router.get("/api/brands/{bid}/airtable")
+def airtable_status(bid: str, user=Depends(current_user)):
+    from ..services import airtable_calendar
+    _brand_or_404(bid, user)
+    return airtable_calendar.status(bid)
+
+
+@router.post("/api/brands/{bid}/airtable/base")
+def airtable_base(bid: str, user=Depends(current_user)):
+    """Create the client's base (schema included) if it does not exist yet."""
+    from ..services import airtable_calendar
+    _brand_or_404(bid, user)
+    if user["role"] == "client":
+        raise HTTPException(403, "Only the agency or the brand owner can create the Airtable base")
+    try:
+        return airtable_calendar.ensure_base(bid)
+    except RuntimeError as e:
+        raise HTTPException(400, str(e))
+
+
+@router.post("/api/brands/{bid}/airtable/push")
+def airtable_push(bid: str, user=Depends(current_user)):
+    from ..services import airtable_calendar
+    _brand_or_404(bid, user)
+    try:
+        return airtable_calendar.push(bid)
+    except RuntimeError as e:
+        raise HTTPException(400, str(e))
+
+
+@router.post("/api/brands/{bid}/airtable/pull")
+def airtable_pull(bid: str, user=Depends(current_user)):
+    from ..services import airtable_calendar
+    _brand_or_404(bid, user)
+    try:
+        return airtable_calendar.pull(bid)
+    except RuntimeError as e:
+        raise HTTPException(400, str(e))
+
+
 # ---------- agency settings (white-label) ----------
 
 @router.get("/api/agency/settings")
 def get_settings(user=Depends(current_user)):
     _operator_only(user)
-    return {"branding": agency_settings.branding(), "defaults": agency_settings.defaults()}
+    at = db.get_setting("airtable") or {}
+    return {"branding": agency_settings.branding(), "defaults": agency_settings.defaults(),
+            "airtable": {"configured": bool(at.get("api_key")), "workspace_id": at.get("workspace_id")}}
 
 
 @router.put("/api/agency/settings")
@@ -254,6 +299,12 @@ def put_settings(body: BrandingIn, user=Depends(current_user)):
             out["branding"] = agency_settings.set_branding(body.branding)
         if body.defaults:
             out["defaults"] = agency_settings.set_defaults(body.defaults)
+        if body.airtable is not None:
+            at = {k: str(v).strip() for k, v in body.airtable.items() if k in ("api_key", "workspace_id") and v}
+            if at.get("workspace_id") and not at["workspace_id"].startswith("wsp"):
+                raise ValueError("workspace_id must start with wsp")
+            db.set_setting("airtable", at)
+            out["airtable"] = {"configured": bool(at.get("api_key")), "workspace_id": at.get("workspace_id")}
     except ValueError as e:
         raise HTTPException(400, str(e))
     return {"ok": True, **out, "branding": agency_settings.branding(), "defaults": agency_settings.defaults()}

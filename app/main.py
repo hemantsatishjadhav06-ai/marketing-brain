@@ -11,9 +11,9 @@ from fastapi.staticfiles import StaticFiles
 
 from .core import database as db
 from .routes import _shared, control, memory
-from .routes import agency, airtable, auth, autopilot, brain, brands, channels, competitors, growth, inbox, misc, onboarding, pipeline, publishing, studio
+from .routes import agency, airtable, auth, autopilot, brain, brands, channels, competitors, growth, inbox, mail, misc, onboarding, pipeline, publishing, studio
 
-ROUTERS = [agency, airtable, auth, autopilot, brain, brands, channels, competitors, control, growth, inbox, memory,
+ROUTERS = [agency, airtable, auth, autopilot, brain, brands, channels, competitors, control, growth, inbox, mail, memory,
            misc, onboarding, pipeline, publishing, studio]
 
 

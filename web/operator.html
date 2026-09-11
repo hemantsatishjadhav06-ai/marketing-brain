@@ -193,7 +193,8 @@ input:focus{outline:none;border-color:var(--accent)}
   </main>
 </div>
 
-<script src="js/growth-ui.js?v=20260911"></script>
+<script src="js/growth-ui.js?v=20260911b"></script>
+<script src="js/mail-ui.js?v=20260911"></script>
 <script>
 "use strict";
 const API = "/api";
@@ -495,7 +496,7 @@ async function askSend(btn){
 
 /* ---------- Growth tooling ---------- */
 let GROWTH_BID=null, GROWTH_TAB="seo";
-const GTABS=[["seo","SEO","Live"],["meta","Meta Ads","Live · your keys"],["google","Google Ads","Partial"],["email","Email","Live · your keys"],["whatsapp","WhatsApp","Live · your keys"]];
+const GTABS=[["seo","SEO","Live"],["meta","Meta Ads","Live · your keys"],["google","Google Ads","Partial"],["mail","Mail","Live · built-in"],["email","Mailchimp / Smartlead","Live · your keys"],["whatsapp","WhatsApp","Live · your keys"]];
 function growthPick(bid){ GROWTH_BID=bid; render(); }
 function growthTab(t){ GROWTH_TAB=t; render(); }
 async function viewGrowth(){
@@ -553,6 +554,9 @@ function renderGrowthPanel(b, st){
       <div id="adOut" style="margin-top:14px"></div>
       ${connectForm(bid,key,(st[key]||{}).setup_guide)}</div>`;
     loadCampaigns(bid,net);
+  } else if(GROWTH_TAB==="mail"){
+    P.innerHTML=`<div class="card"><h2>Built-in mailer <span class="chip live">live · your SMTP</span></h2><p class="sub">Contacts, broadcasts, sequences, tracking — inside the product, sent from the client's own mailbox.</p><div id="mailMount" style="margin-top:10px"><span class="spin"></span></div></div>`;
+    MailUI.mount($("#mailMount"), bid, {canEdit: true});
   } else if(GROWTH_TAB==="email"){
     P.innerHTML=`<div class="card"><h2>Email marketing</h2>
       <p class="sub">Draft a broadcast (Mailchimp) or a cold sequence (Smartlead). Sending requires your approval.</p>

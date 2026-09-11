@@ -305,7 +305,14 @@ def _build_calendar(b, days, start=None):
                             channel=entry.get("channel"), date=entry.get("date"), time=entry.get("time"))
         items.append(db.get_doc("calendar_items", cid))
     ws.write_json(_wslug(b), "brand-profile/content-calendar.json", cal)
-    return {"calendar": items}
+    out = {"calendar": items}
+    try:
+        from ..services import airtable_calendar
+        if airtable_calendar.connected(bid):
+            out["airtable"] = airtable_calendar.push(bid)
+    except Exception as e:  # the calendar is built; a sync failure is reported, never fatal
+        out["airtable"] = {"ok": False, "error": str(e)[:200]}
+    return out
 
 
 def _produce_creative(b, idea_id):

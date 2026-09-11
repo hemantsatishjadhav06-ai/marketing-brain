@@ -77,7 +77,14 @@ def cron(key: str = ""):
         cycle = {"id": c["id"], "brands": len(c.get("brand_ids") or [])} if c else None
     except Exception:
         cycle = None
-    return {"ok": True, "alive": True, "cycled": kicked, "agency_cycle": cycle}
+    # Built-in mailer: advance scheduled / in-flight campaigns within each client's daily cap.
+    mail = None
+    try:
+        from ..services import mailer
+        mail = mailer.tick(os.environ.get("PUBLIC_BASE_URL", "").rstrip("/"))
+    except Exception:
+        mail = None
+    return {"ok": True, "alive": True, "cycled": kicked, "agency_cycle": cycle, "mail": mail}
 
 
 @router.get("/api/digest")

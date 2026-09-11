@@ -115,6 +115,38 @@ def algo_audit(bid: str, cid: str, user=Depends(current_user)):
     return audit
 
 
+@router.post("/api/brands/{bid}/creatives/{cid}/design-review")
+def design_review(bid: str, cid: str, user=Depends(current_user)):
+    """Art-director review of the creative's visual: score, issues, exact fixes. Read-only."""
+    from ..services import design_qa
+    b = _brand_or_404(bid, user)
+    c = _doc_or_404("creatives", cid, bid)
+    if not c.get("asset_path"):
+        raise HTTPException(400, "This creative has no visual yet — generate one first")
+    _gen_guard(bid)
+    rv = design_qa.review(b, c)
+    if not rv.get("ok"):
+        raise HTTPException(400, rv.get("error", "review failed"))
+    db.merge_payload("creatives", cid, {"design_review": {k: rv.get(k) for k in ("score", "verdict", "issues", "vision", "checks", "at")}})
+    return rv
+
+
+@router.post("/api/brands/{bid}/creatives/{cid}/design-fix")
+def design_fix(bid: str, cid: str, user=Depends(current_user)):
+    """Review, then fix: mechanical crop/resize, one regenerate with the revised
+    art direction if needed, keep the better version. Before/after kept."""
+    from ..services import design_qa
+    b = _brand_or_404(bid, user)
+    c = _doc_or_404("creatives", cid, bid)
+    if not c.get("asset_path"):
+        raise HTTPException(400, "This creative has no visual yet — generate one first")
+    _gen_guard(bid)
+    out = design_qa.fix(b, c)
+    if not out.get("ok"):
+        raise HTTPException(400, out.get("error", "fix failed"))
+    return out
+
+
 @router.post("/api/brands/{bid}/creatives/{cid}/approval")
 def set_approval(bid: str, cid: str, body: ApprovalIn, user=Depends(current_user)):
     _brand_or_404(bid, user)

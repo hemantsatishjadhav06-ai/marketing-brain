@@ -298,6 +298,37 @@ CREATE TABLE IF NOT EXISTS agency_settings (
     value TEXT,
     updated_at REAL
 );
+CREATE TABLE IF NOT EXISTS mail_contacts (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    email TEXT NOT NULL,
+    status TEXT DEFAULT 'subscribed',   -- subscribed | unsubscribed | bounced
+    tags TEXT DEFAULT '',                -- comma-separated, lowercase
+    payload TEXT NOT NULL,               -- {name, first_name, fields{}, source}
+    created_at REAL
+);
+CREATE TABLE IF NOT EXISTS mail_campaigns (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    kind TEXT DEFAULT 'broadcast',       -- broadcast | sequence
+    status TEXT DEFAULT 'draft',         -- draft | approved | scheduled | sending | sent | paused | failed
+    subject TEXT,
+    payload TEXT NOT NULL,               -- {subject, preview, html, text, steps[], segment{tags,exclude}, schedule, stats}
+    created_at REAL
+);
+CREATE TABLE IF NOT EXISTS mail_events (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    campaign_id TEXT,
+    contact_id TEXT,
+    kind TEXT,                           -- sent | open | click | unsubscribe | bounce | fail | test
+    step INTEGER DEFAULT 0,
+    payload TEXT NOT NULL,
+    created_at REAL
+);
+CREATE INDEX IF NOT EXISTS idx_mailcontacts_brand ON mail_contacts(brand_id, email);
+CREATE INDEX IF NOT EXISTS idx_mailcampaigns_brand ON mail_campaigns(brand_id, status);
+CREATE INDEX IF NOT EXISTS idx_mailevents_campaign ON mail_events(brand_id, campaign_id, kind);
 CREATE INDEX IF NOT EXISTS idx_assign_brand ON brand_assignments(brand_id);
 CREATE INDEX IF NOT EXISTS idx_reports_brand ON reports(brand_id, period);
 CREATE INDEX IF NOT EXISTS idx_campaigns_brand ON campaigns(brand_id, status);
@@ -393,7 +424,8 @@ def list_brands():
 BRAND_SCOPED_TABLES = ("ideas", "calendar_items", "creatives", "publish_queue", "metrics",
                        "connector_settings", "competitors", "brand_memory", "agent_runs",
                        "conversations", "messages", "invites", "password_resets", "gen_usage", "users",
-                       "campaigns", "email_campaigns", "seo_audits", "spend_log", "reports", "brand_assignments")
+                       "campaigns", "email_campaigns", "seo_audits", "spend_log", "reports", "brand_assignments",
+                       "mail_contacts", "mail_campaigns", "mail_events")
 
 
 def delete_brand(bid):

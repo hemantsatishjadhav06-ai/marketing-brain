@@ -108,6 +108,22 @@ CATALOG = {
         "steps": ["Mailchimp → Account → Extras → API keys → create.", "Create at least one Audience."],
         "docs": "https://mailchimp.com/developer/marketing/",
     },
+    "smtp": {
+        "label": "Built-in mailer (your SMTP)", "group": "email", "status": "live",
+        "can": ["contacts with tags + segments", "AI-drafted broadcasts and sequences", "test send, approve, schedule",
+                "open/click/unsubscribe tracking", "daily cap with warm-up"],
+        "cannot": ["send without an approval", "exceed the daily cap"],
+        "fields": [{"key": "host", "label": "SMTP host (smtp.gmail.com, smtp.zoho.in, email-smtp.ap-south-1.amazonaws.com…)"},
+                   {"key": "port", "label": "Port (587 STARTTLS / 465 SSL)"}, {"key": "username", "label": "SMTP username"},
+                   {"key": "password", "label": "SMTP password / app password", "secret": True},
+                   {"key": "from_email", "label": "From address"}, {"key": "from_name", "label": "From name, optional"},
+                   {"key": "reply_to", "label": "Reply-to, optional"}],
+        "steps": ["Google Workspace: enable 2-step verification → App passwords → create one for 'Mail'.",
+                  "Zoho / SES / Brevo: create SMTP credentials in the provider console.",
+                  "Set up SPF and DKIM for the sending domain before the first campaign.",
+                  "Sending ramps automatically: 20 → 40 → 80 → 120 → 160 → your cap per day."],
+        "docs": "https://support.google.com/a/answer/176600",
+    },
     "smartlead": {
         "label": "Smartlead", "group": "email", "status": "live",
         "can": ["create sequences", "add leads", "start with approval"],
@@ -131,10 +147,14 @@ CATALOG = {
     # ---------------- data ----------------
     "airtable": {
         "label": "Airtable", "group": "data", "status": "live",
-        "can": ["sync approvals, runs, content to a base"],
         "cannot": [],
-        "fields": [{"key": "api_key", "label": "Personal access token", "secret": True}, {"key": "base_id", "label": "Base ID"}],
-        "steps": ["airtable.com/create/tokens → token with data.records:read/write.", "Copy the base ID (app…)."],
+        "can": ["create a content-calendar base per client", "push calendar, ideas, creatives", "pull status/date/notes/caption edits back"],
+        "fields": [{"key": "api_key", "label": "Personal access token", "secret": True},
+                   {"key": "workspace_id", "label": "Workspace ID (wsp…) — lets us create the base, optional"},
+                   {"key": "base_id", "label": "Existing base ID (app…), optional"}],
+        "steps": ["airtable.com/create/tokens → scopes data.records:read, data.records:write, schema.bases:read, schema.bases:write; add your workspace.",
+                  "Copy the workspace ID from the workspace URL (wsp…) so a base can be created for each client.",
+                  "Or paste an existing base ID (app…) to sync into it."],
         "docs": "https://airtable.com/developers/web/api/introduction",
     },
     "webhook": {
@@ -213,6 +233,16 @@ def probe(cid: str, creds: dict) -> dict:
         if cid == "airtable":
             st, j = _get(f"https://api.airtable.com/v0/meta/bases/{creds['base_id']}/tables", headers={"Authorization": "Bearer " + creds["api_key"]})
             return {"ok": st == 200, "account": f"{len(j.get('tables', []))} tables" if st == 200 else None, "detail": "token valid" if st == 200 else f"HTTP {st}"}
+        if cid == "smtp":
+            import smtplib
+            port = int(creds.get("port") or 587)
+            if port == 465:
+                with smtplib.SMTP_SSL(creds["host"], port, timeout=15) as s:
+                    s.login(creds["username"], creds["password"])
+            else:
+                with smtplib.SMTP(creds["host"], port, timeout=15) as s:
+                    s.ehlo(); s.starttls(); s.login(creds["username"], creds["password"])
+            return {"ok": True, "account": creds.get("from_email"), "detail": "SMTP login OK (nothing sent)"}
         if cid == "webhook":
             from ..core import guard
             ok, why = guard.url_is_safe(creds["url"])

@@ -111,6 +111,13 @@ def run_cycle(log, bid, overrides=None):
             try:
                 sh._generate_image(b, cid)
                 summary["images"] += 1
+                if (cfg.get("design_qa") or {}).get("auto", True) and gen_ok("design_qa", bump=False):
+                    from . import design_qa
+                    c = db.get_doc("creatives", cid)
+                    r = design_qa.fix(b, c)
+                    summary.setdefault("design_qa", []).append({"creative": cid, "score": (r.get("after") or {}).get("score"),
+                                                                "applied": r.get("applied")})
+                    log(f"design QA {cid}: {(r.get('after') or {}).get('score')} · {', '.join(r.get('applied') or []) or 'no change'}")
             except Exception as e:
                 summary["errors"].append(f"image: {getattr(e, 'detail', e)}")
     # remember when this ran so the portfolio view and the scheduler can see it

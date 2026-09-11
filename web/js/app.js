@@ -328,9 +328,9 @@ function logoUrl(b){ const k=kitOf(b); return k.logo?`/workspaces/${b.grp?b.grp+
 function renderBrand(){
   const b=state.brand, k=kitOf(b);
   const SEC=[["create","✨ Create"],["content","🗂 Content"],["plan","🗓 Plan"],["grow","📈 Grow"],["settings","⚙ Settings"]];
-  const SUBS={create:[["create","Create"],["brief","✦ Master brief"]],content:[["board","Board"],["reel studio","Reel studio"],["publish","Published"]],plan:[["ideas","Ideas"],["calendar","Calendar"],["campaigns","Campaigns"]],grow:[["growth","Growth"],["ads","Paid ads"],["competitors","Competitors"],["analytics","Analytics"],["playbook","Playbook"]],settings:[["brand kit","Brand kit"],["memory","🧠 Memory"],["connectors","Connectors"],["overview","Overview"]]};
+  const SUBS={create:[["create","Create"],["brief","✦ Master brief"]],content:[["board","Board"],["reel studio","Reel studio"],["publish","Published"]],plan:[["ideas","Ideas"],["calendar","Calendar"],["campaigns","Campaigns"]],grow:[["growth","Growth"],["ads","Paid ads"],["mail","Mail"],["competitors","Competitors"],["analytics","Analytics"],["playbook","Playbook"]],settings:[["brand kit","Brand kit"],["memory","🧠 Memory"],["connectors","Connectors"],["overview","Overview"]]};
   const S2S={}; Object.entries(SUBS).forEach(([sec,arr])=>arr.forEach(([t])=>S2S[t]=sec));
-  const TABFN={create:tabCreate,brief:tabBrief,board:tabBoard,"reel studio":tabReelStudio,publish:tabPublish,ideas:tabIdeas,calendar:tabCalendar,campaigns:tabCampaigns,growth:tabGrowth,ads:tabAds,competitors:tabCompetitors,analytics:tabAnalytics,playbook:tabPlaybook,"brand kit":tabKit,memory:tabMemory,connectors:tabConnectors,overview:tabOverview,coach:tabCoach,creatives:tabCreatives};
+  const TABFN={create:tabCreate,brief:tabBrief,board:tabBoard,"reel studio":tabReelStudio,publish:tabPublish,ideas:tabIdeas,calendar:tabCalendar,campaigns:tabCampaigns,growth:tabGrowth,ads:tabAds,mail:tabMail,competitors:tabCompetitors,analytics:tabAnalytics,playbook:tabPlaybook,"brand kit":tabKit,memory:tabMemory,connectors:tabConnectors,overview:tabOverview,coach:tabCoach,creatives:tabCreatives};
   if(!TABFN[state.tab]) state.tab="create";
   const sec = state.tab==="coach" ? "" : (S2S[state.tab]||"content");
   const subnav = sec ? `<div class="subnav">${SUBS[sec].map(([t,l])=>`<button class="${state.tab===t?'on':''}" onclick="state.tab='${t}';renderBrand()">${esc(l)}</button>`).join("")}</div>` : "";
@@ -642,16 +642,42 @@ async function pollReelJob(jid,btn){
     else { busy(btn,false); if(j.state==="done") toast("Reel generated \u2014 scenes + voiceover ready"); }
   }catch(e){ busy(btn,false); toast(e.status===404?"This reel job is no longer available (the server may have restarted). Please start it again.":e.message,true); }
 }
+let CAL_VIEW="month", CAL_MONTH=null;
 async function tabCalendar(){
-  const b=state.brand; const cal=await api(`/brands/${b.id}/calendar`);
-  $("tabBody").innerHTML=`
-    <div class="card"><div class="row"><button onclick="genCalendar(this)">📅 Build 30-day calendar</button>
-      <span class="sub" style="margin:0">Optimal times per platform; re-running replaces planned items.</span></div></div>
-    <div class="card" style="padding:0">${cal.map(c=>`
+  const b=state.brand; const [cal,at]=await Promise.all([api(`/brands/${b.id}/calendar`), api(`/brands/${b.id}/airtable`).catch(()=>null)]);
+  const byDate={}; cal.forEach(c=>{ (byDate[c.date||""]=byDate[c.date||""]||[]).push(c); });
+  const first=cal.map(c=>c.date).filter(Boolean).sort()[0]; if(!CAL_MONTH) CAL_MONTH=(first||new Date().toISOString().slice(0,10)).slice(0,7);
+  const [Y,M]=CAL_MONTH.split("-").map(Number); const start=new Date(Date.UTC(Y,M-1,1)); const days=new Date(Date.UTC(Y,M,0)).getUTCDate(); const pad=(start.getUTCDay()+6)%7;
+  const STC={planned:"",drafting:"",in_review:"y",approved:"g",scheduled:"y",published:"g",cancelled:""};
+  let grid=`<div class="calgrid">${["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d=>`<div class="calhd">${d}</div>`).join("")}${"<div class=\"calcell off\"></div>".repeat(pad)}`;
+  for(let d=1;d<=days;d++){ const key=`${CAL_MONTH}-${String(d).padStart(2,"0")}`; const items=byDate[key]||[];
+    grid+=`<div class="calcell"><div class="caldn">${d}</div>${items.map(c=>`<div class="calit ${STC[c.status]||""}" title="${esc(c.payload?.title||"")}"><span class="calch">${esc((c.channel||"").slice(0,2))}</span>${esc(c.time||"")} ${esc(c.payload?.title||"")}</div>`).join("")}</div>`; }
+  grid+=`</div>`;
+  const list=`<div class="card" style="padding:0">${cal.map(c=>`
       <div class="calrow"><b>${esc(c.date||"")}</b><span>${esc(c.time||"")}</span>
         <span class="tag y" style="margin:0">${esc(c.channel||"")}</span>
-        <span><b>${esc(c.payload?.title||"")}</b> <span class="sub" style="margin:0">· ${esc(c.payload?.format||"")}</span></span>
-        <span class="tag">${c.status}</span></div>`).join("")||'<p class="sub" style="padding:16px">No calendar yet.</p>'}</div>`;
+        <span><b>${esc(c.payload?.title||"")}</b> <span class="sub" style="margin:0">· ${esc(c.payload?.format||"")}</span>${c.payload?.notes?`<div class="sub" style="margin:0">📝 ${esc(c.payload.notes)}</div>`:""}</span>
+        <span class="tag ${STC[c.status]||""}">${esc(c.status)}</span></div>`).join("")||'<p class="sub" style="padding:16px">No calendar yet.</p>'}</div>`;
+  const atCard = at ? `<div class="card"><div class="row"><h2 style="margin:0">🗂 Airtable</h2><span style="flex:1"></span>
+      ${at.base_id?`<a class="sm ghost" style="text-decoration:none;display:inline-block" href="${esc(at.url)}" target="_blank" rel="noopener">Open base ↗</a>`:""}
+      ${at.connected?`<button class="sm" onclick="atSync('push',this)">${at.base_id?"Push to Airtable":"Create base & push"}</button>`:""}
+      ${at.base_id?`<button class="sm ghost" onclick="atSync('pull',this)">Pull edits</button>`:""}</div>
+      <p class="sub">${at.connected?(at.base_id?`Synced base <b>${esc(at.base_id)}</b>${at.last_push?` · pushed ${ago2(at.last_push)}`:""}${at.last_pull?` · pulled ${ago2(at.last_pull)}`:""}. Edit Status, Date, Time, Notes or Caption in Airtable and pull them back here; everything else is pushed from the app.`:(at.can_create?"Connected. The first push creates a base for this client with Content Calendar, Ideas and Creatives tables.":"Connected, but no workspace ID — add one under Settings → Connections → Airtable so a base can be created, or paste an existing base ID.")):"Not connected. Settings → Connections → Airtable (personal access token + workspace ID) and every calendar you build lands in the client's own base."}</p>
+      ${at.base_id?`<details><summary class="sub" style="cursor:pointer">Add the Calendar and Board views (once, in Airtable)</summary><ol class="checklist">${(at.views_howto||[]).map(x=>`<li>${esc(x)}</li>`).join("")}</ol></details>`:""}</div>`:"";
+  $("tabBody").innerHTML=`
+    <div class="card"><div class="row"><button onclick="genCalendar(this)">📅 Build 30-day calendar</button>
+      <span class="sub" style="margin:0">Optimal times per platform; re-running replaces planned items${at&&at.connected?" and syncs to Airtable":""}.</span>
+      <span style="flex:1"></span><button class="sm ghost" onclick="calNav(-1)">‹</button><b>${CAL_MONTH}</b><button class="sm ghost" onclick="calNav(1)">›</button>
+      <button class="sm ${CAL_VIEW==="month"?"":"ghost"}" onclick="CAL_VIEW='month';tabCalendar()">Month</button><button class="sm ${CAL_VIEW==="list"?"":"ghost"}" onclick="CAL_VIEW='list';tabCalendar()">List</button></div></div>
+    ${atCard}
+    ${CAL_VIEW==="month"?`<div class="card" style="padding:12px">${grid}</div>`:list}`;
+}
+function ago2(ts){ const d=(Date.now()/1000-ts)/3600; return d<1?"just now":d<24?Math.round(d)+"h ago":Math.round(d/24)+"d ago"; }
+function calNav(n){ const [Y,M]=CAL_MONTH.split("-").map(Number); const d=new Date(Date.UTC(Y,M-1+n,1)); CAL_MONTH=d.toISOString().slice(0,7); tabCalendar(); }
+async function atSync(kind,btn){
+  busy(btn,true,kind==="push"?"Syncing…":"Pulling…");
+  try{ const r=await api(`/brands/${state.brand.id}/airtable/${kind}`,"POST"); toast(kind==="push"?`Pushed ${r.pushed.calendar} slots, ${r.pushed.ideas} ideas, ${r.pushed.creatives} creatives${r.created?" — base created":""}`:`Pulled: ${r.calendar} slot change(s), ${r.captions} caption(s)`); tabCalendar(); }
+  catch(e){ toast(e.message,true); busy(btn,false); }
 }
 async function genCalendar(btn){
   busy(btn,true,"Planning…");
@@ -679,7 +705,8 @@ async function tabCreatives(){
         </div>`:""}
       <div class="row" style="margin-top:12px">
         <button class="sm" onclick="genImage('${c.id}',this)">🎨 Generate branded visual</button>
-        ${c.channel==="instagram"?`<button class="sm ghost" onclick="algoAudit('${c.id}',this)">📈 IG algo audit</button>`:""}
+        ${c.asset_path?`<button class="sm" onclick="designFix('${c.id}',this)">🎨 Design review & fix</button>`:""}
+    ${c.channel==="instagram"?`<button class="sm ghost" onclick="algoAudit('${c.id}',this)">📈 IG algo audit</button>`:""}
         ${p.slides?`<button class="sm" onclick="genSlides('${c.id}',this)">🖼 Generate ${p.slides.length} slide images</button>`:""}
         ${(p.format==="reel"||p.script)?`<button class="sm" onclick="genVO('${c.id}',this)">🎙 Generate voiceover</button>`:""}
         ${c.asset_path&&(p.format==="reel"||p.script)?`<button class="sm" onclick="buildVideo('${c.id}',this)">🎬 Build video</button>`:""}
@@ -1204,6 +1231,10 @@ async function tabConnectors(){
     $("hub").innerHTML=GrowthUI.renderHub(hub,{canEdit}); }
   catch(e){ $("hub").innerHTML=`<p style="color:var(--err)">${esc(e.message)}</p>`; }
 }
+async function tabMail(){
+  $("tabBody").innerHTML=`<div class="card"><h2>✉️ Mail</h2><p class="sub">Your own email marketing: contacts with tags, AI-drafted broadcasts and multi-step sequences, test sends, approval, scheduling, open/click/unsubscribe tracking — sent from the brand's own mailbox so the reputation stays with the brand.</p><div id="mailMount"><span class="spinner"></span></div></div>`;
+  await MailUI.mount($("mailMount"), state.brand.id, {canEdit: ME && ME.role!=="client"});
+}
 let ADS_NET="meta", ADS_CUR=null;
 async function tabAds(){
   const b=state.brand; let hub={channels:[],limits:{max_daily_ad_budget:5000}};
@@ -1285,6 +1316,7 @@ function renderCreativeDetail(c){
   const gal=`${p.slide_assets?`<p class="sub" style="margin:12px 0 4px">Slide images</p><div class="row" style="overflow-x:auto;flex-wrap:nowrap">${p.slide_assets.map((a,i)=>`<img alt="Slide ${i+1}" loading="lazy" src="${assetUrl(b,a)}" style="width:120px;border-radius:9px;border:1px solid var(--line)">`).join("")}</div>`:""}
     ${p.scene_assets?`<p class="sub" style="margin:12px 0 4px">Storyboard</p><div class="row" style="overflow-x:auto;flex-wrap:nowrap">${p.scene_assets.map((a,i)=>`<img alt="Scene ${i+1}" loading="lazy" src="${assetUrl(b,a)}" style="width:110px;border-radius:9px;border:1px solid var(--line)">`).join("")}</div>`:""}
     ${p.vo_asset?`<div class="row" style="margin-top:10px"><audio controls src="${assetUrl(b,p.vo_asset)}" style="height:32px"></audio></div>`:""}
+    ${p.design_qa?renderDesignQA(b,p.design_qa):(p.design_review?renderDesignQA(b,{review:p.design_review,after:{asset:c.asset_path,score:p.design_review.score},before:{},applied:[]}):"")}
     ${p.algo_audit?renderAudit(p.algo_audit):""}
     <div id="vout_${c.id}"></div>`;
   return `
@@ -1297,6 +1329,21 @@ function renderCreativeDetail(c){
     ${note}
     <div class="rvhead"><h2 style="margin:0">${esc(p.title||"Untitled")}</h2><span class="tag y">${esc(c.channel||"")}</span><span class="tag">${esc(p.format||"")}</span></div>
     <div class="rvgrid"><div class="rvmain">${renderPackage(p)}</div><div class="rvside">${phone}${acts}${gal}</div></div>`;
+}
+function renderDesignQA(b,q){
+  const rv=q.review||{}; const sc=(q.after||{}).score; const col=sc==null?"var(--mut)":sc>=85?"var(--grn)":sc>=70?"var(--warn)":"var(--err)";
+  const iss=(rv.issues||[]).map(i=>`<li><b style="text-transform:uppercase;font-size:10.5px;letter-spacing:.04em;color:${i.severity==="high"?"var(--err)":i.severity==="medium"?"var(--warn)":"var(--mut)"}">${esc(i.area||"")} · ${esc(i.severity||"")}</b><br>${esc(i.problem||"")}<br><span class="sub" style="margin:0">Fix: ${esc(i.fix||"")}</span></li>`).join("");
+  const ba=(q.before||{}).asset, aa=(q.after||{}).asset, changed=ba&&aa&&ba!==aa;
+  return `<div class="pkg" style="margin-top:12px"><div class="row" style="gap:10px"><b style="font-size:26px;color:${col}">${sc==null?"—":sc}</b><div><b>Design review</b><div class="sub" style="margin:0">${esc(rv.verdict||"")}</div></div><span style="flex:1"></span>${q.publish_ready?'<span class="tag g">publish-ready</span>':(sc!=null?'<span class="tag">needs work</span>':"")}</div>
+    ${(q.applied||[]).length?`<p class="sub" style="margin:6px 0">Applied: ${q.applied.map(esc).join(" · ")}</p>`:""}
+    ${changed?`<div class="row" style="gap:8px;margin:8px 0"><div style="flex:1"><div class="sub" style="margin:0 0 4px">Before · ${esc(String((q.before||{}).score??"—"))}</div><img alt="before" loading="lazy" src="${assetUrl(b,ba)}" style="width:100%;border-radius:8px;border:1px solid var(--line);opacity:.8"></div><div style="flex:1"><div class="sub" style="margin:0 0 4px">After · ${esc(String(sc??"—"))}</div><img alt="after" loading="lazy" src="${assetUrl(b,aa)}?t=${Date.now()}" style="width:100%;border-radius:8px;border:2px solid var(--grn)"></div></div>`:""}
+    ${iss?`<ul style="padding-left:16px;margin:6px 0;font-size:12.5px">${iss}</ul>`:""}
+    ${rv.checks?`<div class="sub" style="margin:0">File: ${rv.checks.width}×${rv.checks.height} · target ${(rv.checks.target||[]).join("×")}</div>`:""}</div>`;
+}
+async function designFix(cid,btn){
+  busy(btn,true,"Art director reviewing…");
+  try{ const r=await api(`/brands/${state.brand.id}/creatives/${cid}/design-fix`,"POST"); toast(r.publish_ready?`Design ${r.after.score}/100 — publish-ready`:`Design ${r.after.score??"—"}/100 — see issues`, !r.publish_ready); openReview(cid); }
+  catch(e){ toast(e.message,true); busy(btn,false); }
 }
 async function openReview(cid){
   REVIEW_CID=cid;
