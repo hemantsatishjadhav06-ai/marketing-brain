@@ -14,6 +14,7 @@ class UserIn(BaseModel):
     password: str
     role: str = "client"
     brand_id: str = ""
+    brand_ids: list[str] = []   # manager role: the clients this account runs
 
 
 class BrandIn(BaseModel):

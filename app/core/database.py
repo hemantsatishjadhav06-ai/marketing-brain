@@ -279,6 +279,27 @@ CREATE TABLE IF NOT EXISTS spend_log (
     payload TEXT,
     created_at REAL
 );
+CREATE TABLE IF NOT EXISTS brand_assignments (
+    user_id TEXT NOT NULL,
+    brand_id TEXT NOT NULL,
+    created_at REAL,
+    PRIMARY KEY (user_id, brand_id)
+);
+CREATE TABLE IF NOT EXISTS reports (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    period TEXT,
+    kind TEXT DEFAULT 'monthly',
+    payload TEXT NOT NULL,
+    created_at REAL
+);
+CREATE TABLE IF NOT EXISTS agency_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT,
+    updated_at REAL
+);
+CREATE INDEX IF NOT EXISTS idx_assign_brand ON brand_assignments(brand_id);
+CREATE INDEX IF NOT EXISTS idx_reports_brand ON reports(brand_id, period);
 CREATE INDEX IF NOT EXISTS idx_campaigns_brand ON campaigns(brand_id, status);
 CREATE INDEX IF NOT EXISTS idx_emailcampaigns_brand ON email_campaigns(brand_id, status);
 CREATE INDEX IF NOT EXISTS idx_seoaudits_brand ON seo_audits(brand_id);
@@ -371,7 +392,8 @@ def list_brands():
 
 BRAND_SCOPED_TABLES = ("ideas", "calendar_items", "creatives", "publish_queue", "metrics",
                        "connector_settings", "competitors", "brand_memory", "agent_runs",
-                       "conversations", "messages", "invites", "password_resets", "gen_usage", "users")
+                       "conversations", "messages", "invites", "password_resets", "gen_usage", "users",
+                       "campaigns", "email_campaigns", "seo_audits", "spend_log", "reports", "brand_assignments")
 
 
 def delete_brand(bid):
@@ -487,7 +509,7 @@ def interrupt_stale_jobs(older_than_s=3600):
         return
     try:
         with _lock, _conn() as c:
-            c.execute("UPDATE jobs SET state='interrupted' WHERE state='running' AND updated_at < ?",
+            c.execute("UPDATE jobs SET state='interrupted' WHERE state IN ('running','queued') AND updated_at < ?",
                       (_now() - older_than_s,))
     except Exception:
         pass
@@ -691,9 +713,11 @@ def get_user(uid):
 def delete_user(uid):
     if IS_REST:
         _rest("DELETE", "users", params={"id": f"eq.{uid}"})
+        _rest("DELETE", "brand_assignments", params={"user_id": f"eq.{uid}"})
         return
     with _lock, _conn() as c:
         c.execute("DELETE FROM users WHERE id=?", (uid,))
+        c.execute("DELETE FROM brand_assignments WHERE user_id=?", (uid,))
 
 
 def update_user_password(uid, pw_hash):
@@ -711,3 +735,93 @@ def get_connectors(brand_id):
     with _conn() as c:
         rows = c.execute("SELECT platform, credentials FROM connector_settings WHERE brand_id=?", (brand_id,)).fetchall()
     return {r["platform"]: json.loads(r["credentials"]) for r in rows}
+
+
+# ---------- agency: manager ↔ brand assignments ----------
+# A `manager` is an agency account-manager who runs a *subset* of the portfolio.
+# Visibility is the assignment list, nothing else — the same tenant wall the
+# owner/client roles already have, just for N brands instead of one.
+
+def set_assignments(user_id, brand_ids):
+    """Replace a user's brand assignments with exactly `brand_ids`."""
+    ids = sorted({b for b in (brand_ids or []) if b})
+    if IS_REST:
+        _rest("DELETE", "brand_assignments", params={"user_id": f"eq.{user_id}"})
+        for b in ids:
+            _rest("POST", "brand_assignments", body={"user_id": user_id, "brand_id": b, "created_at": _now()})
+        return ids
+    with _lock, _conn() as c:
+        c.execute("DELETE FROM brand_assignments WHERE user_id=?", (user_id,))
+        for b in ids:
+            c.execute("INSERT INTO brand_assignments (user_id, brand_id, created_at) VALUES (?,?,?)",
+                      (user_id, b, _now()))
+    return ids
+
+
+def get_assignments(user_id):
+    if not user_id:
+        return []
+    if IS_REST:
+        return [r["brand_id"] for r in _rest("GET", "brand_assignments", params={"user_id": f"eq.{user_id}"})]
+    with _conn() as c:
+        rows = c.execute("SELECT brand_id FROM brand_assignments WHERE user_id=? ORDER BY created_at",
+                         (user_id,)).fetchall()
+    return [dict(r)["brand_id"] for r in rows]
+
+
+def assignments_by_brand(brand_id):
+    if IS_REST:
+        return [r["user_id"] for r in _rest("GET", "brand_assignments", params={"brand_id": f"eq.{brand_id}"})]
+    with _conn() as c:
+        rows = c.execute("SELECT user_id FROM brand_assignments WHERE brand_id=?", (brand_id,)).fetchall()
+    return [dict(r)["user_id"] for r in rows]
+
+
+def all_assignments():
+    """{user_id: [brand_id, ...]} for the whole agency (admin roster view)."""
+    if IS_REST:
+        rows = _rest("GET", "brand_assignments", params={"order": "created_at.asc"})
+    else:
+        with _conn() as c:
+            rows = [dict(r) for r in c.execute("SELECT user_id, brand_id FROM brand_assignments").fetchall()]
+    out = {}
+    for r in rows:
+        out.setdefault(r["user_id"], []).append(r["brand_id"])
+    return out
+
+
+# ---------- agency: key/value settings (branding, defaults) ----------
+
+def get_setting(key, default=None):
+    if IS_REST:
+        rows = _rest("GET", "agency_settings", params={"key": f"eq.{key}", "limit": 1})
+        return json.loads(rows[0]["value"]) if rows and rows[0].get("value") else default
+    with _conn() as c:
+        r = c.execute("SELECT value FROM agency_settings WHERE key=?", (key,)).fetchone()
+    return json.loads(dict(r)["value"]) if r and dict(r)["value"] else default
+
+
+def set_setting(key, value):
+    blob = json.dumps(value)
+    if IS_REST:
+        _rest("POST", "agency_settings", body={"key": key, "value": blob, "updated_at": _now()},
+              prefer="resolution=merge-duplicates")
+        return
+    with _lock, _conn() as c:
+        c.execute("INSERT INTO agency_settings (key, value, updated_at) VALUES (?,?,?) "
+                  "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at",
+                  (key, blob, _now()))
+
+
+def all_settings():
+    if IS_REST:
+        rows = _rest("GET", "agency_settings")
+    else:
+        with _conn() as c:
+            rows = [dict(r) for r in c.execute("SELECT key, value FROM agency_settings").fetchall()]
+    return {r["key"]: (json.loads(r["value"]) if r.get("value") else None) for r in rows}
+
+
+def gen_usage_today(brand_id):
+    """Convenience: this brand's generation count for the current UTC day."""
+    return gen_usage_count(brand_id, time.strftime("%Y-%m-%d", time.gmtime()))

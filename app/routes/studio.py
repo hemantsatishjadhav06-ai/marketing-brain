@@ -16,7 +16,7 @@ def reel_job(job_id: str, user=Depends(current_user)):
     j = _reel_get(job_id)
     if not j:
         raise HTTPException(404, "Job not found")
-    if user["role"] != "admin" and user.get("brand_id") != j.get("brand_id"):
+    if not _can_see(user, j.get("brand_id") or ""):
         raise HTTPException(403, "Not your job")
     return j
 

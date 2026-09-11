@@ -65,8 +65,7 @@ def approval_queue(user=Depends(current_user)):
 
     Ordered oldest-first so nothing sits forgotten at the bottom of a list.
     """
-    brand_list = db.list_brands() if user.get("role") == "admin" else \
-        [b for b in [db.get_brand(user.get("brand_id") or "")] if b]
+    brand_list = _visible_brands(user)
 
     waiting, revising = [], []
     for b in brand_list:

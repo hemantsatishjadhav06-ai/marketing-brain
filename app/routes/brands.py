@@ -18,10 +18,7 @@ def create_brand(body: BrandIn, user=Depends(current_user)):
 
 @router.get("/api/brands")
 def brands(user=Depends(current_user)):
-    if user["role"] == "admin":
-        return db.list_brands()
-    b = db.get_brand(user.get("brand_id") or "")
-    return [b] if b else []
+    return _visible_brands(user)
 
 
 @router.get("/api/brands/{bid}")

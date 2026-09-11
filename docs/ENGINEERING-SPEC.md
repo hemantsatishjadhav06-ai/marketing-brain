@@ -392,3 +392,24 @@ New: `REDIS_URL`, `VAULT_KEY`, `SESSION_COOKIE_*`, `CORS_ORIGINS`, `STRIPE_*`, `
 
 ## Appendix C — File map (what exists)
 `app/main.py` · `app/core/{auth,database,guard}.py` · `app/ai/{engine,brain}.py` · `app/routes/{auth,onboarding,brands,pipeline,studio,brain,control,publishing,inbox,memory,competitors,growth,autopilot,channels,airtable,misc}.py` · `app/services/{scraper,workspace,memory,inbox,onboarding,connectors,projects,playbook,trends,meta_ads,google_ads,email_marketing,seo_tools,whatsapp,airtable*}.py` · `web/{index.html,js/app.js,js/boot.js,css/styles.css,operator.html,site/*}` · `design/console-ui/*` · `tests/*` (480) · `test-report/*` · `docs/*`.
+
+## 14. Agency Operating System (implemented)
+
+Everything in this section is shipped and tested (`tests/test_agency.py`); the
+runbook and architecture note is `docs/AGENCY-OS.md`.
+
+| Capability | Backend | Console |
+|---|---|---|
+| Manager role + brand assignments | `brand_assignments`, `_can_see`, `_visible_brands`, `PUT /api/users/{id}/brands` | Agency settings → Team |
+| Portfolio health + alerts | `agency_portfolio`, `GET /api/agency/portfolio`, `/alerts` | Portfolio |
+| Bounded fair job pool | `agency_pool.BrandPool` (`AGENCY_MAX_WORKERS`) | Portfolio pool status, Weekly cycles |
+| Weekly cycle across clients with per-client caps | `agency_cycle`, `POST /api/agency/cycle`, cron `kick_due` | Weekly cycles |
+| Bulk approve / publish (same gates) | `agency_bulk`, `POST /api/agency/bulk/approve`, `/publish`, `GET /api/agency/queue` | Approvals bulk bar |
+| Templated onboarding | `agency_templates`, `agency_onboard`, `POST /api/agency/onboard` | Clients |
+| Per-client config in every prompt | `brand_config` (`profile.config`), `GET/PUT /api/brands/{id}/config`, `engine._brand_context` | Clients → Config |
+| Monthly white-label reports | `agency_report`, `reports` table, `POST /api/brands/{id}/reports`, `/html` | Clients → Monthly report |
+| Agency branding + defaults | `agency_settings`, `agency_settings` table, `GET/PUT /api/agency/settings`, public `GET /api/agency/branding` | Agency settings |
+
+Invariants kept: tenant isolation (now with a third visibility mode), approval
+gate before live publish, one live publish per creative per channel, ad spend
+needs a human, global generation kill-switch and cap sit above per-client caps.

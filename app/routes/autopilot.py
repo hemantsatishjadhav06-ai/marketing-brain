@@ -39,9 +39,12 @@ def autopilot_all(body: AutopilotIn, user=Depends(current_user)):
 def autopilot_status(user=Depends(current_user)):
     if user["role"] == "admin":
         return _ap_all()
-    bid = user.get("brand_id") or ""
-    j = _ap_get(bid)
-    return {bid: j} if j else {}
+    out = {}
+    for b in _visible_brands(user):
+        j = _ap_get(b["id"])
+        if j:
+            out[b["id"]] = j
+    return out
 
 
 @router.get("/api/cron")
@@ -65,7 +68,16 @@ def cron(key: str = ""):
             threading.Thread(target=_auto_cycle, args=(b["id"],), daemon=True).start()
             kicked.append(b["name"])
             break  # one brand per ping keeps load tiny
-    return {"ok": True, "alive": True, "cycled": kicked}
+    # Agency weekly cycle: queue every due client into the bounded pool (it
+    # runs at most AGENCY_MAX_WORKERS at a time, so twenty clients are fine).
+    cycle = None
+    try:
+        from ..services import agency_cycle
+        c = agency_cycle.kick_due(by="cron")
+        cycle = {"id": c["id"], "brands": len(c.get("brand_ids") or [])} if c else None
+    except Exception:
+        cycle = None
+    return {"ok": True, "alive": True, "cycled": kicked, "agency_cycle": cycle}
 
 
 @router.get("/api/digest")
@@ -73,8 +85,7 @@ def digest(user=Depends(current_user)):
     """Command-center data: today's calendar items + creatives awaiting approval."""
     from datetime import date as _date
     today = _date.today().isoformat()
-    brand_list = db.list_brands() if user["role"] == "admin" else \
-        [b for b in [db.get_brand(user.get("brand_id") or "")] if b]
+    brand_list = _visible_brands(user)
     due_today, needs_approval, changes_requested = [], [], []
     for b in brand_list:
         for c in db.list_docs("calendar_items", b["id"]):
@@ -97,8 +108,7 @@ def digest(user=Depends(current_user)):
 
 @router.get("/api/activity")
 def activity(user=Depends(current_user)):
-    brand_list = db.list_brands() if user["role"] == "admin" else \
-        [b for b in [db.get_brand(user.get("brand_id") or "")] if b]
+    brand_list = _visible_brands(user)
     feed = []
     for b in brand_list:
         for table, verb in (("ideas", "idea"), ("creatives", "creative"), ("publish_queue", "publish"), ("metrics", "metrics")):

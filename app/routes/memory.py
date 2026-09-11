@@ -86,9 +86,7 @@ def get_profile(bid: str, user=Depends(current_user)):
 def all_profiles(user=Depends(current_user)):
     """Every brand profile visible to this user, with its stored-data counts."""
     out = []
-    for b in db.list_brands():
-        if user.get("role") != "admin" and user.get("brand_id") and b["id"] != user.get("brand_id"):
-            continue
+    for b in _visible_brands(user):
         out.append({
             "id": b["id"],
             "name": b.get("name"),

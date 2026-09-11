@@ -11,9 +11,9 @@ from fastapi.staticfiles import StaticFiles
 
 from .core import database as db
 from .routes import _shared, control, memory
-from .routes import airtable, auth, autopilot, brain, brands, channels, competitors, growth, inbox, misc, onboarding, pipeline, publishing, studio
+from .routes import agency, airtable, auth, autopilot, brain, brands, channels, competitors, growth, inbox, misc, onboarding, pipeline, publishing, studio
 
-ROUTERS = [airtable, auth, autopilot, brain, brands, channels, competitors, control, growth, inbox, memory,
+ROUTERS = [agency, airtable, auth, autopilot, brain, brands, channels, competitors, control, growth, inbox, memory,
            misc, onboarding, pipeline, publishing, studio]
 
 
@@ -33,11 +33,13 @@ def _workspace_router(ws_root):
         # only reach its own brand's folder; slugs are guessable, so this is the
         # only thing standing between tenants' generated assets and profiles.
         if user.get("role") != "admin":
-            b = db.get_brand(user.get("brand_id") or "")
-            if not b:
-                raise HTTPException(404, "Not found")
-            own = os.path.realpath(os.path.join(ws_root, _shared._wslug(b)))
-            if target != own and not target.startswith(own + os.sep):
+            allowed = False
+            for b in _shared._visible_brands(user):
+                own = os.path.realpath(os.path.join(ws_root, _shared._wslug(b)))
+                if target == own or target.startswith(own + os.sep):
+                    allowed = True
+                    break
+            if not allowed:
                 raise HTTPException(404, "Not found")
         if not os.path.isfile(target):
             raise HTTPException(404, "Not found")

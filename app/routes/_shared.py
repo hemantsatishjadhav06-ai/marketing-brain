@@ -147,7 +147,51 @@ def current_user(authorization: str = Header(default="")):
     payload["role"] = u.get("role") or payload.get("role")
     payload["brand_id"] = u.get("brand_id") or ""
     payload["email"] = u.get("email") or payload.get("email", "")
+    # Agency account-managers see exactly the brands assigned to them. Read on
+    # every request (like the role) so an un-assignment takes effect at once.
+    if payload["role"] == "manager":
+        try:
+            payload["brand_ids"] = db.get_assignments(payload.get("uid", ""))
+        except Exception:
+            payload["brand_ids"] = []
     return payload
+
+
+ROLES = ("admin", "manager", "owner", "client")
+OPERATOR_ROLES = ("admin", "manager")
+
+
+def _can_see(user, bid) -> bool:
+    """The single tenancy predicate. admin: everything; manager: assigned brands;
+    owner/client: their own brand. Every visibility check routes through here."""
+    if not user or not bid:
+        return False
+    role = user.get("role")
+    if role == "admin":
+        return True
+    if role == "manager":
+        return bid in (user.get("brand_ids") or [])
+    return user.get("brand_id") == bid
+
+
+def _visible_brands(user):
+    """Brand rows this user may see, in portfolio order."""
+    if not user:
+        return []
+    role = user.get("role")
+    if role == "admin":
+        return db.list_brands()
+    if role == "manager":
+        allowed = set(user.get("brand_ids") or [])
+        return [b for b in db.list_brands() if b["id"] in allowed]
+    b = db.get_brand(user.get("brand_id") or "")
+    return [b] if b else []
+
+
+def _operator_only(user):
+    """Agency-level screens (portfolio, cycles, bulk actions): admin or manager."""
+    if user.get("role") not in OPERATOR_ROLES:
+        raise HTTPException(403, "Agency operator access required")
 
 
 def _wslug(b):
@@ -158,7 +202,7 @@ def _brand_or_404(bid, user=None):
     b = db.get_brand(bid)
     if not b:
         raise HTTPException(404, "Brand not found")
-    if user and user["role"] != "admin" and user.get("brand_id") != bid:
+    if user and not _can_see(user, bid):
         raise HTTPException(403, "This login can only access its own brand")
     return b
 

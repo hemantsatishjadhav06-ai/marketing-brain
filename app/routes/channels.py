@@ -112,6 +112,8 @@ def connect_channel(bid: str, body: ChannelConnectIn, user=Depends(current_user)
 def _admin_or_owner(user, bid):
     if user["role"] == "admin":
         return
+    if user["role"] == "manager" and _can_see(user, bid):
+        return  # an assigned account-manager runs this client's channels
     if user.get("brand_id") == bid and user["role"] in ("owner", "admin"):
         return
     raise HTTPException(403, "Only the master account or this company's owner can change connections")

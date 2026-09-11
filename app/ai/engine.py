@@ -118,8 +118,18 @@ def _brand_context(brand, with_memory=True):
         "brand_colors_hex": colors,
         "visual_style": kit.get("style"),
     }
+    # Per-client configuration (persona, market brief, do/don't, CTA, compliance)
+    # is data in the same JSON block — an agency runs twenty different clients
+    # through one engine, so nothing about a client may be hard-coded here.
+    try:
+        from ..services import brand_config
+        ctx["client_config"] = brand_config.prompt_block(brand) or None
+        pointer_ok = brand_config.pointer_allowed(brand) or projects.is_known(brand.get("name", ""))
+    except Exception:
+        pointer_ok = True
     block = json.dumps({k: v for k, v in ctx.items() if v}, ensure_ascii=False)
-    block += projects.pointer(brand.get("name", ""))
+    if pointer_ok:
+        block += projects.pointer(brand.get("name", ""))
     # Everything the brand has already established — approvals, rejections, rules.
     # Without this each run starts blind and repeats corrections the operator
     # has already made. Callers that put brand context in the SYSTEM prompt pass

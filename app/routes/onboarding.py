@@ -46,9 +46,11 @@ def _can_manage_brand(user, bid):
     """Master, or this company's own owner/admin."""
     if user.get("role") == "admin":
         return
+    if user.get("role") == "manager" and _can_see(user, bid):
+        return
     if user.get("brand_id") == bid and user.get("role") in ("owner", "admin"):
         return
-    raise HTTPException(403, "Only the master account or this company's owner can do that")
+    raise HTTPException(403, "Only the master account, an assigned manager or this company's owner can do that")
 
 
 @router.post("/api/signup")
