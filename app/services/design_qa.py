@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import io
 import os
+import re
 import time
 
 import httpx
@@ -132,6 +133,9 @@ VISION_SYSTEM = (
     "unreadable contrast — call these out precisely. Judge logo placement (clear space, corner, not overlapping "
     "faces/text), brand colour fidelity, focal point and hierarchy, crowding, platform safe areas "
     "(top/bottom UI on reels; caption area), stock-photo genericness, and whether the visual matches the caption's promise. "
+    "If the image contains a chart, comparison or diagram, check that its DIRECTION and proportions agree with the caption's "
+    "claim (e.g. the cheaper option must look cheaper) — a chart that contradicts the claim is a high-severity 'relevance' issue. "
+    "Generated images cannot be trusted to render text: the fix for any text problem is a text-free visual, never 'make the text clearer'. "
     "Never invent facts about the brand. Return STRICT JSON only."
 )
 
@@ -163,9 +167,11 @@ def review(brand, creative, image_bytes: bytes | None = None) -> dict:
         "\"composition\": {\"ok\": true/false, \"note\": \"...\"}, "
         "\"safe_areas\": {\"ok\": true/false, \"note\": \"...\"}, "
         "\"generic_stock_look\": true/false, "
+        "\"matches_caption\": {\"ok\": true/false, \"note\": \"does the visual support or contradict the caption's claim\"}, "
         "\"issues\": [{\"area\": \"text|logo|colour|composition|safe_area|relevance|quality\", \"severity\": \"high|medium|low\", \"problem\": \"...\", \"fix\": \"exact change\"}], "
         "\"regenerate\": true/false, "
-        "\"revised_image_prompt\": \"a complete, improved prompt that fixes the issues; NO text, letters or words in the image; keep the brand palette\"}"
+        "\"revised_image_prompt\": \"a complete, improved prompt that fixes the issues; NO text, letters or words in the image; keep the brand palette\", "
+        "\"scene_prompt\": \"a TEXT-FREE photographic or illustrative scene (people, place, product, mood, light, palette) that carries the caption's idea without any words, numbers, charts or diagrams\"}"
     )
     try:
         v = engine._json_chat_vision(VISION_SYSTEM + " " + engine.ANTI_INJECTION, user, blob,
@@ -184,9 +190,24 @@ def review(brand, creative, image_bytes: bytes | None = None) -> dict:
     for f in facts["issues"]:
         issues.append({"area": "quality", "severity": "high", "problem": f, "fix": "auto-fixed mechanically"})
     return {"ok": True, "score": score, "verdict": v.get("verdict", ""), "vision": {k: v.get(k) for k in
-            ("text_in_image", "logo", "brand_colours", "composition", "safe_areas", "generic_stock_look")},
+            ("text_in_image", "logo", "brand_colours", "composition", "safe_areas", "generic_stock_look", "matches_caption")},
             "issues": issues, "regenerate": bool(v.get("regenerate")) or (score is not None and score < 60),
-            "revised_image_prompt": v.get("revised_image_prompt") or "", "checks": facts, "at": time.time()}
+            "revised_image_prompt": v.get("revised_image_prompt") or "", "scene_prompt": v.get("scene_prompt") or "",
+            "checks": facts, "at": time.time()}
+
+
+_TEXTY = re.compile(r"\b(infographic|chart|graph|diagram|table|breakdown|comparison|label(?:s|led)?|caption(?:s)?|typography|"
+                    r"headline|text|numbers?|percentages?|statistics|data visuali[sz]ation|bar[- ]chart|pie[- ]chart)\b", re.I)
+
+
+def regen_prompt(rv: dict) -> str:
+    """The prompt we actually regenerate with. Generated images cannot be trusted to
+    render text, so the regeneration NEVER asks for text, charts or labels: prefer
+    the reviewer's text-free scene, strip chart/infographic language from any
+    fallback, and state the rule up front. The caption carries the message."""
+    base = (rv.get("scene_prompt") or "").strip() or _TEXTY.sub("scene", (rv.get("revised_image_prompt") or "").strip())
+    return ("PURELY VISUAL scene — ABSOLUTELY NO text, numbers, labels, charts, infographics, diagrams or UI of any kind; "
+            "the caption carries the message. " + base)
 
 
 def fix(brand, creative, review_result: dict | None = None, max_regens: int = 1) -> dict:
@@ -225,14 +246,9 @@ def fix(brand, creative, review_result: dict | None = None, max_regens: int = 1)
         rv = rv2 if rv2.get("ok") else rv
     # 2. regenerate once with the art director's revised prompt
     regen = None
-    if (rv.get("regenerate") or (cur_score is not None and cur_score < min_score)) and rv.get("revised_image_prompt") and max_regens > 0:
+    if (rv.get("regenerate") or (cur_score is not None and cur_score < min_score)) and (rv.get("revised_image_prompt") or rv.get("scene_prompt")) and max_regens > 0:
         try:
-            prompt = rv["revised_image_prompt"]
-            tii = ((rv.get("vision") or {}).get("text_in_image") or {})
-            if tii.get("present") and not tii.get("legible", True):
-                # The model keeps rendering (garbled) text: take text off the table entirely.
-                prompt = ("PURELY VISUAL scene with ABSOLUTELY NO text, numbers, labels, charts, infographics, "
-                          "diagrams or UI of any kind — the message is carried by the caption. " + prompt)
+            prompt = regen_prompt(rv)
             sh._generate_image(brand, cid, prompt_override=prompt)
             new_creative = db.get_doc("creatives", cid)
             new_blob = load_asset(brand, new_creative.get("asset_path") or "")

@@ -29,6 +29,14 @@ CAPTIONS = {
  "16-client-connections": ("Client app — Connections", "Connect the client's own accounts; test proves the token; disconnect any time."),
  "17-client-memory": ("Client app — Memory", "What the system learned from approvals and corrections."),
  "20-landing-site": ("Marketing site", "The public product site."),
+ "30-client-calendar-month-airtable": ("Client app — Calendar month view + Airtable", "The plan as a month grid; the Airtable card creates the client's base and syncs both ways."),
+ "31-client-mail-campaigns": ("Client app — Mail", "Built-in mailer: contacts, broadcasts, sequences, stats, approval-gated sending."),
+ "32-client-mail-campaign-preview": ("Client app — campaign preview", "Subject A/B, preview text, branded HTML as the recipient sees it, test send, approve or schedule."),
+ "33-client-mail-sequences": ("Client app — sequences", "Multi-step sequences with day delays and merge fields."),
+ "34-client-mail-contacts": ("Client app — contacts", "CSV import, tags, suppression."),
+ "35-client-design-qa-review": ("Client app — Design review", "The art director's score, issues and fixes on the creative, with before/after."),
+ "36-console-mailer": ("Console — mailer", "The same mailer inside Growth tooling for the agency."),
+ "37-console-connections-smtp-airtable": ("Console — connections", "SMTP (built-in mailer) and Airtable with workspace ID in the hub."),
 }
 
 def img_uri(name, width=1100, q=68):
@@ -105,6 +113,43 @@ recs = [
  ("Move the job queue out of process", "A redeploy drops queued cycles until the next weekly pass. Redis or a DB-backed queue is the next infrastructure step."),
 ]
 rec_rows = "".join(f'<li><b>{esc(a)}</b> — {esc(b)}</li>' for a,b in recs)
+
+R2 = json.load(open(os.path.join(HERE, "neopolis_round2.json"))) if os.path.exists(os.path.join(HERE, "neopolis_round2.json")) else None
+FIX2 = json.load(open(os.path.join(HERE, "neopolis_round2_fix2.json"))) if os.path.exists(os.path.join(HERE, "neopolis_round2_fix2.json")) else None
+def _img_file(name, width=520, q=72):
+    p = os.path.join(os.path.dirname(HERE), "..", "..", "tmp") if False else None
+    return None
+def round2_section():
+    if not R2:
+        return ""
+    a = R2.get("artefacts", {}); rb = a.get("review_before") or {}; fx = FIX2 or a.get("fix") or {}; rv = fx.get("review") or {}
+    def issues(lst):
+        return "".join(f'<li><b>{esc(str(i.get("area","")))} · {esc(str(i.get("severity","")))}</b> — {esc(str(i.get("problem","")))}{(" <span class=small>Fix: " + esc(str(i.get("fix",""))) + "</span>") if i.get("fix") else ""}</li>' for i in lst if isinstance(i, dict))
+    sp = "/tmp/claude-0/-home-user/fa0348bf-bc23-56ce-a8a2-a3f296fc119a/scratchpad"
+    def data_img(path, w=520):
+        if not os.path.exists(path): return ""
+        im = Image.open(path).convert("RGB"); r = w / im.width; im = im.resize((w, int(im.height * r)))
+        buf = io.BytesIO(); im.save(buf, "JPEG", quality=74); return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
+    before_img = data_img(os.path.join(sp, "r2_before.png")); after_img = data_img(os.path.join(sp, "r2_after.png"))
+    cr = a.get("creative") or {}; mail = a.get("mail") or {}; seq = a.get("sequence") or []
+    steps_rows = "".join(f'<tr><td class="mono">{esc(s["step"][:2])}</td><td>{esc(s["step"][3:])}</td><td><span class="st {s["status"].lower()}">{s["status"]}</span></td><td class="mono small">{esc(s["detail"][:170])}</td></tr>' for s in R2["steps"])
+    return f"""<h2>7b · Round 2: a new post judged and fixed by the art director, the built-in mailer, the Airtable calendar</h2>
+<p>Run {esc(R2["run"])} on production, {R2["pass"]}/{R2["pass"]+R2["fail"]} steps passed. The Design QA agent looks at every generated visual the way a graphic designer would — text legibility, logo, brand colours, composition, platform safe areas — and fixes what it can: crop to the platform ratio, regenerate once with revised art direction, keep the better version, never lose the original.</p>
+<h3>The new post · {esc(str(cr.get("title","")))}</h3>
+<p class="small">Caption: {esc(str(cr.get("caption",""))[:260])}</p>
+<div class="tw"><table><tr><th>First visual (before)</th><th>After the fix loop</th></tr><tr>
+<td style="width:50%">{('<img src="' + before_img + '" alt="before" style="width:100%;border-radius:8px;border:1px solid var(--ln)">') if before_img else '<span class="small">image not captured</span>'}
+<p class="small"><b>Score {esc(str(rb.get("score")))}</b> — {esc(str(rb.get("verdict","")))}</p><ul class="small">{issues(rb.get("issues", []))}</ul></td>
+<td style="width:50%">{('<img src="' + after_img + '" alt="after" style="width:100%;border-radius:8px;border:2px solid var(--ok)">') if after_img else '<span class="small">image not captured</span>'}
+<p class="small"><b>Score {esc(str((fx.get("after") or {}).get("score")))}</b> — {esc(str(rv.get("verdict","")))}<br>Applied: {esc("; ".join(fx.get("applied") or []))}<br>File: {esc(str((rv.get("checks") or {}).get("width")))}×{esc(str((rv.get("checks") or {}).get("height")))} · publish-ready: {esc(str(fx.get("publish_ready")))}</p><ul class="small">{issues(rv.get("issues", []))}</ul></td></tr></table></div>
+<div class="note"><b>What the designer's eye caught, and what the code changed because of it.</b> The first pass produced a square 1024×1024 infographic with garbled text ("Landolarf-share") — the vision review scored it 60 and the mechanical check flagged the ratio. The first fix loop regenerated but still got a square file back from the model. That exposed two product defects, both fixed in this session: the image API was always asked for 1:1 (now the platform's own ratio, 4:5 for Instagram posts, 9:16 for reels, with a supported-ratio fallback), and the regenerated file was not re-cropped (now it is). When the reviewer finds illegible text, the regeneration prompt now forbids text, numbers, charts and labels outright and lets the caption carry the message. The original pixels are kept as a snapshot so before/after is always real.</div>
+<h3>Built-in mailer</h3>
+<div class="tw"><table><tr><th>Broadcast subject</th><td>{esc(str(mail.get("subject","")))} <span class="small">(A/B: {esc(str(mail.get("subject_alt","")))})</span></td></tr><tr><th>Preview text</th><td>{esc(str(mail.get("preview","")))}</td></tr><tr><th>Segment</th><td>tag enquiry-2026 · 2 test contacts imported from CSV</td></tr><tr><th>Sequence</th><td>{" · ".join(f"day {s.get('delay_days')}: {esc(str(s.get('subject','')))}" for s in seq)}</td></tr><tr><th>Gates exercised</th><td>send refused without approval (403); send refused without SMTP (400); preview renders with open pixel, click tracking and unsubscribe link</td></tr></table></div>
+<h3>Airtable content calendar</h3>
+<p>The product creates one base per client through the Airtable API on first sync (Content Calendar, Ideas, Creatives) and keeps it two-way: push upserts on a stable key, pull applies Status, Date, Time, Notes and Caption edits back into the app. For this run the base was created in your Airtable workspace with the same schema and the 18 planned slots — <a href="https://airtable.com/app5aLxJcfXKasnMw" target="_blank" rel="noopener">open it</a>. Add the Calendar view once (Content Calendar → + Create view → Calendar → Date). Connect a personal access token under Connections → Airtable to let the product sync it automatically.</p>
+<div class="tw"><table><tr><th>#</th><th>Step</th><th>Result</th><th>Evidence</th></tr>{steps_rows}</table></div>
+"""
+round2_html = round2_section()
 
 HTML = f"""<title>Neopolis Infra Launch Readiness</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -185,6 +230,7 @@ ol,ul{{max-width:80ch}}li{{margin-bottom:8px}}
 <h2>7 · What the client and the agency see</h2>
 {gallery or "<p class='small'>Screenshots not captured in this run.</p>"}
 
+{round2_html}
 <h2>8 · How it works</h2>
 <div class="arch">
 <div><b>Onboard</b>One call: brand → vertical template → scrape the site → AI analysis → workspace → ready. Runs in the bounded job pool.</div>

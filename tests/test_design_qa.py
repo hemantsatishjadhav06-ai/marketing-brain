@@ -167,3 +167,13 @@ def test_FIX_recrops_regenerated_square_and_forbids_text(vision, monkeypatch):
     assert final["asset_path"].endswith("-qa2.png")
     assert Image.open(io.BytesIO(design_qa.load_asset(b, final["asset_path"]))).size == (1080, 1350)
     assert out["after"]["score"] == 90 and out["publish_ready"]
+
+
+def test_REGEN_PROMPT_never_asks_for_text_or_charts():
+    rv = {"revised_image_prompt": "Create an infographic with a clear breakdown of costs and a bar chart with legible text labels", "scene_prompt": ""}
+    p = design_qa.regen_prompt(rv)
+    body = p.split("the caption carries the message. ", 1)[1]
+    assert p.startswith("PURELY VISUAL") and "infographic" not in body.lower() and "chart" not in body.lower() and "text labels" not in body.lower()
+    rv2 = {"revised_image_prompt": "infographic", "scene_prompt": "A young couple receiving keys on a sunlit balcony in Kokapet, navy and orange accents"}
+    body2 = design_qa.regen_prompt(rv2).split("the caption carries the message. ", 1)[1]
+    assert "sunlit balcony" in body2 and "infographic" not in body2
