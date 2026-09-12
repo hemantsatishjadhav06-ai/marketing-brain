@@ -328,9 +328,9 @@ function logoUrl(b){ const k=kitOf(b); return k.logo?`/workspaces/${b.grp?b.grp+
 function renderBrand(){
   const b=state.brand, k=kitOf(b);
   const SEC=[["create","✨ Create"],["content","🗂 Content"],["plan","🗓 Plan"],["grow","📈 Grow"],["settings","⚙ Settings"]];
-  const SUBS={create:[["create","Create"],["brief","✦ Master brief"]],content:[["board","Board"],["reel studio","Reel studio"],["publish","Published"]],plan:[["ideas","Ideas"],["calendar","Calendar"],["campaigns","Campaigns"]],grow:[["growth","Growth"],["ads","Paid ads"],["mail","Mail"],["competitors","Competitors"],["analytics","Analytics"],["playbook","Playbook"]],settings:[["brand kit","Brand kit"],["memory","🧠 Memory"],["connectors","Connectors"],["overview","Overview"]]};
+  const SUBS={create:[["create","Create"],["brief","✦ Master brief"]],content:[["board","Board"],["reel studio","Reel studio"],["film studio","🎬 Film studio"],["publish","Published"]],plan:[["ideas","Ideas"],["calendar","Calendar"],["campaigns","Campaigns"]],grow:[["growth","Growth"],["ads","Paid ads"],["mail","Mail"],["competitors","Competitors"],["analytics","Analytics"],["playbook","Playbook"]],settings:[["brand kit","Brand kit"],["memory","🧠 Memory"],["connectors","Connectors"],["overview","Overview"]]};
   const S2S={}; Object.entries(SUBS).forEach(([sec,arr])=>arr.forEach(([t])=>S2S[t]=sec));
-  const TABFN={create:tabCreate,brief:tabBrief,board:tabBoard,"reel studio":tabReelStudio,publish:tabPublish,ideas:tabIdeas,calendar:tabCalendar,campaigns:tabCampaigns,growth:tabGrowth,ads:tabAds,mail:tabMail,competitors:tabCompetitors,analytics:tabAnalytics,playbook:tabPlaybook,"brand kit":tabKit,memory:tabMemory,connectors:tabConnectors,overview:tabOverview,coach:tabCoach,creatives:tabCreatives};
+  const TABFN={create:tabCreate,brief:tabBrief,board:tabBoard,"reel studio":tabReelStudio,"film studio":tabFilmStudio,publish:tabPublish,ideas:tabIdeas,calendar:tabCalendar,campaigns:tabCampaigns,growth:tabGrowth,ads:tabAds,mail:tabMail,competitors:tabCompetitors,analytics:tabAnalytics,playbook:tabPlaybook,"brand kit":tabKit,memory:tabMemory,connectors:tabConnectors,overview:tabOverview,coach:tabCoach,creatives:tabCreatives};
   if(!TABFN[state.tab]) state.tab="create";
   const sec = state.tab==="coach" ? "" : (S2S[state.tab]||"content");
   const subnav = sec ? `<div class="subnav">${SUBS[sec].map(([t,l])=>`<button class="${state.tab===t?'on':''}" onclick="state.tab='${t}';renderBrand()">${esc(l)}</button>`).join("")}</div>` : "";
@@ -1498,4 +1498,142 @@ async function addMemory(btn){
 async function dropMemory(mid){
   try{ await api(`/brands/${state.brand.id}/memory/${mid}`,"DELETE"); toast("Forgotten"); tabMemory(); }
   catch(e){ toast(e.message||"Failed",true); }
+}
+
+/* ============================ Cinematic Storyboard Film ============================
+   Storyboard first, video second. The director plans reorderable cuts; you edit
+   every cut; a human approves; only then does the film render. Mirrors the same
+   approval gate as every other creative. */
+const LOOK_ICON={"warm-neutral-premium":"🎞","teal-orange-cinematic":"🎬","golden-hour":"🌅","bright-airy":"☀️","moody-noir":"🌑","documentary-natural":"📷","product-studio":"📦","editorial-mono":"⬛"};
+let FILM_CID=null, FILM_TIMER=null;
+async function tabFilmStudio(){
+  const b=state.brand; const [opts,films]=await Promise.all([api("/film-studio/options"),api(`/brands/${b.id}/films`).catch(()=>[])]);
+  const cfg=((b.profile||{}).config||{}).film||{look:"warm-neutral-premium",aspect:"9:16",cuts:6,target_seconds:30};
+  const ro=ME&&ME.role==="client";
+  $("tabBody").innerHTML=`
+    <div class="card filmhero"><h2>🎬 Cinematic storyboard film</h2>
+      <p class="sub">Storyboard first, video second. The director writes a cut-by-cut plan — camera, lighting, voice, visual, transition — and <b>renders nothing</b>. You refine every cut, approve, and only then does the film generate. 9:16, ~30s.</p>
+      ${ro?'<p class="sub">You can review and approve a storyboard; your agency directs and renders it.</p>':`
+      <label>Describe the film (or start from an existing creative)</label>
+      <textarea id="fmPrompt" rows="3" placeholder="e.g. 30s launch film: why landlord-share flats in Kokapet cost 8–14% less than resale, direct from the landowner, end on a site-visit CTA"></textarea>
+      <div class="row" style="flex-wrap:wrap">
+        <div style="width:120px"><label>Cuts</label><select id="fmCuts">${[3,4,5,6,7,8].map(n=>`<option ${n===(cfg.cuts||6)?"selected":""}>${n}</option>`).join("")}</select></div>
+        <div style="width:130px"><label>Duration (s)</label><input id="fmDur" type="number" min="${opts.limits.target_min}" max="${opts.limits.target_max}" value="${cfg.target_seconds||30}"></div>
+        <div style="width:110px"><label>Aspect</label><select id="fmAspect">${opts.aspects.map(a=>`<option ${a===(cfg.aspect||"9:16")?"selected":""}>${a}</option>`).join("")}</select></div>
+        <div style="width:140px"><label>Voice</label><select id="fmVoice">${opts.voices.map(v=>`<option>${v}</option>`).join("")}</select></div>
+      </div>
+      <label>Look</label>
+      <div class="chooser" id="fmLook">${opts.looks.map(l=>`<div class="choice ${l.id===(cfg.look||"warm-neutral-premium")?"on":""}" data-l="${l.id}" title="${esc(l.desc)}" onclick="[...this.parentNode.children].forEach(x=>x.classList.remove('on'));this.classList.add('on')">${LOOK_ICON[l.id]||"🎞"} ${l.id.replace(/-/g," ")}</div>`).join("")}</div>
+      <button onclick="planFilm(this)">🎬 Direct storyboard</button>`}
+      <div id="fmOut"></div></div>
+    <div class="card"><h2>Films</h2><div id="fmList">${films.length?films.map(f=>filmRow(b,f)).join(""):'<p class="sub">No films yet.</p>'}</div></div>`;
+  if(FILM_CID && films.some(f=>f.id===FILM_CID)) openFilm(FILM_CID);
+}
+function filmRow(b,f){
+  const st=f.status==="rendered"?"g":f.status==="rendering"?"y":"";
+  return `<div class="calrow"><b>${esc(f.title||"Untitled")}</b><span class="tag ${st}">${esc(f.status)}</span>
+    <span class="sub" style="margin:0">${f.cuts} cuts · ${f.total_seconds}s · ${esc((f.look||"").replace(/-/g," "))}${f.approval?` · ${esc(f.approval)}`:""}</span>
+    <span style="flex:1"></span><button class="sm ghost" onclick="openFilm('${f.id}')">Open storyboard</button></div>`;
+}
+async function planFilm(btn){
+  const look=(document.querySelector("#fmLook .choice.on")||{}).dataset?.l||"warm-neutral-premium";
+  const body={prompt:$("fmPrompt").value.trim(),look,aspect:$("fmAspect").value,cuts:+$("fmCuts").value,target_seconds:+$("fmDur").value,voice:$("fmVoice").value};
+  if(body.prompt.length<10) return toast("Describe the film in a sentence or two",true);
+  busy(btn,true,"Director at work…");
+  try{ let r=await api(`/brands/${state.brand.id}/film/plan`,"POST",body);
+    r=await pollFilmJob(r,btn,"Directing storyboard");
+    if(r.creative_id){ FILM_CID=r.creative_id; toast("Storyboard ready — no video generated yet"); tabFilmStudio(); }
+  }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+async function pollFilmJob(r,btn,label){
+  let n=0; while(r.job_id && !["done","failed"].includes(r.state) && n<120){ await new Promise(x=>setTimeout(x,3000));
+    const j=await api(`/agency/jobs/${r.job_id}`); r={...r,state:j.state,...(j.result||{}),error:j.error};
+    if(btn&&j.log&&j.log.length) btn.innerHTML='<span class="spinner"></span>'+esc((j.log[j.log.length-1]||"").slice(9,52)); n++; }
+  if(r.state==="failed") throw new Error(r.error||label+" failed");
+  return r;
+}
+async function openFilm(cid){
+  FILM_CID=cid; const el=$("fmOut")||$("tabBody"); el.innerHTML='<div class="card"><span class="spinner"></span> Loading storyboard…</div>';
+  try{ const f=await api(`/brands/${state.brand.id}/film/${cid}`); renderFilmBoard(f); }
+  catch(e){ el.innerHTML=`<div class="card"><p class="sub">${esc(e.message)}</p></div>`; }
+}
+function renderFilmBoard(f){
+  const b=state.brand, film=f.film, ap=(f.approval||{}).state, approved=ap==="approved", ed=f.editable, ren=film.status;
+  const total=film.total_seconds, tgt=film.target_seconds;
+  const barw=Math.min(100,Math.round(100*total/Math.max(tgt,total)));
+  const gate = ren==="rendered"
+    ? `<div class="filmbanner ok">✅ Film rendered — ${film.cuts.length} frames + voiceover. Review below, then publish from Creatives.</div>`
+    : `<div class="filmbanner">🎬 <b>Storyboard first. No video generated yet.</b> Refine every cut${ed?"":""}, ${approved?"then render the film.":"then approve the storyboard."}</div>`;
+  let h=`<div class="card filmcard"><div class="row" style="align-items:flex-start">
+      <div style="flex:1"><h2 style="margin:0">${esc(f.title||"Film")}</h2>
+        <div class="sub" style="margin:2px 0">${esc(film.logline||"")}</div>
+        <div class="sub" style="margin:0">${LOOK_ICON[film.look]||"🎞"} ${esc((film.look||"").replace(/-/g," "))} · ${esc(film.aspect)} · ${film.cuts.length} cuts · <b>${total}s</b> / ${tgt}s target${film.music?` · 🎵 ${esc(film.music)}`:""}</div></div>
+      <span class="tag ${ren==="rendered"?"g":ren==="rendering"?"y":""}">${esc(ren)}</span></div>
+    <div class="filmtl"><i style="width:${barw}%"></i></div>
+    ${gate}
+    ${apBadge?`<div class="rvbar" style="margin:8px 0">${apBadge({approval:f.approval})}<span style="flex:1"></span>
+      <button class="grn sm" onclick="filmApprove('${f.id}','approved')">✓ Approve storyboard</button>
+      <button class="ghost sm" onclick="filmApprove('${f.id}','changes_requested')">✎ Request changes</button></div>`:""}
+    <div class="filmboard">`;
+  film.cuts.forEach((c,i)=>{ h+=filmCut(f.id,c,i,film.cuts.length,ed,ren); });
+  h+=`</div>`;
+  if(ed) h+=`<div class="row" style="margin-top:10px"><button class="sm ghost" onclick="filmAddCut('${f.id}')">＋ Add cut</button>
+      <span style="flex:1"></span>
+      <button class="sm accent" ${approved?"":"disabled title='Approve the storyboard first'"} onclick="filmRender('${f.id}',this)">${ren==="rendered"?"Re-render film":"🎬 Render film"}</button></div>`;
+  if(film.vo_asset) h+=`<div class="row" style="margin-top:10px"><audio controls src="${assetUrl(b,film.vo_asset)}" style="height:34px"></audio><span class="sub" style="margin:0 0 0 8px">Voiceover · ${esc(film.voice||"")}</span></div>`;
+  h+=`<div class="sub" style="margin-top:8px">${esc(f.caption||"")}</div></div>`;
+  const el=$("fmOut")||$("tabBody"); el.innerHTML=h;
+}
+function filmCut(cid,c,i,total,ed,status){
+  const b=state.brand; const frame=c.asset?`<img class="cutframe" alt="cut ${c.n}" loading="lazy" src="${assetUrl(b,c.asset)}${c.asset.startsWith("http")?"":"?t="+Date.now()}">`:`<div class="cutframe empty">${status==="rendered"?"—":"visual renders on approval"}</div>`;
+  return `<div class="filmcut" id="cut-${cid}-${i}">
+    <div class="cuthd"><span class="tc">${c.t_in}–${c.t_out}s</span><b>Cut ${c.n}</b><span class="dur">${c.duration_s}s</span>
+      ${ed?`<span class="cutmove">${i>0?`<button title="Move up" onclick="filmMove('${cid}',${i},-1)">▲</button>`:""}${i<total-1?`<button title="Move down" onclick="filmMove('${cid}',${i},1)">▼</button>`:""}${total>1?`<button title="Remove" onclick="filmRemoveCut('${cid}',${i})">✕</button>`:""}</span>`:""}</div>
+    ${frame}
+    <div class="cutmeta">
+      <div class="kv2"><span>🎥 ${esc(c.camera||"")}</span><span>💡 ${esc(c.lighting||"")}</span></div>
+      ${c.on_screen_text?`<div class="ost">“${esc(c.on_screen_text)}”</div>`:""}
+      <div class="vo">🎙 <b>${esc(c.vo_tone||"")}</b> — ${esc(c.vo_line||"")}</div>
+      <div class="sub" style="margin:4px 0 0">${esc(c.visual||"")}</div>
+      <div class="sub" style="margin:2px 0 0">↳ ${esc(c.transition||"")}${c.negatives?` · 🚫 ${esc(c.negatives)}`:""}</div>
+      ${ed?`<button class="sm ghost" style="margin-top:6px" onclick="filmEditCut('${cid}',${i})">✎ Edit cut</button>`:""}
+    </div></div>`;
+}
+async function filmMove(cid,i,dir){
+  const f=await api(`/brands/${state.brand.id}/film/${cid}`); const n=f.film.cuts.length; const j=i+dir; if(j<0||j>=n) return;
+  const order=[...Array(n).keys()]; [order[i],order[j]]=[order[j],order[i]];
+  try{ await api(`/brands/${state.brand.id}/film/${cid}/reorder`,"POST",{order}); openFilm(cid); }catch(e){ toast(e.message,true); }
+}
+async function filmAddCut(cid){ try{ await api(`/brands/${state.brand.id}/film/${cid}/cut`,"POST",{}); openFilm(cid); }catch(e){ toast(e.message,true); } }
+async function filmRemoveCut(cid,i){ if(!confirm("Remove this cut?"))return; try{ await api(`/brands/${state.brand.id}/film/${cid}/cut/${i}`,"DELETE"); openFilm(cid); }catch(e){ toast(e.message,true); } }
+async function filmEditCut(cid,i){
+  const f=await api(`/brands/${state.brand.id}/film/${cid}`); const c=f.film.cuts[i]; if(!c)return;
+  const cell=document.getElementById(`cut-${cid}-${i}`); if(!cell)return;
+  cell.querySelector(".cutmeta").innerHTML=`
+    <div class="row2"><div class="fld"><label>Duration (3–15s)</label><input id="ec_dur" type="number" min="3" max="15" value="${c.duration_s}"></div>
+    <div class="fld"><label>Transition</label><input id="ec_tr" value="${esc(c.transition||"")}"></div></div>
+    <div class="fld"><label>Camera</label><input id="ec_cam" value="${esc(c.camera||"")}"></div>
+    <div class="fld"><label>Lighting</label><input id="ec_lit" value="${esc(c.lighting||"")}"></div>
+    <div class="row2"><div class="fld"><label>VO tone</label><input id="ec_tone" value="${esc(c.vo_tone||"")}"></div>
+    <div class="fld"><label>On-screen text</label><input id="ec_ost" maxlength="60" value="${esc(c.on_screen_text||"")}"></div></div>
+    <div class="fld"><label>Voiceover line</label><textarea id="ec_vo" rows="2">${esc(c.vo_line||"")}</textarea></div>
+    <div class="fld"><label>Visual (text-free)</label><textarea id="ec_vis" rows="3">${esc(c.visual||"")}</textarea></div>
+    <div class="fld"><label>Must NOT appear</label><input id="ec_neg" value="${esc(c.negatives||"")}"></div>
+    <div class="row"><button class="sm" onclick="filmSaveCut('${cid}',${i})">Save cut</button><button class="sm ghost" onclick="openFilm('${cid}')">Cancel</button></div>`;
+}
+async function filmSaveCut(cid,i){
+  const g=id=>document.getElementById(id)?document.getElementById(id).value:undefined;
+  const patch={duration_s:+g("ec_dur"),transition:g("ec_tr"),camera:g("ec_cam"),lighting:g("ec_lit"),vo_tone:g("ec_tone"),on_screen_text:g("ec_ost"),vo_line:g("ec_vo"),visual:g("ec_vis"),negatives:g("ec_neg")};
+  try{ await api(`/brands/${state.brand.id}/film/${cid}/cut/${i}`,"PUT",patch); toast("Cut saved — re-approve before rendering"); openFilm(cid); }catch(e){ toast(e.message,true); }
+}
+async function filmApprove(cid,st){
+  let comment=""; if(st==="changes_requested"){ comment=prompt("What should change?")||""; if(!comment) return; }
+  try{ await api(`/brands/${state.brand.id}/creatives/${cid}/approval`,"POST",{state:st,comment}); toast(st==="approved"?"Storyboard approved — you can render":"Change request saved"); openFilm(cid); }catch(e){ toast(e.message,true); }
+}
+async function filmRender(cid,btn){
+  if(!confirm("Render the film now? This generates the reference frames and voiceover for the approved storyboard.")) return;
+  busy(btn,true,"Rendering…");
+  try{ let r=await api(`/brands/${state.brand.id}/film/${cid}/render`,"POST"); r=await pollFilmJob(r,btn,"Rendering film");
+    toast(`Film rendered — ${r.frames} frames`); openFilm(cid); }
+  catch(e){ toast(e.message,true); busy(btn,false); }
 }

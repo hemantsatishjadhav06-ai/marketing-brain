@@ -146,6 +146,39 @@ class ReelStudioIn(BaseModel):
     scenes: int = 4
 
 
+class FilmPlanIn(BaseModel):
+    prompt: str = ""            # the film idea / brief
+    creative_id: str = ""       # or start from an existing creative's script/caption
+    look: str = "warm-neutral-premium"
+    aspect: str = "9:16"
+    cuts: int = 6
+    target_seconds: int = 30
+    voice: str = "alloy"
+
+
+class FilmCutIn(BaseModel):
+    duration_s: int | None = None
+    camera: str | None = None
+    lighting: str | None = None
+    vo_line: str | None = None
+    vo_tone: str | None = None
+    on_screen_text: str | None = None
+    visual: str | None = None
+    transition: str | None = None
+    negatives: str | None = None
+
+
+class FilmReorderIn(BaseModel):
+    order: list[int]
+
+
+class FilmMetaIn(BaseModel):
+    target_seconds: int | None = None
+    look: str | None = None
+    voice: str | None = None
+    music: str | None = None
+
+
 class ApprovalIn(BaseModel):
     state: str  # approved|changes_requested
     comment: str = ""

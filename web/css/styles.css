@@ -246,3 +246,28 @@ ol.clean{margin:0 0 0 18px} ol.clean li{margin:5px 0;font-size:13px}
 .calit.y{background:var(--yelBg);border-color:var(--yel);color:var(--yelD)}.calit.g{background:var(--grnBg);border-color:#bbf7d0;color:var(--grn)}
 .calch{display:inline-block;font-size:9.5px;font-weight:800;text-transform:uppercase;margin-right:4px;opacity:.8}
 @media(max-width:700px){.calgrid{grid-template-columns:repeat(2,1fr)}.calhd{display:none}}
+
+/* Cinematic storyboard film */
+.filmhero{background:linear-gradient(180deg,var(--panel),var(--panel2))}
+.filmcard{border:1px solid var(--line)}
+.filmbanner{border-left:4px solid var(--yel);background:var(--yelBg);color:var(--yelInk);padding:10px 14px;border-radius:10px;margin:10px 0;font-size:13px}
+.filmbanner.ok{border-color:var(--grn);background:var(--grnBg);color:var(--grn)}
+.filmtl{height:8px;border-radius:5px;background:var(--line-2,var(--panel2));overflow:hidden;margin:6px 0}
+.filmtl i{display:block;height:100%;background:var(--yel)}
+.filmboard{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;margin-top:10px}
+.filmcut{border:1px solid var(--line);border-radius:12px;background:var(--panel);overflow:hidden;display:flex;flex-direction:column}
+.cuthd{display:flex;align-items:center;gap:8px;padding:8px 10px;font-size:12.5px;border-bottom:1px solid var(--line-2,var(--line))}
+.cuthd .tc{font-family:ui-monospace,monospace;font-weight:700;color:var(--yelD)}
+.cuthd .dur{color:var(--mut);font-size:11px}
+.cuthd .cutmove{margin-left:auto;display:flex;gap:2px}
+.cuthd .cutmove button{background:none;border:1px solid var(--line);border-radius:6px;color:var(--mut);font-size:11px;padding:1px 6px;cursor:pointer}
+.cutframe{width:100%;aspect-ratio:9/16;object-fit:cover;background:linear-gradient(135deg,#0a2540,#1f2740);display:block}
+.cutframe.empty{display:grid;place-items:center;color:#c9d3e6;font-size:11px;text-align:center;padding:8px}
+.cutmeta{padding:10px;font-size:12.5px;display:flex;flex-direction:column;gap:2px}
+.cutmeta .kv2{display:flex;flex-direction:column;gap:2px;color:var(--mut);font-size:11.5px}
+.cutmeta .ost{font-weight:700;color:var(--ink,var(--txt));margin:4px 0}
+.cutmeta .vo{margin:4px 0}
+.cutmeta .row2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.cutmeta .fld{display:flex;flex-direction:column;gap:3px;margin-bottom:6px}
+.cutmeta .fld label{font-size:10.5px;font-weight:700;color:var(--mut)}
+@media(max-width:520px){.cutmeta .row2{grid-template-columns:1fr}}

@@ -581,6 +581,80 @@ STYLE_PRESETS = {
 }
 
 
+# ---------------------------------------------------------------- cinematic film (storyboard-first)
+
+# Colour-grade / look presets for a directed film. Each is a full look brief the
+# director applies to every cut so the film reads as one graded piece, not a
+# slideshow of unrelated frames.
+FILM_LOOKS = {
+    "warm-neutral-premium": "premium warm-neutral grade, soft filmic contrast, gentle highlight roll-off, natural skin tones, restrained saturation, editorial calm",
+    "teal-orange-cinematic": "modern teal-and-orange cinema grade, deep shadows, warm skin against cool backgrounds, anamorphic flares, shallow depth of field",
+    "golden-hour": "golden-hour warmth, long shadows, glowing rim light, hazy sun, romantic and aspirational",
+    "bright-airy": "bright airy daylight, high key, soft diffused light, pastel palette, clean and optimistic",
+    "moody-noir": "moody low-key noir, single hard key light, deep blacks, dramatic negative space, restrained colour",
+    "documentary-natural": "natural documentary look, available light, honest textures, handheld authenticity, true colour",
+    "product-studio": "seamless studio product cinematography, controlled softbox light, crisp reflections, macro detail, commercial polish",
+    "editorial-mono": "editorial monochrome, silver-gelatin contrast, rich grain, timeless and premium",
+}
+FILM_ASPECTS = {"9:16": "vertical 9:16 mobile-first film", "1:1": "square 1:1 film", "16:9": "widescreen 16:9 film"}
+CAMERA_MOVES = ["static lock-off", "slow dolly-in", "slow dolly-out", "smooth pan left", "smooth pan right",
+                "gentle crane up", "gentle crane down", "handheld follow", "orbit around subject", "rack focus"]
+TRANSITIONS = ["hard cut", "match cut", "whip pan", "cross dissolve", "speed ramp", "light-leak wipe", "morph cut"]
+
+
+def film_storyboard(brand, source_text, look="warm-neutral-premium", cut_count=6,
+                    target_seconds=30, aspect="9:16"):
+    """Direct a cut-by-cut cinematic storyboard BEFORE any video is generated.
+
+    Storyboard first, video second: this returns a complete, editable production
+    plan (the 'cuts') that a human reviews and refines; nothing is rendered here.
+    Every cut carries the craft a director specifies — lens + camera move,
+    lighting, a voice line with its tone, the on-screen text, a text-free visual
+    (reference frame), a transition into the next cut, and negative constraints.
+    """
+    look_desc = FILM_LOOKS.get(look, look)
+    aspect_desc = FILM_ASPECTS.get(aspect, "vertical 9:16 mobile-first film")
+    n = max(3, min(10, int(cut_count or 6)))
+    system = (
+        "You are a senior commercial film director planning a premium short marketing film. "
+        "Direct it as a sequence of CUTS that flow as one graded story: an arresting hook, escalating "
+        "value beats, and a decisive brand payoff / CTA. Hold a single visual language across every cut. "
+        "Each cut's `visual` describes ONLY what is in frame (subject, blocking, composition, depth) — "
+        "ABSOLUTELY NO text, words, letters, numbers, logos or UI, because captions and logo are added "
+        "after render. Use ONLY facts in the brand context; never invent prices, guarantees or figures. "
+        + ANTI_INJECTION
+    )
+    user = f"""Brand context: {_brand_context(brand)}
+Film look (apply to every cut): {look_desc}
+Format: {aspect_desc}. Target total duration: about {target_seconds}s across {n} cuts (each cut 3-15s).
+Source / brief: {source_text[:4000]}
+
+Return STRICT JSON:
+{{
+ "title": "film title",
+ "logline": "one sentence describing the film",
+ "hook": "the first spoken + on-screen hook, max 9 words",
+ "look": "{look}",
+ "music": "music / sound-design direction (genre, tempo, mood)",
+ "cuts": [{{
+   "n": 1,
+   "duration_s": 4,
+   "camera": "lens + movement, e.g. '35mm, slow dolly-in'",
+   "lighting": "lighting setup + quality, e.g. 'controlled golden hour, soft key'",
+   "vo_line": "one natural spoken sentence for this cut (the voiceover)",
+   "vo_tone": "delivery direction, e.g. 'calm, confident'",
+   "on_screen_text": "max 6 punchy words shown as caption (or empty)",
+   "visual": "rich TEXT-FREE description of the frame in the film look, {aspect} composition",
+   "transition": "transition INTO the next cut (hard cut, match cut, cross dissolve, speed ramp, whip pan, ...)",
+   "negatives": "what must NOT appear (e.g. 'no text, no competitor logos, no stock-photo look')"
+ }}] ({n} cuts),
+ "cta_text": "end-card line, max 7 words",
+ "caption": "publish-ready caption with keywords",
+ "hashtags": ["..."] (8-12)
+}}"""
+    return _json_chat(system, user, max_tokens=4000, temperature=0.7)
+
+
 def reel_storyboard(brand, source_text, style="cinematic", scene_count=4):
     """Turn an idea/script/article into a scene-by-scene reel storyboard.
     Scene image prompts are CLEAN (no burned-in text) — captions overlay later."""

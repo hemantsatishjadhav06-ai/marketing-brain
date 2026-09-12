@@ -37,6 +37,7 @@ DEFAULTS = {
     "caps": {"gen_daily": 60, "creatives_per_cycle": 3, "images_per_cycle": 2, "mail_daily": 200},
     "cycle": {"ideas_per_channel": 4, "calendar_days": 14, "generate_images": False},
     "design_qa": {"auto": True, "min_score": 75},
+    "film": {"look": "warm-neutral-premium", "aspect": "9:16", "cuts": 6, "target_seconds": 30},
     "pointer_allowed": False,
 }
 
