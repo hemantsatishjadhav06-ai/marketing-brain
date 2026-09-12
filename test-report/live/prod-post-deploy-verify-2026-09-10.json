@@ -1,0 +1,54 @@
+{
+ "results": [
+  {
+   "test": "HEALTH_ok",
+   "status": "PASS",
+   "detail": "{\"ok\": true, \"model\": \"openai/gpt-4o-mini\", \"key_configured\": true, \"persistent_db\": true, \"direct_access\": false}"
+  },
+  {
+   "test": "SIGNUP_gate_closed_403",
+   "status": "PASS",
+   "detail": "403 {\"detail\":\"Self-serve signup is closed \u2014 ask the team to create your company.\"}"
+  },
+  {
+   "test": "AUTH_legacy_hash_login_still_works",
+   "status": "PASS",
+   "detail": "200"
+  },
+  {
+   "test": "AUTH_login_after_rehash_works",
+   "status": "PASS",
+   "detail": "200"
+  },
+  {
+   "test": "AUTH_me_with_revocation_check",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "PUBLISH_duplicate_request_single_publish",
+   "status": "PASS",
+   "detail": "rows added=1 same_id=True"
+  },
+  {
+   "test": "SSRF_private_url_rejected_at_creation",
+   "status": "PASS",
+   "detail": "400 {\"detail\":\"Enter a public http(s) website URL for the competitor.\"}"
+  },
+  {
+   "test": "IDOR_B_cannot_set_A_idea_state",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "TENANT_B_cannot_read_A_workspace_files",
+   "status": "PASS",
+   "detail": "404"
+  },
+  {
+   "test": "COST_guarded_route_requires_auth",
+   "status": "PASS",
+   "detail": "401"
+  }
+ ]
+}

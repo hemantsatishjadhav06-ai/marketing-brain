@@ -1,0 +1,803 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Marketing Brain — Operator Console</title>
+<meta name="description" content="The master control surface for Marketing Brain: command centre, approvals, brands and autopilot — live on your workspace.">
+<style>
+:root{
+  --bg:#f6f7f9; --surface:#ffffff; --surface-2:#fbfcfd; --ink:#0b1524; --ink-2:#3b475a;
+  --muted:#6b7688; --line:#e6e9ef; --line-2:#eef1f5; --navy:#001848; --navy-ink:#0a2a63;
+  --accent:#3563e9; --accent-soft:#eaf0fe; --ok:#1f9d63; --ok-soft:#e6f6ee; --warn:#b7791f;
+  --warn-soft:#fbf1de; --err:#d1435b; --err-soft:#fce8ec; --faint:#c3cad6;
+  --shadow:0 1px 2px rgba(11,21,36,.05),0 6px 20px rgba(11,21,36,.05); --radius:14px;
+  --sans:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+:root[data-theme="dark"]{
+  --bg:#0a0f18; --surface:#111827; --surface-2:#0e1521; --ink:#eef2f8; --ink-2:#c2cbd9;
+  --muted:#8b97a8; --line:#1e2836; --line-2:#182130; --navy:#0a2350; --navy-ink:#cfe0ff;
+  --accent:#6b93ff; --accent-soft:#16233f; --ok:#3ecf8e; --ok-soft:#0f2a1f; --warn:#e3b341;
+  --warn-soft:#2a2312; --err:#f2647c; --err-soft:#2c1620; --faint:#3a4761;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0a0f18; --surface:#111827; --surface-2:#0e1521; --ink:#eef2f8; --ink-2:#c2cbd9;
+  --muted:#8b97a8; --line:#1e2836; --line-2:#182130; --navy:#0a2350; --navy-ink:#cfe0ff;
+  --accent:#6b93ff; --accent-soft:#16233f; --ok:#3ecf8e; --ok-soft:#0f2a1f; --warn:#e3b341;
+  --warn-soft:#2a2312; --err:#f2647c; --err-soft:#2c1620; --faint:#3a4761;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+h1,h2,h3{margin:0;font-weight:650;letter-spacing:-.01em}
+button{font-family:inherit;font-size:14px;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.skip{position:absolute;left:-999px}.skip:focus{left:8px;top:8px;background:var(--surface);padding:8px 12px;border-radius:8px;z-index:99}
+.hide{display:none!important}
+
+/* shell */
+#app{display:grid;grid-template-columns:248px 1fr;min-height:100vh}
+aside{background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:10px;padding:18px 18px 12px;font-weight:750;letter-spacing:-.02em;font-size:15px}
+.brand .logo{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,var(--navy),var(--accent));display:grid;place-items:center;color:#fff;font-size:13px;font-weight:800}
+.nav{overflow:auto;padding:6px 10px 12px;flex:1}
+.navgrp{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;padding:14px 10px 6px}
+.navitem{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:0;background:none;color:var(--ink-2);padding:8px 10px;border-radius:9px;font-weight:550;position:relative}
+.navitem:hover{background:var(--line-2);color:var(--ink)}
+.navitem.on{background:var(--accent-soft);color:var(--accent);font-weight:650}
+.navitem .ic{width:16px;height:16px;flex:none;opacity:.85}
+.navitem .cnt{margin-left:auto;background:var(--err);color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;display:grid;place-items:center;padding:0 5px}
+.navitem .soon{margin-left:auto;font-size:10px;font-weight:700;color:var(--muted);background:var(--line-2);padding:2px 6px;border-radius:6px}
+.side-foot{border-top:1px solid var(--line);padding:12px 14px;display:flex;align-items:center;gap:10px}
+.avatar{width:30px;height:30px;border-radius:50%;background:var(--navy);color:#fff;display:grid;place-items:center;font-weight:700;font-size:13px}
+.side-foot .who{min-width:0}.side-foot .who b{display:block;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.side-foot .who span{font-size:11px;color:var(--muted)}
+.iconbtn{margin-left:auto;border:1px solid var(--line);background:var(--surface);border-radius:8px;width:30px;height:30px;display:grid;place-items:center;color:var(--ink-2)}
+
+main{min-width:0;display:flex;flex-direction:column}
+.topbar{display:flex;align-items:center;gap:12px;padding:14px 22px;border-bottom:1px solid var(--line);background:var(--surface);position:sticky;top:0;z-index:5}
+.crumb{font-weight:600;letter-spacing:-.01em}.crumb span{color:var(--muted);font-weight:500}
+.topbar .grow{flex:1}
+.hstat{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);border:1px solid var(--line);padding:5px 10px;border-radius:20px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--faint)}.dot.ok{background:var(--ok)}.dot.bad{background:var(--err)}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 14px;border-radius:10px;font-weight:600}
+.btn:hover{background:var(--line-2)}
+.btn.primary{background:var(--navy);color:#fff;border-color:var(--navy)}
+.btn.primary:hover{filter:brightness(1.12)}
+.btn.accent{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.ok{background:var(--ok);color:#fff;border-color:var(--ok)}
+.btn.ghost{background:none}
+.btn.sm{padding:5px 10px;font-size:13px;border-radius:8px}
+.btn:disabled{opacity:.55;cursor:default}
+.wrap{padding:22px;max-width:1200px;width:100%;margin:0 auto;flex:1}
+.pagehd{margin-bottom:18px}
+.pagehd h1{font-size:24px}.pagehd p{color:var(--muted);margin:4px 0 0}
+
+.grid{display:grid;gap:16px}
+.g4{grid-template-columns:repeat(4,1fr)}.g3{grid-template-columns:repeat(3,1fr)}.g2{grid-template-columns:repeat(2,1fr)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow)}
+.card h2{font-size:15px;margin-bottom:2px}
+.card .sub{color:var(--muted);font-size:13px}
+.metric .k{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.metric .v{font-size:30px;font-weight:750;letter-spacing:-.02em;margin-top:4px}
+.metric .d{font-size:12px;font-weight:600;margin-top:2px}.metric .d.up{color:var(--ok)}.metric .d.dn{color:var(--err)}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;letter-spacing:.02em}
+.chip.live{background:var(--ok-soft);color:var(--ok)}.chip.run{background:var(--accent-soft);color:var(--accent)}
+.chip.wait{background:var(--warn-soft);color:var(--warn)}.chip.plan{background:var(--line-2);color:var(--muted)}
+.chip.role{background:var(--navy);color:#fff}
+.list{display:flex;flex-direction:column}
+.row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line-2)}
+.row:last-child{border-bottom:0}
+.row .ti{font-weight:600}.row .mt{font-size:12px;color:var(--muted)}
+.row .rt{margin-left:auto;text-align:right;white-space:nowrap}
+.tag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;background:var(--line-2);color:var(--ink-2)}
+.empty{text-align:center;padding:40px 20px;color:var(--muted)}
+.empty .big{font-size:16px;color:var(--ink-2);font-weight:600;margin-bottom:4px}
+.spin{width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;display:inline-block;animation:sp .7s linear infinite;vertical-align:-3px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.skel{background:linear-gradient(90deg,var(--line-2),var(--line),var(--line-2));background-size:200% 100%;animation:sh 1.2s infinite;border-radius:8px;height:14px}
+@keyframes sh{to{background-position:-200% 0}}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:11px 18px;border-radius:12px;box-shadow:var(--shadow);z-index:60;font-weight:600;max-width:92vw}
+.toast.err{background:var(--err)}
+
+/* approval card */
+.appr{border:1px solid var(--line);border-radius:var(--radius);padding:16px;background:var(--surface);box-shadow:var(--shadow)}
+.appr .hd{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.appr .hd .t{font-weight:650;font-size:15px}
+.appr .cap{color:var(--ink-2);font-size:13px;background:var(--surface-2);border:1px solid var(--line-2);border-radius:10px;padding:10px 12px;margin:8px 0;white-space:pre-wrap;max-height:120px;overflow:auto}
+.appr .acts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.hgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.hc{border:1px solid var(--line);border-radius:var(--radius);padding:14px;background:var(--surface);box-shadow:var(--shadow);cursor:pointer;position:relative}
+.hc:hover{border-color:var(--accent)}
+.hc .nm{font-weight:650;font-size:14px;display:flex;align-items:center;gap:8px}
+.hc .sc{margin-left:auto;font-weight:800;font-size:13px}
+.hc.green .sc{color:var(--ok)}.hc.amber .sc{color:var(--warn)}.hc.red .sc{color:#d33}
+.hc .kv{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;font-size:12px;color:var(--muted);margin-top:8px}
+.hc .kv b{color:var(--ink)}
+.hc .al{margin-top:8px;font-size:12px}.hc .al div{padding:2px 0}
+.al .crit{color:#d33;font-weight:600}.al .warn{color:var(--warn);font-weight:600}.al .info{color:var(--muted)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.kpi .v{font-size:22px;font-weight:800}.kpi .l{font-size:12px;color:var(--muted)}
+.bulkbar{position:sticky;top:0;z-index:5;display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:14px;box-shadow:var(--shadow)}
+.fld{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}.fld label{font-size:12px;color:var(--muted);font-weight:600}
+.fld input,.fld select,.fld textarea{padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--ink);font:inherit}
+.prog{height:8px;background:var(--line-2);border-radius:6px;overflow:hidden}.prog i{display:block;height:100%;background:var(--accent)}
+.warnbox{background:var(--warn-soft);color:var(--warn);border:1px solid var(--warn);border-radius:10px;padding:8px 12px;font-size:12px;font-weight:600;margin-top:8px}
+
+/* login */
+#login{position:fixed;inset:0;background:var(--bg);display:grid;place-items:center;z-index:80;padding:20px}
+.loginbox{background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:30px;width:min(400px,94vw)}
+.loginbox h1{font-size:20px;display:flex;align-items:center;gap:10px}
+.loginbox p{color:var(--muted);margin:6px 0 18px}
+label{display:block;font-size:12px;font-weight:600;color:var(--ink-2);margin:12px 0 5px}
+input{width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--ink);font-size:14px}
+input:focus{outline:none;border-color:var(--accent)}
+.loginbox .btn{width:100%;justify-content:center;margin-top:18px;display:flex}
+.lerr{color:var(--err);font-size:13px;font-weight:600;margin-top:10px;min-height:18px}
+.mode-note{font-size:12px;color:var(--muted);margin-top:14px;text-align:center}
+
+@media(max-width:860px){
+  #app{grid-template-columns:1fr}
+  aside{position:fixed;left:0;top:0;bottom:0;width:260px;z-index:40;transform:translateX(-100%);transition:transform .2s}
+  aside.open{transform:none}
+  .menu-toggle{display:grid!important}
+  .g4{grid-template-columns:repeat(2,1fr)}.g3,.g2{grid-template-columns:1fr}
+  .scrim{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:35}
+}
+.menu-toggle{display:none;border:1px solid var(--line);background:var(--surface);border-radius:8px;width:34px;height:34px;place-items:center;color:var(--ink)}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<!-- LOGIN -->
+<div id="login">
+  <form class="loginbox" onsubmit="doLogin(event)">
+    <h1><span class="logo" style="width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--navy),var(--accent));display:grid;place-items:center;color:#fff;font-weight:800">MB</span> Operator Console</h1>
+    <p>Sign in to your Marketing Brain workspace. Master accounts see every company; owners see their own.</p>
+    <label for="email">Email</label>
+    <input id="email" type="email" autocomplete="username" required placeholder="you@company.com">
+    <label for="pw">Password</label>
+    <input id="pw" type="password" autocomplete="current-password" required placeholder="••••••••">
+    <button class="btn primary" type="submit" id="loginBtn">Sign in</button>
+    <div class="lerr" id="lerr" role="alert"></div>
+    <div class="mode-note">One login works across the console and the <a href="/">brand app</a> — same secure session.</div>
+  </form>
+</div>
+
+<!-- APP -->
+<div id="app" class="hide">
+  <aside id="side">
+    <div class="brand"><span class="logo">MB</span> <span id="brandName">Marketing Brain</span></div>
+    <nav class="nav" id="nav" aria-label="Primary"></nav>
+    <div class="side-foot">
+      <div class="avatar" id="avatar">·</div>
+      <div class="who"><b id="whoEmail">—</b><span id="whoRole">—</span></div>
+      <button class="iconbtn" id="themeBtn" title="Toggle theme" onclick="toggleTheme()">◐</button>
+      <button class="iconbtn" title="Sign out" onclick="logout()">⎋</button>
+    </div>
+  </aside>
+  <main>
+    <div class="topbar">
+      <button class="menu-toggle" onclick="document.getElementById('side').classList.toggle('open')" aria-label="Menu">☰</button>
+      <div class="crumb" id="crumb">Command Center</div>
+      <div class="grow"></div>
+      <div class="hstat" id="hstat" title="Live backend status"><span class="dot" id="hdot"></span><span id="htext">checking…</span></div>
+      <button class="btn accent sm" onclick="go('ask')">Ask Brain</button>
+      <a class="btn sm" href="/" title="Open the per-brand app">Brand app ↗</a>
+    </div>
+    <div class="wrap" id="main"><div class="empty"><span class="spin"></span></div></div>
+  </main>
+</div>
+
+<script src="js/growth-ui.js?v=20260911b"></script>
+<script src="js/mail-ui.js?v=20260911"></script>
+<script>
+"use strict";
+const API = "/api";
+let TOKEN = localStorage.getItem("mb_token") || "";
+let ME = null;
+let VIEW = "dash";
+let BRANDS = [];
+const $ = s => document.querySelector(s);
+const esc = s => (s??"").toString().replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmtTime = t => t? new Date(t*1000).toLocaleString([], {month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}) : "";
+function toast(m, err){ const t=document.createElement("div"); t.className="toast"+(err?" err":""); t.textContent=m; document.body.appendChild(t); setTimeout(()=>t.remove(), err?6000:3500); }
+
+class ApiError extends Error{ constructor(m,s){ super(m); this.status=s; } }
+async function api(path, method="GET", body){
+  const opt={method,headers:{}};
+  if(TOKEN) opt.headers.Authorization="Bearer "+TOKEN;
+  if(body){ opt.headers["Content-Type"]="application/json"; opt.body=JSON.stringify(body); }
+  const ctl=new AbortController(); const timer=setTimeout(()=>ctl.abort(),180000); opt.signal=ctl.signal;
+  let r; try{ r=await fetch(API+path,opt); } catch(e){ clearTimeout(timer); throw new ApiError(e.name==="AbortError"?"The server took too long — try again.":"Network error.",0); }
+  clearTimeout(timer);
+  if(r.status===401){ TOKEN=""; localStorage.removeItem("mb_token"); showLogin(); throw new ApiError("Your session expired — sign in again.",401); }
+  if(r.status===429){ let d={}; try{d=await r.json()}catch{} throw new ApiError(d.detail||"Rate limit reached — try again shortly.",429); }
+  if(!r.ok){ let d={}; try{d=await r.json()}catch{} throw new ApiError(r.status>=500?"Something went wrong on our side.":(typeof d.detail==="string"?d.detail:r.statusText),r.status); }
+  return r.status===204?null:r.json();
+}
+
+/* ---------- theme ---------- */
+function applyTheme(t){ document.documentElement.setAttribute("data-theme",t); $("#themeBtn").textContent=t==="dark"?"◑":"◐"; }
+function toggleTheme(){ const n=document.documentElement.getAttribute("data-theme")==="dark"?"light":"dark"; try{localStorage.setItem("mb_theme",n)}catch{} applyTheme(n); }
+(function(){ let t="light"; try{t=localStorage.getItem("mb_theme")|| (matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light")}catch{} applyTheme(t); })();
+
+/* ---------- auth ---------- */
+function showLogin(){ $("#login").classList.remove("hide"); $("#app").classList.add("hide"); }
+async function doLogin(e){
+  e.preventDefault(); const btn=$("#loginBtn"); btn.disabled=true; btn.textContent="Signing in…"; $("#lerr").textContent="";
+  try{
+    const r=await api("/auth/login","POST",{email:$("#email").value.trim(),password:$("#pw").value});
+    TOKEN=r.token; localStorage.setItem("mb_token",TOKEN); localStorage.setItem("mb_me",JSON.stringify(r));
+    await boot();
+  }catch(err){ $("#lerr").textContent=err.message; btn.disabled=false; btn.textContent="Sign in"; }
+}
+function logout(){ TOKEN=""; localStorage.removeItem("mb_token"); localStorage.removeItem("mb_me"); ME=null; showLogin(); }
+
+/* ---------- navigation ---------- */
+const NAV=[
+  {grp:"AGENCY", items:[["portfolio","Portfolio",true],["clients","Clients",true],["cycles","Weekly cycles",true]]},
+  {grp:"COMMAND", items:[["dash","Command Center",true],["ask","Ask Brain",true]]},
+  {grp:"KNOW", items:[["brands","Brands",true],["activity","Activity",true]]},
+  {grp:"CREATE", items:[["approvals","Approvals",true]]},
+  {grp:"GROW", items:[["growth","Growth tooling",true]]},
+  {grp:"MEASURE", items:[["autopilot","Autopilot",true]]},
+  {grp:"SYSTEM", items:[["connections","Connections",true],["agency","Agency settings",true],["system","System health",true]]},
+];
+function renderNav(counts){
+  let h="";
+  for(const g of NAV){
+    h+=`<div class="navgrp">${g.grp}</div>`;
+    for(const [id,label,live] of g.items){
+      const cnt = id==="approvals"&&counts&&counts.waiting ? `<span class="cnt">${counts.waiting}</span>` : "";
+      h+=`<button class="navitem ${VIEW===id?'on':''}" onclick="go('${id}')"><span class="ic">${ICON[id]||""}</span>${label}${cnt}</button>`;
+    }
+  }
+  $("#nav").innerHTML=h;
+}
+const ICON={
+  dash:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>',
+  ask:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.5 8.5 0 0 1-3.9-.9L3 21l1.9-5A8.4 8.4 0 1 1 21 11.5z"/></svg>',
+  brands:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M6 21V7l6-4 6 4v14M10 9h.01M14 9h.01M10 13h.01M14 13h.01"/></svg>',
+  activity:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
+  approvals:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
+  autopilot:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/></svg>',
+  growth:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8M21 7v6M21 7h-6"/></svg>',
+  connections:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12a3 3 0 0 0 3 3l4-4a3 3 0 0 0-4-4"/><path d="M15 12a3 3 0 0 0-3-3l-4 4a3 3 0 0 0 4 4"/></svg>',
+  portfolio:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></svg>',
+  clients:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.5"/><path d="M2 20a7 7 0 0 1 14 0M17 8a3 3 0 0 1 0 6M22 20a6 6 0 0 0-5-5.9"/></svg>',
+  cycles:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7M21 3v6h-6"/></svg>',
+  agency:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+  system:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 4v6l4 2"/></svg>',
+};
+function go(v){ VIEW=v; $("#side").classList.remove("open"); renderNav(window.__counts); const t={portfolio:"Portfolio",clients:"Clients",cycles:"Weekly cycles",agency:"Agency settings",dash:"Command Center",ask:"Ask Brain",brands:"Brands",activity:"Activity",approvals:"Approvals",autopilot:"Autopilot",growth:"Growth tooling",connections:"Connections",system:"System health"}[v]; $("#crumb").innerHTML=`<span>Operator</span> · ${t}`; render(); }
+
+/* ---------- boot ---------- */
+async function boot(){
+  try{ ME=await api("/auth/me"); }catch(e){ return; }
+  $("#login").classList.add("hide"); $("#app").classList.remove("hide");
+  $("#whoEmail").textContent=ME.email||"—";
+  $("#whoRole").innerHTML = ME.role==="admin"?'<span class="chip role">Master account</span>':`<span class="chip role">${esc(ME.role||"user")}</span>`;
+  $("#avatar").textContent=(ME.email||"?")[0].toUpperCase();
+  pollHealth(); setInterval(pollHealth, 60000);
+  try{ BRANDS=await api("/brands"); }catch{ BRANDS=[]; }
+  try{ const a=await api("/approvals"); window.__counts=a.counts; }catch{}
+  try{ const br=await api("/agency/branding"); if(br&&br.agency_name){ const el=$("#brandName"); if(el) el.textContent=br.agency_name; if(br.accent) document.documentElement.style.setProperty("--accent", br.accent); } }catch{}
+  IS_OPERATOR = ME.role==="admin"||ME.role==="manager";
+  if(!IS_OPERATOR){ NAV.splice(NAV.findIndex(g=>g.grp==="AGENCY"),1); const sys=NAV.find(g=>g.grp==="SYSTEM"); if(sys) sys.items=sys.items.filter(i=>i[0]!=="agency"); }
+  renderNav(window.__counts); go(IS_OPERATOR?"portfolio":"dash");
+}
+let IS_OPERATOR=false;
+async function pollHealth(){
+  try{ const h=await api("/health"); const ok=h.ok&&h.persistent_db; $("#hdot").className="dot "+(ok?"ok":"bad"); $("#htext").textContent=ok?"Live · secure · persistent":"degraded"; }
+  catch{ $("#hdot").className="dot bad"; $("#htext").textContent="offline"; }
+}
+
+/* ---------- views ---------- */
+function loading(){ $("#main").innerHTML='<div class="empty"><span class="spin"></span> Loading…</div>'; }
+async function render(){
+  loading();
+  try{
+    if(VIEW==="portfolio") return await viewPortfolio();
+    if(VIEW==="clients") return await viewClients();
+    if(VIEW==="cycles") return await viewCycles();
+    if(VIEW==="agency") return await viewAgencySettings();
+    if(VIEW==="dash") return await viewDash();
+    if(VIEW==="ask") return viewAsk();
+    if(VIEW==="brands") return await viewBrands();
+    if(VIEW==="activity") return await viewActivity();
+    if(VIEW==="approvals") return await viewApprovals();
+    if(VIEW==="autopilot") return await viewAutopilot();
+    if(VIEW==="growth") return await viewGrowth();
+    if(VIEW==="connections") return await viewConnections();
+    if(VIEW==="system") return await viewSystem();
+  }catch(e){ $("#main").innerHTML=`<div class="pagehd"><h1>Couldn't load this</h1><p>${esc(e.message)}</p></div><button class="btn" onclick="render()">Retry</button>`; }
+}
+
+async function viewDash(){
+  const [digest,activity,ap]=await Promise.all([api("/digest").catch(()=>({})), api("/activity").catch(()=>[]), api("/autopilot/status").catch(()=>({}))]);
+  const brandsN=BRANDS.length, na=(digest.needs_approval||[]).length, due=(digest.due_today||[]).length, running=Object.values(ap||{}).filter(x=>x&&x.state==="running").length;
+  const hour=new Date().getHours(); const greet=hour<12?"Good morning":hour<18?"Good afternoon":"Good evening";
+  let h=`<div class="pagehd"><h1>${greet}</h1><p>${esc(ME.email)} · ${new Date().toLocaleDateString([], {weekday:"long",month:"long",day:"numeric"})}</p></div>`;
+  h+=`<div class="grid g4">
+    ${metric("Companies", brandsN, ME.role==="admin"?"across your workspace":"your workspace")}
+    ${metric("Awaiting approval", na, na?"needs a decision":"all clear", na?"warn":"ok")}
+    ${metric("Scheduled today", due, "calendar items")}
+    ${metric("Autopilot running", running, running?"generating now":"idle", running?"run":"")}
+  </div>`;
+  // opportunities-style: what needs you
+  h+=`<div class="grid g2" style="margin-top:16px">
+    <div class="card"><h2>What needs you</h2><p class="sub">Decisions and items waiting on a human.</p><div class="list" style="margin-top:8px">`;
+  const need=(digest.needs_approval||[]).slice(0,6);
+  if(!need.length) h+=`<div class="empty"><div class="big">All clear 🎉</div>Nothing is waiting for approval.</div>`;
+  else need.forEach(i=>{ h+=`<div class="row"><div><div class="ti">${esc(i.title||"Untitled")}</div><div class="mt">${esc(i.brand||"")} · ${esc(i.format||i.channel||"")}</div></div><div class="rt"><button class="btn accent sm" onclick="go('approvals')">Review</button></div></div>`; });
+  h+=`</div></div>`;
+  h+=`<div class="card"><h2>Today's AI work</h2><p class="sub">Latest activity across the workspace.</p><div class="list" style="margin-top:8px">`;
+  const act=(activity||[]).slice(0,7);
+  if(!act.length) h+=`<div class="empty">No activity yet.</div>`;
+  else act.forEach(a=>{ h+=`<div class="row"><span class="tag">${esc(a.type||"")}</span><div><div class="ti">${esc(a.title||"")}</div><div class="mt">${esc(a.brand||"")}</div></div><div class="rt mt">${fmtTime(a.at)}</div></div>`; });
+  h+=`</div></div></div>`;
+  $("#main").innerHTML=h;
+}
+function metric(k,v,d,cls){ return `<div class="card metric"><div class="k">${esc(k)}</div><div class="v">${v}</div><div class="d ${cls==='up'||cls==='ok'?'up':cls==='dn'||cls==='warn'?'dn':''}">${esc(d||"")}</div></div>`; }
+
+async function viewBrands(){
+  BRANDS=await api("/brands");
+  let h=`<div class="pagehd"><h1>Brands</h1><p>${BRANDS.length} ${ME.role==="admin"?"companies in your workspace":"workspace"}. Deep work happens in the brand app.</p></div>`;
+  if(!BRANDS.length){ h+=`<div class="card empty"><div class="big">No companies yet</div>${ME.role==="admin"?"Create one in the brand app to get started.":"Ask your workspace admin to add your company."}</div>`; $("#main").innerHTML=h; return; }
+  h+=`<div class="grid g3">`;
+  BRANDS.forEach(b=>{
+    const st=b.status||"—"; const cls=st==="ready"?"live":"wait";
+    h+=`<div class="card"><div style="display:flex;align-items:center;gap:10px"><div class="avatar" style="border-radius:9px">${esc((b.name||"?")[0])}</div><div style="min-width:0"><h2 style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(b.name)}</h2><div class="mt">${esc(b.website||"")}</div></div></div>
+      <div style="margin:12px 0"><span class="chip ${cls}">${esc(st)}</span></div>
+      <div style="display:flex;gap:8px"><a class="btn sm" href="/#brand=${encodeURIComponent(b.id)}">Open in app ↗</a><button class="btn sm ghost" onclick="askFor('${esc(b.id)}','${esc(b.name)}')">Ask Brain</button></div></div>`;
+  });
+  h+=`</div>`; $("#main").innerHTML=h;
+}
+
+async function viewActivity(){
+  const activity=await api("/activity");
+  let h=`<div class="pagehd"><h1>Activity</h1><p>Everything the system has done across ${ME.role==="admin"?"all companies":"your workspace"}, newest first.</p></div><div class="card"><div class="list">`;
+  if(!activity.length) h+=`<div class="empty">No activity recorded yet.</div>`;
+  else activity.forEach(a=>{ h+=`<div class="row"><span class="tag">${esc(a.type||"")}</span><div><div class="ti">${esc(a.title||"")}</div><div class="mt">${esc(a.brand||"")} · ${esc(a.channel||"")}</div></div><div class="rt mt">${fmtTime(a.at)}</div></div>`; });
+  h+=`</div></div>`; $("#main").innerHTML=h;
+}
+
+async function viewApprovals(){
+  const q=await api("/approvals"); window.__counts=q.counts; renderNav(q.counts);
+  const waiting=q.waiting_for_approval||[], changes=q.changes_requested||[];
+  let h=`<div class="pagehd"><h1>Approval Center</h1><p>${waiting.length? waiting.length+" decision"+(waiting.length>1?"s":"")+" require you." : "Nothing is waiting for a decision."} High-impact actions always pass through here.</p></div>`;
+  if(!waiting.length && !changes.length){ h+=`<div class="card empty"><div class="big">All clear 🎉</div>Every creative has been reviewed.</div>`; $("#main").innerHTML=h; return; }
+  if(waiting.length && IS_OPERATOR){
+    h+=`<div class="bulkbar"><label style="display:flex;gap:6px;align-items:center;font-weight:600"><input type="checkbox" id="selAll" onchange="selAll(this.checked)"> Select all <span id="selCount" class="chip plan">0</span></label>
+      <button class="btn ok sm" onclick="bulkDecide('approved')">Approve selected</button>
+      <button class="btn sm" onclick="bulkDecide('changes_requested')">Request changes</button>
+      <button class="btn sm" onclick="bulkPublish('simulated')">Dry-run publish</button>
+      <button class="btn accent sm" onclick="bulkPublish('live')">Publish live (approved only)</button>
+      <span class="mt" style="margin-left:auto;font-size:12px;color:var(--muted)">Each item still passes the same approval + credential gates.</span></div>`;
+  }
+  if(waiting.length){ h+=`<div class="grid g2">`; waiting.forEach(i=>h+=apprCard(i,false)); h+=`</div>`; }
+  if(changes.length){ h+=`<h2 style="margin:22px 0 12px">Changes requested</h2><div class="grid g2">`; changes.forEach(i=>h+=apprCard(i,true)); h+=`</div>`; }
+  $("#main").innerHTML=h;
+}
+function apprCard(i,isChange){
+  const asset = i.asset_path ? (i.asset_path.startsWith("http")?i.asset_path:"") : "";
+  return `<div class="appr" id="appr-${esc(i.id)}">
+    <div class="hd">${(!isChange&&IS_OPERATOR)?`<input type="checkbox" class="selbox" data-b="${esc(i.brand_id)}" data-c="${esc(i.id)}" onchange="selCount()">`:""}<span class="tag">${esc(i.format||i.channel||"post")}</span><span class="t">${esc(i.title||"Untitled")}</span><span class="chip ${i.ready?'live':'wait'}" style="margin-left:auto">${i.ready?"ready":"generating"}</span></div>
+    <div class="mt">${esc(i.brand||"")}</div>
+    ${i.caption?`<div class="cap">${esc(i.caption)}</div>`:""}
+    ${isChange&&i.comment?`<div class="warnbox">Requested change: ${esc(i.comment)}</div>`:""}
+    <div class="acts">
+      <button class="btn ok sm" onclick="decide('${esc(i.brand_id)}','${esc(i.id)}','approved',this)">Approve</button>
+      <button class="btn sm" onclick="decide('${esc(i.brand_id)}','${esc(i.id)}','changes_requested',this)">Request changes</button>
+      <a class="btn ghost sm" href="/#brand=${encodeURIComponent(i.brand_id)}">Open in app ↗</a>
+    </div></div>`;
+}
+async function decide(bid,cid,state,btn){
+  let comment="";
+  if(state==="changes_requested"){ comment=prompt("What should change?")||""; if(!comment) return; }
+  btn.disabled=true; btn.textContent="…";
+  try{
+    await api(`/brands/${bid}/creatives/${cid}/approval`,"POST",{state,comment});
+    const el=document.getElementById("appr-"+cid); if(el){ el.style.opacity=".4"; el.querySelector(".acts").innerHTML=`<span class="chip ${state==='approved'?'live':'wait'}">${state==='approved'?'Approved ✓':'Changes requested'}</span>`; }
+    toast(state==="approved"?"Approved":"Change request sent");
+    try{ const a=await api("/approvals"); window.__counts=a.counts; renderNav(a.counts); }catch{}
+  }catch(e){ toast(e.message,true); btn.disabled=false; btn.textContent=state==="approved"?"Approve":"Request changes"; }
+}
+
+async function viewAutopilot(){
+  const st=await api("/autopilot/status");
+  let h=`<div class="pagehd"><h1>Autopilot</h1><p>AI-Assist and Autopilot generate work; every high-impact action still routes to Approvals. Nothing publishes or spends without a human.</p></div>`;
+  const brands = ME.role==="admin"? BRANDS : BRANDS;
+  h+=`<div class="card"><div class="list">`;
+  if(!brands.length) h+=`<div class="empty">No companies to run.</div>`;
+  brands.forEach(b=>{
+    const j=st[b.id]; const running=j&&j.state==="running";
+    h+=`<div class="row"><div><div class="ti">${esc(b.name)}</div><div class="mt">${running?("running · "+esc((j.log||[]).slice(-1)[0]||"working…")):(j?("last: "+esc(j.state||"")):"idle")}</div></div>
+      <div class="rt">${running?'<span class="chip run">running</span>':`<button class="btn accent sm" onclick="startAP('${esc(b.id)}',this)">Start</button>`}</div></div>`;
+  });
+  h+=`</div></div>`;
+  h+=`<div class="warnbox" style="max-width:640px">Autopilot follows configured policy. Publishing, ad spend, new campaigns and brand changes are never executed automatically — they wait in Approvals.</div>`;
+  $("#main").innerHTML=h;
+}
+async function startAP(bid,btn){ btn.disabled=true; btn.textContent="Starting…"; try{ await api(`/brands/${bid}/autopilot`,"POST",{}); toast("Autopilot started"); setTimeout(()=>render(),800); }catch(e){ toast(e.message,true); btn.disabled=false; btn.textContent="Start"; } }
+
+let CONN_BID=null;
+async function viewConnections(){
+  let h=`<div class="pagehd"><h1>Connections</h1><p>Every distribution channel, per client: what it can do today, how to connect it, and a read-only test that proves the token works.</p></div>`;
+  if(!BRANDS.length){ h+=`<div class="card empty">Add a client first.</div>`; $("#main").innerHTML=h; return; }
+  const b=BRANDS.find(x=>x.id===CONN_BID)||BRANDS[0]; CONN_BID=b.id;
+  h+=`<div class="card" style="margin-bottom:14px"><label for="cBrand">Client</label><select id="cBrand" onchange="CONN_BID=this.value;render()" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--ink)">${BRANDS.map(x=>`<option value="${esc(x.id)}" ${x.id===b.id?"selected":""}>${esc(x.name)}</option>`).join("")}</select>
+    <div id="connSummary" class="mt" style="margin-top:8px"></div></div><div id="hub"><span class="spin"></span></div>`;
+  $("#main").innerHTML=h;
+  await loadHub(b.id);
+}
+async function loadHub(bid){
+  try{ const hub=await api(`/brands/${bid}/channels/hub`); GrowthUI.brandId=bid; GrowthUI.onHubChange=()=>loadHub(bid);
+    const canEdit=ME.role==="admin"||ME.role==="manager"||ME.role==="owner";
+    $("#hub").innerHTML=GrowthUI.renderHub(hub,{canEdit});
+    const live=hub.channels.filter(c=>c.status==="live").length; $("#connSummary").innerHTML=`${hub.connected.length} connected · ${live} channels with live APIs · ad ceiling ${hub.limits.max_daily_ad_budget}/day${hub.limits.ad_spend_enabled?"":" · <b>AD SPEND DISABLED</b>"}`;
+  }catch(e){ $("#hub").innerHTML=`<div class="warnbox">${esc(e.message)}</div>`; }
+}
+
+async function viewSystem(){
+  const h0=`<div class="pagehd"><h1>System health</h1><p>Live status of the backend both this console and the brand app run on.</p></div>`;
+  let h="";
+  try{
+    const hh=await api("/health");
+    h+=`<div class="grid g3">
+      ${sysCard("API", hh.ok, hh.ok?"online":"down")}
+      ${sysCard("Persistent database", hh.persistent_db, hh.persistent_db?"durable (survives redeploys)":"ephemeral")}
+      ${sysCard("Auth enforced", !hh.direct_access, hh.direct_access?"OPEN — insecure":"secure")}
+    </div>`;
+    h+=`<div class="card" style="margin-top:16px"><h2>Model</h2><p class="sub">Text model: <b>${esc(hh.model||"—")}</b> · generation key ${hh.key_configured?'<span class="chip live">configured</span>':'<span class="chip plan">missing</span>'}</p></div>`;
+  }catch(e){ h+=`<div class="card empty">Backend unreachable: ${esc(e.message)}</div>`; }
+  h+=`<div class="card" style="margin-top:16px"><h2>How this connects</h2><p class="sub">The operator console and the brand app are two views of one backend. Your session token works across both. The console is the master surface (all companies for a master account, your own for an owner); the brand app is where per-company production happens. Access is enforced server-side on every request.</p></div>`;
+  $("#main").innerHTML=h0+h;
+}
+function sysCard(k,ok,txt){ return `<div class="card"><div class="metric"><div class="k">${esc(k)}</div><div style="display:flex;align-items:center;gap:8px;margin-top:8px"><span class="dot ${ok?'ok':'bad'}"></span><b style="font-size:16px">${esc(txt)}</b></div></div></div>`; }
+
+/* ---------- Ask Brain ---------- */
+let ASK_BRAND=null;
+function askFor(bid,name){ ASK_BRAND={id:bid,name}; go("ask"); }
+function viewAsk(){
+  const b=ASK_BRAND || BRANDS[0];
+  let h=`<div class="pagehd"><h1>Ask Brain</h1><p>Natural-language questions grounded in a company's own workspace and verified facts.</p></div>`;
+  if(!BRANDS.length){ h+=`<div class="card empty">Add a company first.</div>`; $("#main").innerHTML=h; return; }
+  h+=`<div class="card" style="max-width:760px">
+    <label for="askBrand">Company</label>
+    <select id="askBrand" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--ink)">
+      ${BRANDS.map(x=>`<option value="${esc(x.id)}" ${b&&x.id===b.id?"selected":""}>${esc(x.name)}</option>`).join("")}</select>
+    <label for="askQ" style="margin-top:12px">What do you want to accomplish?</label>
+    <textarea id="askQ" rows="3" style="width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--ink);font-family:inherit;resize:vertical" placeholder="e.g. Give me 3 content angles for this month, or Why did engagement drop?"></textarea>
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+      ${["Create content ideas","Analyze performance","Research competitors","Find opportunities"].map(s=>`<button class="btn sm ghost" onclick="document.getElementById('askQ').value='${s}'">${s}</button>`).join("")}
+      <span style="flex:1"></span><button class="btn accent" onclick="askSend(this)">Ask</button></div>
+    <div id="askOut" style="margin-top:16px"></div>
+  </div>`;
+  $("#main").innerHTML=h;
+}
+async function askSend(btn){
+  const bid=$("#askBrand").value, q=$("#askQ").value.trim(); if(!q) return;
+  btn.disabled=true; btn.innerHTML='<span class="spin"></span>';
+  $("#askOut").innerHTML=`<div class="row"><span class="spin"></span> Brain is working…</div>`;
+  try{
+    const r=await api(`/brands/${bid}/chat`,"POST",{message:q});
+    const reply=r.reply||r.answer||r.message||"(no reply)";
+    $("#askOut").innerHTML=`<div class="cap" style="max-height:none">${esc(reply)}</div>`;
+  }catch(e){ $("#askOut").innerHTML=`<div class="warnbox">${esc(e.message)}</div>`; }
+  btn.disabled=false; btn.textContent="Ask";
+}
+
+
+/* ---------- Growth tooling ---------- */
+let GROWTH_BID=null, GROWTH_TAB="seo";
+const GTABS=[["seo","SEO","Live"],["meta","Meta Ads","Live · your keys"],["google","Google Ads","Partial"],["mail","Mail","Live · built-in"],["email","Mailchimp / Smartlead","Live · your keys"],["whatsapp","WhatsApp","Live · your keys"]];
+function growthPick(bid){ GROWTH_BID=bid; render(); }
+function growthTab(t){ GROWTH_TAB=t; render(); }
+async function viewGrowth(){
+  let h=`<div class="pagehd"><h1>Growth tooling</h1><p>Ads, email, SEO and WhatsApp per company. Nothing spends money or sends a message without your explicit approval — high-impact actions are gated server-side.</p></div>`;
+  if(!BRANDS.length){ h+=`<div class="card empty">Add a company first.</div>`; $("#main").innerHTML=h; return; }
+  const b=BRANDS.find(x=>x.id===GROWTH_BID)||BRANDS[0]; GROWTH_BID=b.id;
+  h+=`<div class="card" style="max-width:820px"><label for="gBrand">Company</label>
+    <select id="gBrand" onchange="growthPick(this.value)" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--ink)">
+    ${BRANDS.map(x=>`<option value="${esc(x.id)}" ${x.id===b.id?"selected":""}>${esc(x.name)}</option>`).join("")}</select></div>`;
+  // status
+  let st={}; try{ st=await api(`/brands/${b.id}/channels`); }catch{}
+  h+=`<div class="tabs" style="margin:16px 0;display:flex;gap:8px;flex-wrap:wrap">`;
+  for(const [id,label,badge] of GTABS){
+    const key={seo:null,meta:"meta_ads",google:"google_ads",email:"mailchimp",whatsapp:"whatsapp"}[id];
+    const on = key? (st[key]&&st[key].connected):true;
+    h+=`<button class="btn sm ${GROWTH_TAB===id?'accent':'ghost'}" onclick="growthTab('${id}')">${label} <span class="chip ${badge.startsWith('Live')?'live':'plan'}" style="margin-left:6px">${badge}</span>${key&&on?' ●':''}</button>`;
+  }
+  h+=`</div><div id="gPanel"></div>`;
+  $("#main").innerHTML=h;
+  renderGrowthPanel(b, st);
+}
+function connectForm(bid, channel, guide){
+  const gid="cc_"+channel;
+  return `<details class="card" style="margin-top:12px"><summary>Connect / edit credentials</summary>
+    <ol class="sub" style="margin:10px 0;padding-left:18px;line-height:1.6">${(guide||[]).map(g=>`<li>${esc(g)}</li>`).join("")}</ol>
+    <textarea id="${gid}" rows="4" placeholder='{"access_token":"...","...":"..."}' style="width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--ink);font-family:ui-monospace,monospace;font-size:12px"></textarea>
+    <div style="margin-top:8px"><button class="btn sm" onclick="saveConn('${bid}','${channel}','${gid}',this)">Save credentials</button> <span class="mt">stored per company; only sent to the platform's own API</span></div></details>`;
+}
+async function saveConn(bid, channel, gid, btn){
+  let creds; try{ creds=JSON.parse(document.getElementById(gid).value||"{}"); }catch{ toast("Credentials must be valid JSON",true); return; }
+  btn.disabled=true;
+  try{ await api(`/brands/${bid}/channels/connect`,"POST",{channel,credentials:creds}); toast("Connected"); render(); }
+  catch(e){ toast(e.message,true); btn.disabled=false; }
+}
+function renderGrowthPanel(b, st){
+  const P=$("#gPanel"); const bid=b.id;
+  if(GROWTH_TAB==="seo"){
+    P.innerHTML=`<div class="card"><h2>SEO audit <span class="chip live">live</span></h2>
+      <p class="sub">Fetches a page and scores real on-page + technical signals. Read-only — never changes the site.</p>
+      <div style="display:flex;gap:8px;margin-top:10px"><input id="seoUrl" placeholder="https://your-site.com/page" value="${esc(b.website||"")}" style="flex:1;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--ink)">
+      <button class="btn accent" onclick="runSeo('${bid}',this)">Run audit</button></div>
+      <div id="seoOut" style="margin-top:14px"></div></div>`;
+  } else if(GROWTH_TAB==="meta"||GROWTH_TAB==="google"){
+    const net=GROWTH_TAB, key=net+"_ads", conf=st[key]&&st[key].connected;
+    const cap=(st._limits&&st._limits.max_daily_ad_budget)||5000;
+    P.innerHTML=`<div class="card"><h2>${net==="meta"?"Meta":"Google"} Ads</h2>
+      <p class="sub">The Brain drafts a campaign; you review it; launch creates it <b>PAUSED</b>; activating it (spends) needs your approval. Daily budget ceiling: <b>${cap}</b>.</p>
+      ${conf?"":'<div class="warnbox" style="margin-top:10px">Not connected — add credentials below to launch. You can still draft a plan.</div>'}
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <select id="adObj" style="padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--ink)">
+          <option value="OUTCOME_LEADS">Leads</option><option value="OUTCOME_TRAFFIC">Traffic</option><option value="OUTCOME_ENGAGEMENT">Engagement</option><option value="OUTCOME_AWARENESS">Awareness</option></select>
+        <input id="adBudget" type="number" placeholder="daily budget" value="${Math.round(cap/2)}" style="width:140px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--ink)">
+        <input id="adPrompt" placeholder="optional direction" style="flex:1;min-width:160px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--ink)">
+        <button class="btn accent" onclick="planAd('${bid}','${net}',this)">Draft campaign</button></div>
+      <div id="adOut" style="margin-top:14px"></div>
+      ${connectForm(bid,key,(st[key]||{}).setup_guide)}</div>`;
+    loadCampaigns(bid,net);
+  } else if(GROWTH_TAB==="mail"){
+    P.innerHTML=`<div class="card"><h2>Built-in mailer <span class="chip live">live · your SMTP</span></h2><p class="sub">Contacts, broadcasts, sequences, tracking — inside the product, sent from the client's own mailbox.</p><div id="mailMount" style="margin-top:10px"><span class="spin"></span></div></div>`;
+    MailUI.mount($("#mailMount"), bid, {canEdit: true});
+  } else if(GROWTH_TAB==="email"){
+    P.innerHTML=`<div class="card"><h2>Email marketing</h2>
+      <p class="sub">Draft a broadcast (Mailchimp) or a cold sequence (Smartlead). Sending requires your approval.</p>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <select id="emProv" style="padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--ink)"><option value="mailchimp">Mailchimp (broadcast)</option><option value="smartlead">Smartlead (sequence)</option></select>
+        <input id="emGoal" placeholder="campaign goal, e.g. spring EOI push" style="flex:1;min-width:200px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--ink)">
+        <button class="btn accent" onclick="draftEmail('${bid}',this)">Draft</button></div>
+      <div id="emOut" style="margin-top:14px"></div>
+      ${connectForm(bid,"mailchimp",(st.mailchimp||{}).setup_guide)}${connectForm(bid,"smartlead",(st.smartlead||{}).setup_guide)}</div>`;
+  } else if(GROWTH_TAB==="whatsapp"){
+    const conf=st.whatsapp&&st.whatsapp.connected;
+    P.innerHTML=`<div class="card"><h2>WhatsApp</h2>
+      <p class="sub">Send a message with the company's own WhatsApp Business number. Inbound messages and PRICE/PDF/LOCATION triggers land in the inbox automatically.</p>
+      ${conf?"":'<div class="warnbox" style="margin-top:10px">Not connected — add credentials below.</div>'}
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><input id="waTo" placeholder="recipient number e.g. 9199..." style="width:220px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--ink)">
+      <input id="waText" placeholder="message" style="flex:1;min-width:200px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--ink)">
+      <button class="btn accent" onclick="waSend('${bid}',this)">Send</button></div>
+      <div id="waOut" style="margin-top:14px"></div>
+      ${connectForm(bid,"whatsapp",(st.whatsapp||{}).setup_guide)}</div>`;
+  }
+}
+async function runSeo(bid,btn){ const url=$("#seoUrl").value.trim(); if(!url)return; btn.disabled=true; btn.innerHTML='<span class="spin"></span>'; $("#seoOut").innerHTML='<span class="spin"></span> Auditing…';
+  try{ const r=await api(`/brands/${bid}/seo/audit`,"POST",{url});
+    let h=`<div style="display:flex;align-items:center;gap:14px"><div style="font-size:40px;font-weight:800;color:${r.score>=80?'var(--accent)':r.score>=60?'#ffb84d':'#ff6b8a'}">${r.score}</div><div><b>${r.counts.pass}/${r.counts.total} checks pass</b><div class="mt">${esc(r.summary.title||"")}</div></div></div>`;
+    h+=`<div class="list" style="margin-top:12px">`+r.checks.map(c=>`<div class="row"><div><span style="color:${c.pass?'var(--accent)':c.level==='warn'?'#ffb84d':'#ff6b8a'}">${c.pass?'✓':c.level==='warn'?'!':'✗'}</span> ${esc(c.name)}</div><div class="mt">${esc(c.detail)}</div></div>`).join("")+`</div>`;
+    $("#seoOut").innerHTML=h;
+  }catch(e){ $("#seoOut").innerHTML=`<div class="warnbox">${esc(e.message)}</div>`; }
+  btn.disabled=false; btn.textContent="Run audit";
+}
+async function planAd(bid,net,btn){ btn.disabled=true; btn.innerHTML='<span class="spin"></span>'; $("#adOut").innerHTML='<span class="spin"></span> Drafting…';
+  try{ const r=await api(`/brands/${bid}/ads/${net}/plan`,"POST",{objective:$("#adObj").value,daily_budget:parseFloat($("#adBudget").value||0),prompt:$("#adPrompt").value});
+    showPlan(bid,net,{id:r.campaign_id,status:"draft",payload:r.plan});
+    loadCampaigns(bid,net);
+  }catch(e){ $("#adOut").innerHTML=`<div class="warnbox">${esc(e.message)}</div>`; }
+  btn.disabled=false; btn.textContent="Draft campaign";
+}
+async function loadCampaigns(bid,net){ try{ const cs=await api(`/brands/${bid}/ads/${net}/campaigns`); const el=document.getElementById("adCamps"); const html=`<div class="card" id="adCamps" style="margin-top:12px"><h3>Campaigns</h3>`+(cs.length?`<div class="list">`+cs.map(c=>`<div class="row"><div><b>${esc((c.payload&&c.payload.name)||"Campaign")}</b><div class="mt">${esc(c.status)} · ${esc(String(c.daily_budget||0))} ${esc(c.currency||"")}/day · ${((c.payload||{}).ad_sets||(c.payload||{}).ad_groups||[]).length} audience(s)${(c.payload&&c.payload.compliance&&c.payload.compliance.special_ad_category&&c.payload.compliance.special_ad_category!=="NONE")?" · "+esc(c.payload.compliance.special_ad_category):""}</div></div><div class="rt"><button class="btn sm ghost" onclick="openCampaign('${bid}','${net}','${c.id}')">Open plan</button> ${adButtons(bid,net,c)}</div></div>`).join("")+`</div>`:`<p class="sub">No campaigns yet.</p>`)+`</div>`; if(el)el.outerHTML=html; else $("#adOut").insertAdjacentHTML("beforeend",html);}catch{} }
+let CUR_PLAN=null;
+function showPlan(bid,net,c){
+  CUR_PLAN={bid,net,c};
+  const editable=c.status==="draft"||c.status==="approved"||c.status==="paused";
+  $("#adOut").innerHTML=GrowthUI.renderPlan(c.payload,{campaignId:c.id,status:c.status,editable,network:net});
+  const acts=document.getElementById("gpActs"); if(!acts) return;
+  let h=`<div class="fl" style="display:flex;flex-direction:column;gap:3px"><label style="font-size:11px;font-weight:700;color:var(--muted)">Total daily budget</label><input data-budget type="number" min="0" value="${Number(c.daily_budget||c.payload.daily_budget||0)}" style="width:150px;padding:7px 9px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--ink)" ${editable?"":"disabled"}></div>`;
+  if(editable) h+=`<button class="btn" onclick="savePlanEdits()">Save edits</button>`;
+  h+=adButtons(bid,net,c);
+  if(c.status!=="draft") h+=` <button class="btn ghost sm" onclick="adInsights('${bid}','${net}','${c.id}')">Insights</button>`;
+  acts.innerHTML=h;
+}
+async function savePlanEdits(){
+  const {bid,net,c}=CUR_PLAN; const root=document.querySelector("#adOut .gp");
+  const plan=GrowthUI.collectEdits(root,c.payload,net);
+  try{ const r=await api(`/brands/${bid}/ads/${net}/campaigns/${c.id}`,"PUT",{plan}); toast("Plan saved — budget re-capped, compliance re-applied"); showPlan(bid,net,{...c,payload:r.plan,daily_budget:r.plan.daily_budget}); loadCampaigns(bid,net); }
+  catch(e){ toast(e.message,true); }
+}
+async function openCampaign(bid,net,cid){ try{ const c=await api(`/brands/${bid}/ads/${net}/campaigns/${cid}`); showPlan(bid,net,c); window.scrollTo({top:0,behavior:"smooth"}); }catch(e){ toast(e.message,true); } }
+async function adInsights(bid,net,cid){ try{ const r=await api(`/brands/${bid}/ads/${net}/insights/${cid}`); alert(JSON.stringify(r,null,1).slice(0,1500)); }catch(e){ toast(e.message,true); } }
+function adButtons(bid,net,c){ const id=c.id; if(c.status==="draft")return `<button class="btn sm" onclick="adAct('${bid}','${net}','launch','${id}',this)">Launch (PAUSED)</button>`; if(c.status==="approved"||c.status==="paused")return `<button class="btn sm accent" onclick="adAct('${bid}','${net}','activate','${id}',this)">Activate (spends)</button>`; if(c.status==="live")return `<button class="btn sm ghost" onclick="adAct('${bid}','${net}','pause','${id}',this)">Pause</button> <span class="chip live">live</span>`; return `<span class="chip plan">${esc(c.status)}</span>`; }
+async function adAct(bid,net,action,cid,btn){ const spends=(action==="launch"||action==="activate"); if(spends && !confirm(action==="activate"?"Activate this campaign? This starts real ad spend within your daily budget ceiling.":"Create this campaign on the platform (PAUSED, no spend yet)?"))return; btn.disabled=true;
+  try{ await api(`/brands/${bid}/ads/${net}/${action}`,"POST",{campaign_id:cid,approve:spends}); toast(action==="activate"?"Campaign live":action==="launch"?"Created (paused)":"Paused"); loadCampaigns(bid,net); }
+  catch(e){ toast(e.message,true); btn.disabled=false; } }
+async function draftEmail(bid,btn){ const prov=$("#emProv").value, goal=$("#emGoal").value.trim(); if(!goal)return; btn.disabled=true; btn.innerHTML='<span class="spin"></span>'; $("#emOut").innerHTML='<span class="spin"></span> Drafting…';
+  try{ const r=await api(`/brands/${bid}/email/${prov}/draft`,"POST",{goal,kind:prov==="smartlead"?"sequence":"broadcast"});
+    $("#emOut").innerHTML=`<div class="card" style="background:var(--surface-2)"><div class="cap" style="max-height:220px">${esc(JSON.stringify(r.content,null,1))}</div><div class="warnbox" style="margin-top:8px">${esc(r.note)}</div><div style="margin-top:8px"><button class="btn sm accent" onclick="sendEmail('${bid}','${prov}','${r.email_campaign_id}',this)">Approve & send</button></div></div>`;
+  }catch(e){ $("#emOut").innerHTML=`<div class="warnbox">${esc(e.message)}</div>`; }
+  btn.disabled=false; btn.textContent="Draft"; }
+async function sendEmail(bid,prov,eid,btn){ if(!confirm("Send this email campaign to the audience now? This sends real mail."))return; btn.disabled=true;
+  try{ await api(`/brands/${bid}/email/${prov}/send`,"POST",{email_campaign_id:eid,approve:true}); toast("Sent"); }
+  catch(e){ toast(e.message,true); btn.disabled=false; } }
+async function waSend(bid,btn){ const to=$("#waTo").value.trim(), text=$("#waText").value.trim(); if(!to||!text)return; btn.disabled=true;
+  try{ await api(`/brands/${bid}/whatsapp/send`,"POST",{to,text}); toast("Sent"); $("#waOut").innerHTML='<div class="mt">Message sent.</div>'; }
+  catch(e){ $("#waOut").innerHTML=`<div class="warnbox">${esc(e.message)}</div>`; }
+  btn.disabled=false; }
+
+/* ---------- start ---------- */
+if(TOKEN){ boot(); } else { showLogin(); }
+
+/* ---------- AGENCY OS ---------- */
+function selAll(on){ document.querySelectorAll(".selbox").forEach(b=>b.checked=on); selCount(); }
+function selCount(){ const n=document.querySelectorAll(".selbox:checked").length; const el=$("#selCount"); if(el) el.textContent=n; return n; }
+function selItems(){ return [...document.querySelectorAll(".selbox:checked")].map(b=>({brand_id:b.dataset.b, creative_id:b.dataset.c})); }
+async function bulkDecide(state){
+  const items=selItems(); if(!items.length) return toast("Select at least one creative",true);
+  let comment=""; if(state==="changes_requested"){ comment=prompt(`What should change on ${items.length} creative(s)?`)||""; if(!comment) return; }
+  try{ const r=await api("/agency/bulk/approve","POST",{items,state,comment}); toast(`${r.ok} ${state==="approved"?"approved":"sent back"}${r.failed?`, ${r.failed} failed`:""}`, !!r.failed); render(); }
+  catch(e){ toast(e.message,true); }
+}
+async function bulkPublish(mode){
+  const items=selItems(); if(!items.length) return toast("Select at least one creative",true);
+  if(mode==="live" && !confirm(`Publish ${items.length} creative(s) LIVE? Only approved items with saved credentials will go out.`)) return;
+  try{ const r=await api("/agency/bulk/publish","POST",{items,mode}); const errs=r.results.filter(x=>!x.ok).map(x=>x.error); toast(`${r.ok} ${mode==="live"?"published":"dry-run"}${r.failed?` · ${r.failed} blocked: ${errs[0]||""}`:""}`, !!r.failed); }
+  catch(e){ toast(e.message,true); }
+}
+function kpi(v,l){ return `<div class="kpi"><div class="v">${v}</div><div class="l">${l}</div></div>`; }
+function ago(ts){ if(!ts) return "never"; const d=(Date.now()/1000-ts)/3600; return d<1?"just now":d<24?Math.round(d)+"h ago":Math.round(d/24)+"d ago"; }
+async function viewPortfolio(){
+  const p=await api("/agency/portfolio"); const t=p.totals;
+  let h=`<div class="pagehd"><h1>Portfolio</h1><p>${t.clients} client${t.clients===1?"":"s"} · ${t.green} healthy · ${t.amber} need attention · ${t.red} at risk. Pool: ${p.pool.running} running, ${p.pool.queued} queued (max ${p.pool.max_workers}).</p></div>`;
+  h+=`<div class="kpis">${kpi(t.approvals_waiting,"waiting for approval")}${kpi(t.changes_requested,"changes requested")}${kpi(t.creatives_7d,"creatives · 7d")}${kpi(t.published_7d,"published · 7d")}${kpi(t.alerts.crit,"critical alerts")}${kpi(t.alerts.warn,"warnings")}</div>`;
+  h+=`<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap"><button class="btn accent" onclick="startCycle([])">Run weekly cycle for all ready clients</button><button class="btn" onclick="go('approvals')">Open approvals (${t.approvals_waiting})</button>${ME.role==="admin"?`<button class="btn" onclick="go('clients')">+ Onboard client</button>`:""}</div>`;
+  if(!p.clients.length){ h+=`<div class="card empty"><div class="big">No clients yet</div>Onboard the first client from the Clients tab.</div>`; $("#main").innerHTML=h; return; }
+  h+=`<div class="hgrid">`;
+  for(const c of p.clients){
+    h+=`<div class="hc ${c.grade}" onclick="openClient('${esc(c.brand_id)}')"><div class="nm">${esc(c.name)} <span class="tag">${esc(c.vertical||"")}</span><span class="sc">${c.score}</span></div>
+      <div class="kv"><span>status <b>${esc(c.status||"")}</b></span><span>connectors <b>${c.connectors.length}</b></span><span>waiting <b>${c.approvals.waiting}</b></span><span>next 7d <b>${c.content.upcoming_7d}</b></span><span>creatives 7d <b>${c.content.creatives_7d}</b></span><span>gen today <b>${c.budget.gen_today}/${c.budget.gen_cap||"∞"}</b></span><span>last cycle <b>${ago(c.cycle.last_at)}</b></span><span>${c.cycle.active_state?`job <b>${esc(c.cycle.active_state)}</b>`:""}</span></div>
+      <div class="al">${c.alerts.slice(0,3).map(a=>`<div class="${a.level}">${a.level==="crit"?"●":a.level==="warn"?"▲":"·"} ${esc(a.text)}</div>`).join("")}</div></div>`;
+  }
+  h+=`</div>`; $("#main").innerHTML=h;
+}
+async function startCycle(ids){
+  if(!confirm(ids.length?`Run the weekly cycle for ${ids.length} client(s)?`:"Run the weekly cycle for every ready client? Content lands in Approvals — nothing publishes.")) return;
+  try{ const c=await api("/agency/cycle","POST",{brand_ids:ids}); toast(`Cycle started for ${c.brand_ids.length} client(s)`); VIEW="cycles"; renderNav(window.__counts); render(); }catch(e){ toast(e.message,true); }
+}
+let CLIENT_BID=null;
+function openClient(bid){ CLIENT_BID=bid; go("clients"); }
+async function viewClients(){
+  BRANDS=await api("/brands").catch(()=>BRANDS);
+  let h=`<div class="pagehd"><h1>Clients</h1><p>Onboard with a vertical template, tune each client's brief, caps and triggers, generate monthly reports.</p></div>`;
+  if(ME.role==="admin"){
+    let tpl={templates:[]}; try{ tpl=await api("/agency/templates"); }catch{}
+    h+=`<div class="card" style="margin-bottom:16px"><h2>Onboard a new client</h2><div class="sub">Creates the brand, seeds the template, scrapes + analyses the site in the background, and marks it ready for the weekly cycle.</div>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin-top:12px">
+        <div class="fld"><label>Client name</label><input id="obName" placeholder="Smile Dental Clinic"></div>
+        <div class="fld"><label>Website</label><input id="obSite" placeholder="https://…"></div>
+        <div class="fld"><label>Vertical template</label><select id="obVert">${tpl.templates.map(t=>`<option value="${esc(t.id)}">${esc(t.label)} · ${t.channels.join(", ")}</option>`).join("")}</select></div>
+        <div class="fld"><label>Contact line (CTA)</label><input id="obContact" placeholder="+91 …"></div>
+      </div><button class="btn accent" onclick="onboard()">Onboard client</button></div>`;
+  }
+  h+=`<div class="card"><h2>Portfolio</h2><div id="clist">`;
+  for(const b of BRANDS){ h+=`<div class="row"><span class="ti">${esc(b.name)}</span><span class="mt">${esc(b.status||"")}</span><span class="rt"><button class="btn sm" onclick="clientConfig('${esc(b.id)}')">Config</button> <button class="btn sm" onclick="clientReport('${esc(b.id)}')">Monthly report</button> <button class="btn sm ghost" onclick="startCycle(['${esc(b.id)}'])">Run cycle</button></span></div>`; }
+  h+=`</div></div><div id="cpanel" style="margin-top:16px"></div>`;
+  $("#main").innerHTML=h;
+  if(CLIENT_BID){ const id=CLIENT_BID; CLIENT_BID=null; clientConfig(id); }
+}
+async function onboard(){
+  const name=$("#obName").value.trim(), website=$("#obSite").value.trim(), vertical=$("#obVert").value, contact=$("#obContact").value.trim();
+  if(name.length<2) return toast("Client name is required",true);
+  try{ const r=await api("/agency/onboard","POST",{name,website,vertical,config:contact?{cta:{contact}}:{}}); toast(`Onboarded · job ${r.job_state}`); CLIENT_BID=r.brand_id; render(); }
+  catch(e){ toast(e.message,true); }
+}
+async function clientConfig(bid){
+  const b=BRANDS.find(x=>x.id===bid)||{name:bid}; let c={config:{}}; try{ c=await api(`/brands/${bid}/config`); }catch(e){ return toast(e.message,true); }
+  const cfg=c.config; const j=v=>esc(JSON.stringify(v,null,1).replace(/\n\s*/g," "));
+  const list=(k)=> (cfg[k]||[]).join("\n");
+  $("#cpanel").innerHTML=`<div class="card"><h2>${esc(b.name)} · configuration</h2><div class="sub">Vertical: ${esc(cfg.vertical)} · this brief is injected as DATA into every prompt for this client.</div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));margin-top:12px">
+      <div class="fld"><label>Tone</label><input id="cfTone" value="${esc((cfg.persona||{}).tone||"")}"></div>
+      <div class="fld"><label>Offer</label><input id="cfOffer" value="${esc((cfg.market_brief||{}).offer||"")}"></div>
+      <div class="fld"><label>Audience</label><input id="cfAud" value="${esc((cfg.market_brief||{}).audience||"")}"></div>
+      <div class="fld"><label>Location</label><input id="cfLoc" value="${esc((cfg.market_brief||{}).location||"")}"></div>
+      <div class="fld"><label>CTA text</label><input id="cfCta" value="${esc((cfg.cta||{}).text||"")}"></div>
+      <div class="fld"><label>Contact line</label><input id="cfContact" value="${esc((cfg.cta||{}).contact||"")}"></div>
+      <div class="fld"><label>Always (one per line)</label><textarea id="cfDo" rows="3">${esc(list("do"))}</textarea></div>
+      <div class="fld"><label>Never (one per line)</label><textarea id="cfDont" rows="3">${esc(list("dont"))}</textarea></div>
+      <div class="fld"><label>Compliance notes (one per line)</label><textarea id="cfComp" rows="3">${esc(list("compliance"))}</textarea></div>
+      <div class="fld"><label>Daily generation cap</label><input id="cfCap" type="number" min="0" value="${cfg.caps.gen_daily}"></div>
+      <div class="fld"><label>Creatives per cycle</label><input id="cfCpc" type="number" min="0" max="20" value="${cfg.caps.creatives_per_cycle}"></div>
+      <div class="fld"><label>Images per cycle</label><input id="cfIpc" type="number" min="0" max="20" value="${cfg.caps.images_per_cycle}"></div>
+      <div class="fld"><label>Generate images in cycle</label><select id="cfImg"><option value="1" ${cfg.cycle.generate_images?"selected":""}>yes</option><option value="0" ${!cfg.cycle.generate_images?"selected":""}>no</option></select></div>
+      <div class="fld"><label>WhatsApp triggers (JSON)</label><textarea id="cfTrig" rows="3">${j(cfg.triggers)}</textarea></div>
+    </div><button class="btn accent" onclick="saveConfig('${esc(bid)}')">Save configuration</button> <span class="mt" style="font-size:12px;color:var(--muted)">Reports: <span id="repList">loading…</span></span></div>`;
+  try{ const r=await api(`/brands/${bid}/reports`); $("#repList").innerHTML=r.reports.length? r.reports.map(x=>`<a href="/api/brands/${bid}/reports/${x.id}/html" target="_blank" onclick="return openReport('${esc(bid)}','${esc(x.id)}')">${esc(x.period)}</a>`).join(" · "):"none yet"; }catch{}
+}
+async function openReport(bid,rid){
+  try{ const r=await fetch(`${API}/brands/${bid}/reports/${rid}/html`,{headers:{Authorization:"Bearer "+TOKEN}}); if(!r.ok) throw new Error("Could not load the report"); const t=await r.text(); const w=window.open("about:blank"); w.document.write(t); w.document.close(); }
+  catch(e){ toast(e.message,true); } return false; }
+async function saveConfig(bid){
+  const lines=id=>$("#"+id).value.split("\n").map(x=>x.trim()).filter(Boolean);
+  let triggers; try{ triggers=JSON.parse($("#cfTrig").value||"{}"); }catch{ return toast("Triggers must be valid JSON",true); }
+  const config={persona:{tone:$("#cfTone").value}, market_brief:{offer:$("#cfOffer").value,audience:$("#cfAud").value,location:$("#cfLoc").value},
+    cta:{text:$("#cfCta").value,contact:$("#cfContact").value}, do:lines("cfDo"), dont:lines("cfDont"), compliance:lines("cfComp"),
+    caps:{gen_daily:+$("#cfCap").value,creatives_per_cycle:+$("#cfCpc").value,images_per_cycle:+$("#cfIpc").value},
+    cycle:{generate_images:$("#cfImg").value==="1"}, triggers};
+  try{ await api(`/brands/${bid}/config`,"PUT",{config}); toast("Configuration saved"); }catch(e){ toast(e.message,true); }
+}
+async function clientReport(bid){
+  const d=new Date(); d.setMonth(d.getMonth()-1); const def=d.toISOString().slice(0,7);
+  const period=prompt("Report period (YYYY-MM)",def); if(!period) return;
+  try{ const r=await api(`/brands/${bid}/reports`,"POST",{period}); toast("Report ready"); openReport(bid,r.id); }catch(e){ toast(e.message,true); }
+}
+async function viewCycles(){
+  const [c,pool]=await Promise.all([api("/agency/cycles"),api("/agency/pool").catch(()=>({pool:{},jobs:[]}))]);
+  let h=`<div class="pagehd"><h1>Weekly cycles</h1><p>Each cycle runs ideas → calendar → creatives (→ images) for every client, fairly, at most ${pool.pool.max_workers||"—"} clients at a time. Output goes to Approvals; nothing publishes on its own.</p></div>`;
+  h+=`<div style="display:flex;gap:8px;margin-bottom:14px"><button class="btn accent" onclick="startCycle([])">Run cycle for all ready clients</button><button class="btn" onclick="render()">Refresh</button></div>`;
+  if(!c.cycles.length){ h+=`<div class="card empty"><div class="big">No cycles yet</div>Run one, or point a pinger at /api/cron with your CRON_KEY for weekly automation.</div>`; }
+  for(const cy of c.cycles){
+    const pct=Math.round((cy.progress||0)*100);
+    h+=`<div class="card" style="margin-bottom:12px"><div style="display:flex;align-items:center;gap:10px"><h2 style="margin:0">${esc(cy.label||cy.id)}</h2><span class="chip ${cy.state==="done"?"live":"run"}">${esc(cy.state)}</span><span class="mt" style="margin-left:auto;font-size:12px;color:var(--muted)">${ago(cy.started)} · ${cy.counts.done} done · ${cy.counts.failed} failed · ${cy.counts.queued+cy.counts.running} pending</span></div>
+      <div class="prog" style="margin:10px 0"><i style="width:${pct}%"></i></div>`;
+    for(const [bid,st] of Object.entries(cy.brands||{})){
+      const b=BRANDS.find(x=>x.id===bid)||{name:bid}; const r=st.result||{};
+      h+=`<div class="row"><span class="ti">${esc(b.name)}</span><span class="chip ${st.state==="done"?"live":st.state==="failed"?"wait":"run"}">${esc(st.state)}</span><span class="mt">${st.state==="done"?`${r.ideas} ideas · ${r.calendar} slots · ${r.creatives} creatives · ${r.images} images${(r.skipped||[]).length?` · skipped: ${esc(r.skipped[0])}`:""}`:esc((st.log||[]).slice(-1)[0]||st.error||"")}</span></div>`;
+    }
+    h+=`</div>`;
+  }
+  $("#main").innerHTML=h;
+}
+async function viewAgencySettings(){
+  const s=await api("/agency/settings"); const b=s.branding, d=s.defaults; const ro=ME.role!=="admin";
+  let h=`<div class="pagehd"><h1>Agency settings</h1><p>White-label branding for reports and the console, and portfolio defaults.${ro?" (read-only for managers)":""}</p></div>`;
+  h+=`<div class="card"><h2>Branding</h2><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));margin-top:10px">
+    <div class="fld"><label>Agency name</label><input id="asName" value="${esc(b.agency_name)}" ${ro?"disabled":""}></div>
+    <div class="fld"><label>Logo URL (https)</label><input id="asLogo" value="${esc(b.logo_url)}" ${ro?"disabled":""}></div>
+    <div class="fld"><label>Accent colour</label><input id="asAccent" type="color" value="${esc(b.accent)}" ${ro?"disabled":""}></div>
+    <div class="fld"><label>Support email</label><input id="asMail" value="${esc(b.support_email)}" ${ro?"disabled":""}></div>
+    <div class="fld"><label>Report intro</label><input id="asIntro" value="${esc(b.report_intro)}" ${ro?"disabled":""}></div>
+    <div class="fld"><label>Report footer</label><input id="asFoot" value="${esc(b.footer)}" ${ro?"disabled":""}></div></div>
+    <h2 style="margin-top:14px">Defaults</h2><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));margin-top:10px">
+    <div class="fld"><label>Approval SLA (hours)</label><input id="asSla" type="number" min="1" value="${d.approval_sla_hours}" ${ro?"disabled":""}></div>
+    <div class="fld"><label>Quiet-client alert (days)</label><input id="asQuiet" type="number" min="1" value="${d.quiet_days_alert}" ${ro?"disabled":""}></div>
+    <div class="fld"><label>Automatic weekly cycle (via /api/cron)</label><select id="asAuto" ${ro?"disabled":""}><option value="1" ${d.auto_cycle?"selected":""}>on</option><option value="0" ${!d.auto_cycle?"selected":""}>off</option></select></div></div>
+    ${ro?"":`<button class="btn accent" onclick="saveAgency()">Save settings</button>`}</div>`;
+  if(ME.role==="admin"){
+    let users=[]; try{ users=await api("/users"); }catch{}
+    h+=`<div class="card" style="margin-top:16px"><h2>Team</h2><div class="sub">Managers see only the clients assigned to them. Add one with role "manager" and pick their clients.</div>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin-top:10px">
+        <div class="fld"><label>Email</label><input id="tmEmail"></div><div class="fld"><label>Password</label><input id="tmPw" type="password"></div>
+        <div class="fld"><label>Role</label><select id="tmRole"><option value="manager">manager</option><option value="admin">admin</option></select></div></div>
+      <div class="fld"><label>Assigned clients (managers)</label><select id="tmBrands" multiple size="5">${BRANDS.map(x=>`<option value="${esc(x.id)}">${esc(x.name)}</option>`).join("")}</select></div>
+      <button class="btn accent" onclick="addTeam()">Add team member</button>
+      <div style="margin-top:12px">${users.filter(u=>u.role==="manager"||u.role==="admin").map(u=>`<div class="row"><span class="ti">${esc(u.email)}</span><span class="tag">${esc(u.role)}</span><span class="mt">${u.role==="manager"?`${(u.brand_ids||[]).length} client(s)`:"all clients"}</span><span class="rt">${u.role==="manager"?`<button class="btn sm" onclick="editAssign('${esc(u.id)}')">Assign</button>`:""}</span></div>`).join("")}</div></div>`;
+  }
+  $("#main").innerHTML=h;
+}
+async function saveAgency(){
+  const branding={agency_name:$("#asName").value,logo_url:$("#asLogo").value,accent:$("#asAccent").value,support_email:$("#asMail").value,report_intro:$("#asIntro").value,footer:$("#asFoot").value};
+  const defaults={approval_sla_hours:+$("#asSla").value,quiet_days_alert:+$("#asQuiet").value,auto_cycle:$("#asAuto").value==="1"};
+  try{ await api("/agency/settings","PUT",{branding,defaults}); toast("Saved"); boot(); }catch(e){ toast(e.message,true); }
+}
+async function addTeam(){
+  const email=$("#tmEmail").value.trim(), password=$("#tmPw").value, role=$("#tmRole").value, brand_ids=[...$("#tmBrands").selectedOptions].map(o=>o.value);
+  try{ await api("/users","POST",{email,password,role,brand_ids}); toast("Team member added"); render(); }catch(e){ toast(e.message,true); }
+}
+async function editAssign(uid){
+  const cur=await api(`/users/${uid}/brands`).catch(()=>({brand_ids:[]}));
+  const pick=prompt("Client names to assign (comma-separated):\n"+BRANDS.map(b=>b.name).join(", "), BRANDS.filter(b=>cur.brand_ids.includes(b.id)).map(b=>b.name).join(", "));
+  if(pick===null) return;
+  const names=pick.split(",").map(x=>x.trim().toLowerCase()).filter(Boolean);
+  const brand_ids=BRANDS.filter(b=>names.includes(b.name.toLowerCase())).map(b=>b.id);
+  try{ await api(`/users/${uid}/brands`,"PUT",{brand_ids}); toast(`Assigned ${brand_ids.length} client(s)`); render(); }catch(e){ toast(e.message,true); }
+}
+</script>
+</body>
+</html>

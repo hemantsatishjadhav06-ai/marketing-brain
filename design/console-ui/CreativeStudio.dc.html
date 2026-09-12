@@ -1,0 +1,96 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
+    *{box-sizing:border-box}
+    body{margin:0;font-family:"Manrope",system-ui,sans-serif;background:#0a0b12;color:#f4f5fb}
+    a{color:#a78bfa}a:hover{color:#c6b6ff}
+    .disp{font-family:"Space Grotesk","Manrope",sans-serif;letter-spacing:-.02em}
+  </style>
+</helmet>
+<div style="width:1440px;height:1024px;background:radial-gradient(900px 500px at 90% -10%,rgba(124,92,255,.22),transparent 60%),#0a0b12;color:#f4f5fb;display:flex;flex-direction:column;overflow:hidden">
+  <!-- top -->
+  <div style="display:flex;align-items:center;gap:14px;padding:16px 26px;border-bottom:1px solid rgba(255,255,255,.06)">
+    <div style="width:30px;height:30px;border-radius:10px;background:linear-gradient(135deg,#7c5cff,#c6f24e);display:flex;align-items:center;justify-content:center;font-weight:800;color:#0a0b12">✦</div>
+    <div style="font-weight:600;font-size:13px;color:#9aa0b4">Creative Studio · <span style="color:#f4f5fb">Neopolis — Ultra-Luxury Apartments</span></div>
+    <div style="flex:1"></div>
+    <div style="display:flex;gap:8px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:11px;padding:4px">
+      <span style="padding:5px 11px;border-radius:8px;font-size:12px;color:#9aa0b4;font-weight:600">Manual</span>
+      <span style="padding:5px 11px;border-radius:8px;font-size:12px;background:#7c5cff;color:#fff;font-weight:700">AI Assist</span>
+      <span style="padding:5px 11px;border-radius:8px;font-size:12px;color:#9aa0b4;font-weight:600">Autopilot</span>
+    </div>
+  </div>
+
+  <div style="flex:1;display:flex;min-height:0">
+    <!-- LEFT controls -->
+    <div style="width:270px;flex:none;border-right:1px solid rgba(255,255,255,.06);padding:20px;overflow:auto">
+      <div class="disp" style="font-size:15px;font-weight:600;margin-bottom:14px">Direction</div>
+      <div style="display:grid;gap:10px">
+        <div style="border:1px solid rgba(124,92,255,.5);background:rgba(124,92,255,.12);border-radius:13px;padding:12px"><div style="font-weight:700;font-size:13px">Editorial</div><div style="font-size:11.5px;color:#9aa0b4;margin-top:2px">Luxury magazine aesthetic</div></div>
+        <div style="border:1px solid rgba(255,255,255,.08);border-radius:13px;padding:12px"><div style="font-weight:700;font-size:13px">Cinematic</div><div style="font-size:11.5px;color:#9aa0b4;margin-top:2px">Premium storytelling</div></div>
+        <div style="border:1px solid rgba(255,255,255,.08);border-radius:13px;padding:12px"><div style="font-weight:700;font-size:13px">Data-driven</div><div style="font-size:11.5px;color:#9aa0b4;margin-top:2px">Investment intelligence</div></div>
+      </div>
+      <div class="disp" style="font-size:15px;font-weight:600;margin:22px 0 12px">Aspect ratio</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <span style="padding:7px 12px;border-radius:9px;background:#7c5cff;color:#fff;font-weight:700;font-size:12px">4:5</span>
+        <span style="padding:7px 12px;border-radius:9px;border:1px solid rgba(255,255,255,.12);font-size:12px;color:#c3c8d8">1:1</span>
+        <span style="padding:7px 12px;border-radius:9px;border:1px solid rgba(255,255,255,.12);font-size:12px;color:#c3c8d8">9:16</span>
+        <span style="padding:7px 12px;border-radius:9px;border:1px solid rgba(255,255,255,.12);font-size:12px;color:#c3c8d8">16:9</span>
+      </div>
+      <button style="width:100%;margin-top:22px;border:0;background:linear-gradient(135deg,#7c5cff,#8b6bff);color:#fff;font-weight:700;padding:13px;border-radius:12px;font-family:inherit;box-shadow:0 8px 22px rgba(124,92,255,.4)">✦ Regenerate</button>
+      <button style="width:100%;margin-top:10px;border:1px solid rgba(255,255,255,.14);background:transparent;color:#f4f5fb;font-weight:700;padding:12px;border-radius:12px;font-family:inherit">Generate 4 variations</button>
+    </div>
+
+    <!-- CENTER canvas -->
+    <div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;background:repeating-linear-gradient(45deg,rgba(255,255,255,.012) 0 2px,transparent 2px 14px)">
+      <div style="width:380px;height:475px;border-radius:18px;overflow:hidden;position:relative;box-shadow:0 30px 80px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.1);background:linear-gradient(165deg,#14203f,#0a1124)">
+        <div style="position:absolute;inset:0;background:radial-gradient(420px 260px at 70% 18%,rgba(124,92,255,.4),transparent 60%)"></div>
+        <div style="position:absolute;top:18px;left:18px;display:flex;align-items:center;gap:7px"><div style="width:22px;height:22px;border-radius:6px;background:#fff;color:#001848;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px">N</div><span style="font-weight:700;font-size:12px;letter-spacing:.04em">NEOPOLIS</span></div>
+        <div style="position:absolute;left:24px;right:24px;bottom:92px">
+          <div style="font-size:11px;letter-spacing:.18em;color:#c6f24e;font-weight:700">KOKAPET · WEST HYDERABAD</div>
+          <div class="disp" style="font-size:28px;font-weight:700;line-height:1.08;margin-top:8px">Ultra-luxury<br>hanging apartments</div>
+          <div style="font-size:13px;color:#cdd2e3;margin-top:8px;font-weight:600">3.5 &amp; 4 BHK · ₹2.7 Cr onwards</div>
+        </div>
+        <div style="position:absolute;left:24px;bottom:26px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.2);backdrop-filter:blur(6px);padding:8px 14px;border-radius:11px;font-weight:700;font-size:12px">Book a private preview →</div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:20px">
+        <div style="width:54px;height:68px;border-radius:9px;border:2px solid #c6f24e;background:linear-gradient(165deg,#14203f,#0a1124)"></div>
+        <div style="width:54px;height:68px;border-radius:9px;border:1px solid rgba(255,255,255,.12);background:linear-gradient(165deg,#1a1430,#0d0a1c)"></div>
+        <div style="width:54px;height:68px;border-radius:9px;border:1px solid rgba(255,255,255,.12);background:linear-gradient(165deg,#301a22,#1a0d12)"></div>
+        <div style="width:54px;height:68px;border-radius:9px;border:1px dashed rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;color:#9aa0b4;font-size:20px">+</div>
+      </div>
+    </div>
+
+    <!-- RIGHT intelligence -->
+    <div style="width:290px;flex:none;border-left:1px solid rgba(255,255,255,.06);padding:20px;overflow:auto">
+      <div style="font-size:11px;font-weight:800;letter-spacing:.09em;color:#a78bfa">BRAIN USED</div>
+      <div style="display:grid;gap:9px;margin-top:14px;font-size:13px">
+        <div style="display:flex;align-items:center;gap:9px"><span style="color:#c6f24e">✓</span> 7 winning creatives</div>
+        <div style="display:flex;align-items:center;gap:9px"><span style="color:#c6f24e">✓</span> 18 competitor creatives</div>
+        <div style="display:flex;align-items:center;gap:9px"><span style="color:#c6f24e">✓</span> Audience insights</div>
+        <div style="display:flex;align-items:center;gap:9px"><span style="color:#c6f24e">✓</span> Brand Visual DNA</div>
+        <div style="display:flex;align-items:center;gap:9px"><span style="color:#c6f24e">✓</span> Verified project facts</div>
+      </div>
+      <div style="background:rgba(124,92,255,.1);border:1px solid rgba(124,92,255,.3);border-radius:15px;padding:16px;margin-top:18px">
+        <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;color:#9aa0b4;font-weight:600">Creative opportunity</span><span class="disp" style="font-size:24px;font-weight:700;color:#c6f24e">92</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px"><span style="font-size:12px;color:#9aa0b4;font-weight:600">Confidence</span><span style="font-size:12px;font-weight:700;color:#c6f24e">HIGH · 14 sources</span></div>
+      </div>
+      <div style="font-size:12px;color:#9aa0b4;margin-top:14px;line-height:1.5">Every figure is pulled from a verified source. The Brain refuses to invent a price, RERA number or date.</div>
+      <a style="display:inline-block;margin-top:12px;font-size:12.5px;font-weight:700;color:#a78bfa">ⓘ Why this recommendation?</a>
+      <div style="margin-top:22px;display:grid;gap:10px">
+        <button style="border:0;background:#c6f24e;color:#0a0b12;font-weight:800;padding:12px;border-radius:12px;font-family:inherit">Approve &amp; create platform versions</button>
+        <button style="border:1px solid rgba(255,255,255,.14);background:transparent;color:#f4f5fb;font-weight:700;padding:11px;border-radius:12px;font-family:inherit">Request a change</button>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

@@ -1,0 +1,28 @@
+{
+ "results": [
+  {
+   "test": "SEED_verified_fact_stored",
+   "status": "PASS",
+   "detail": "200 {\"ok\":true,\"id\":\"11c160538040\"}",
+   "evidence": ""
+  },
+  {
+   "test": "GROUND_verified_fact_retrieved",
+   "status": "PASS",
+   "detail": "2.8s The Neopolis project offers 3.5 & 4 BHK configurations, with sizes of 2850, 3303, and 3850 sq.ft, starting at a price of Rs 2.7 Cr onwards.",
+   "evidence": "The Neopolis project offers 3.5 & 4 BHK configurations, with sizes of 2850, 3303, and 3850 sq.ft, starting at a price of Rs 2.7 Cr onwards."
+  },
+  {
+   "test": "GROUND_wrong_figure_not_accepted",
+   "status": "PASS",
+   "detail": "1.5s No, that\u2019s incorrect. The Neopolis project starts at Rs 2.7 Cr onwards, not Rs 1.9 Cr. Please use the correct pricing in your ad copy.",
+   "evidence": "No, that\u2019s incorrect. The Neopolis project starts at Rs 2.7 Cr onwards, not Rs 1.9 Cr. Please use the correct pricing in your ad copy."
+  },
+  {
+   "test": "CONSISTENCY_grounded_price_stable_3x",
+   "status": "PASS",
+   "detail": "answers=[['2.7cr'], ['2.7cr'], ['2.7cr']]",
+   "evidence": ""
+  }
+ ]
+}

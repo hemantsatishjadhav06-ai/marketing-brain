@@ -1,5 +1,7 @@
 from fastapi import APIRouter
 from ._shared import *  # noqa: F401,F403
+from ..ai import brain as ai_brain
+from ..services import projects, memory
 
 router = APIRouter()
 
@@ -11,30 +13,58 @@ def reel_options(user=Depends(current_user)):
 
 @router.get("/api/reel-studio/jobs/{job_id}")
 def reel_job(job_id: str, user=Depends(current_user)):
-    j = REEL_JOBS.get(job_id)
+    j = _reel_get(job_id)
     if not j:
         raise HTTPException(404, "Job not found")
-    if user["role"] != "admin" and user.get("brand_id") != j.get("brand_id"):
+    if not _can_see(user, j.get("brand_id") or ""):
         raise HTTPException(403, "Not your job")
     return j
+
+
+def _trim_headline(text, limit=40):
+    """Shorten a slide headline to whole words.
+
+    A blunt slice cut mid-word and the model faithfully rendered the broken string
+    into the image (e.g. "Discover the Pinnacle of Ultra-Luxury Li").
+    """
+    text = " ".join((text or "").split())
+    if len(text) <= limit:
+        return text
+    cut = text[:limit].rsplit(" ", 1)[0].rstrip(" ,;:-–—")
+    return cut or text[:limit]
+
+
+def _locality_hint(b):
+    """Anchor slide imagery to the brand's actual market.
+
+    Without this the model defaulted to generic western skylines — one Hyderabad
+    carousel rendered a New York interior with Central Park through the window.
+    """
+    rows = projects.brand_projects(b.get("name", "")) if hasattr(projects, "brand_projects") else []
+    if not rows:
+        return ""
+    areas = ", ".join(dict.fromkeys(r["area"] for r in rows))
+    return (f"Location: {areas} — Indian (Hyderabad) architecture, streetscape, landscaping and people. "
+            f"Do NOT depict New York, Dubai, Singapore or any non-Indian skyline or landmark. ")
 
 
 @router.post("/api/brands/{bid}/creatives/{cid}/slides")
 def slides(bid: str, cid: str, user=Depends(current_user)):
     """Generate one branded image per carousel slide (logo composited)."""
     b = _brand_or_404(bid, user)
-    c = db.get_doc("creatives", cid)
-    if not c:
-        raise HTTPException(404, "Creative not found")
+    _gen_guard(bid)
+    c = _doc_or_404("creatives", cid, bid)
     slide_specs = c["payload"].get("slides") or []
     if not slide_specs:
         raise HTTPException(400, "This creative has no slides (not a carousel)")
     palette = ai_engine.brand_palette(b)
     assets, errors = [], []
     for sl in slide_specs[:6]:
-        headline = (sl.get("headline") or "")[:40]
-        prompt = (f"Premium social media carousel slide design. Visual: {sl.get('visual_direction','')}. "
+        headline = _trim_headline(sl.get("headline") or "")
+        prompt = (f"{ai_brain.brand_lock(b)}"
+                  f"Premium social media carousel slide design. Visual: {sl.get('visual_direction','')}. "
                   f"{sl.get('design_notes','')} Vertical 4:5, clean modern layout, generous negative space. "
+                  f"{_locality_hint(b)}"
                   f"The ONLY text in the image: \"{headline}\" in large bold clean sans-serif lettering, "
                   f"spelled exactly like that. No other words, no paragraphs, no fine print.")
         blob = ai_engine.generate_image(prompt, b["name"], palette)
@@ -46,9 +76,8 @@ def slides(bid: str, cid: str, user=Depends(current_user)):
         assets.append(_save_asset(b, rel, blob))
     if not assets:
         raise HTTPException(502, "Slide generation failed: " + ", ".join(errors))
-    payload = c["payload"]
-    payload["slide_assets"] = assets
-    db.update_doc("creatives", cid, payload=payload, asset_path=assets[0])
+    db.merge_payload("creatives", cid, {"slide_assets": assets})
+    db.update_doc("creatives", cid, asset_path=assets[0])
     return {"ok": True, "slides": [a if a.startswith("http") else f"/workspaces/{_wslug(b)}/{a}" for a in assets], "failed": errors}
 
 
@@ -56,9 +85,8 @@ def slides(bid: str, cid: str, user=Depends(current_user)):
 def voiceover(bid: str, cid: str, user=Depends(current_user)):
     """Generate spoken voiceover audio for a reel script."""
     b = _brand_or_404(bid, user)
-    c = db.get_doc("creatives", cid)
-    if not c:
-        raise HTTPException(404, "Creative not found")
+    _gen_guard(bid)
+    c = _doc_or_404("creatives", cid, bid)
     s = c["payload"].get("script") or {}
     lines = [sh.get("dialogue_or_vo") for sh in (s.get("shots") or []) if sh.get("dialogue_or_vo")]
     vo_text = " ".join(lines) or c["payload"].get("caption", "")[:400]
@@ -70,10 +98,7 @@ def voiceover(bid: str, cid: str, user=Depends(current_user)):
         raise HTTPException(502, f"Voiceover failed: {e}")
     rel = f"{c['channel']}/assets/{cid}-vo.wav"
     ref = _save_asset(b, rel, audio)
-    payload = c["payload"]
-    payload["vo_asset"] = ref
-    payload["vo_text"] = vo_text[:500]
-    db.update_doc("creatives", cid, payload=payload)
+    db.merge_payload("creatives", cid, {"vo_asset": ref, "vo_text": vo_text[:500]})
     return {"ok": True, "vo_url": ref if ref.startswith("http") else f"/workspaces/{_wslug(b)}/{ref}", "vo_text": vo_text[:300]}
 
 
@@ -81,31 +106,74 @@ def voiceover(bid: str, cid: str, user=Depends(current_user)):
 def algo_audit(bid: str, cid: str, user=Depends(current_user)):
     """Audit a creative against Instagram's confirmed ranking signals."""
     b = _brand_or_404(bid, user)
-    c = db.get_doc("creatives", cid)
-    if not c:
-        raise HTTPException(404, "Creative not found")
+    c = _doc_or_404("creatives", cid, bid)
     try:
         audit = ai_engine.algo_audit(b, c["payload"])
     except Exception as e:
         raise HTTPException(502, f"Algo audit failed: {e}")
-    payload = c["payload"]
-    payload["algo_audit"] = audit
-    db.update_doc("creatives", cid, payload=payload)
+    db.merge_payload("creatives", cid, {"algo_audit": audit})
     return audit
+
+
+@router.post("/api/brands/{bid}/creatives/{cid}/design-review")
+def design_review(bid: str, cid: str, user=Depends(current_user)):
+    """Art-director review of the creative's visual: score, issues, exact fixes. Read-only."""
+    from ..services import design_qa
+    b = _brand_or_404(bid, user)
+    c = _doc_or_404("creatives", cid, bid)
+    if not c.get("asset_path"):
+        raise HTTPException(400, "This creative has no visual yet — generate one first")
+    _gen_guard(bid)
+    rv = design_qa.review(b, c)
+    if not rv.get("ok"):
+        raise HTTPException(400, rv.get("error", "review failed"))
+    db.merge_payload("creatives", cid, {"design_review": {k: rv.get(k) for k in ("score", "verdict", "issues", "vision", "checks", "at")}})
+    return rv
+
+
+@router.post("/api/brands/{bid}/creatives/{cid}/design-fix")
+def design_fix(bid: str, cid: str, user=Depends(current_user)):
+    """Review, then fix: mechanical crop/resize, one regenerate with the revised
+    art direction if needed, keep the better version. Before/after kept."""
+    from ..services import agency_pool, design_qa
+    b = _brand_or_404(bid, user)
+    c = _doc_or_404("creatives", cid, bid)
+    if not c.get("asset_path"):
+        raise HTTPException(400, "This creative has no visual yet — generate one first")
+    _gen_guard(bid)
+    # Review + regenerate + review again takes 1–3 minutes — longer than an edge
+    # proxy allows — so it runs as a pool job; poll /api/agency/jobs/{job_id}.
+    def run(log):
+        log("art director reviewing")
+        out = design_qa.fix(b, c)
+        if not out.get("ok"):
+            raise RuntimeError(out.get("error", "fix failed"))
+        log(f"done: {(out.get('after') or {}).get('score')} · {', '.join(out.get('applied') or []) or 'no change'}")
+        return out
+    j = agency_pool.POOL.submit(bid, "design_fix", run, meta={"creative_id": cid})
+    resp = {"job_id": j["id"], "state": j["state"], "creative_id": cid}
+    if j.get("state") == "done" and j.get("result"):
+        resp.update(j["result"])
+    elif j.get("state") == "failed":
+        raise HTTPException(400, j.get("error") or "fix failed")
+    return resp
 
 
 @router.post("/api/brands/{bid}/creatives/{cid}/approval")
 def set_approval(bid: str, cid: str, body: ApprovalIn, user=Depends(current_user)):
     _brand_or_404(bid, user)
-    c = db.get_doc("creatives", cid)
-    if not c:
-        raise HTTPException(404, "Creative not found")
+    c = _doc_or_404("creatives", cid, bid)
     if body.state not in ("approved", "changes_requested"):
         raise HTTPException(400, "state must be approved or changes_requested")
-    payload = c["payload"]
-    payload["approval"] = {"state": body.state, "comment": body.comment[:1000],
-                           "by": user.get("uid"), "role": user.get("role"), "at": time.time()}
-    db.update_doc("creatives", cid, payload=payload)
+    db.merge_payload("creatives", cid, {"approval": {"state": body.state, "comment": body.comment[:1000],
+                                                     "by": user.get("uid"), "role": user.get("role"), "at": time.time()}})
+    # An approve/reject is the strongest signal the system gets — record it so the
+    # next brief already knows, instead of repeating a correction the operator
+    # has already made.
+    try:
+        memory.capture_approval(bid, c, body.state, body.comment)
+    except Exception:
+        pass
     return db.get_doc("creatives", cid)
 
 
@@ -113,6 +181,7 @@ def set_approval(bid: str, cid: str, body: ApprovalIn, user=Depends(current_user
 def studio_moodboard(bid: str, body: StudioMoodIn, user=Depends(current_user)):
     """Art director: topic -> creative direction + ready image prompt + caption (+ slide prompts)."""
     b = _brand_or_404(bid, user)
+    _gen_guard(bid)
     try:
         return ai_engine.studio_moodboard(b, body.topic, body.format)
     except Exception as e:
@@ -123,6 +192,7 @@ def studio_moodboard(bid: str, body: StudioMoodIn, user=Depends(current_user)):
 def studio_image(bid: str, body: StudioImageIn, user=Depends(current_user)):
     """Generate one image (optional paste reference) with the brand logo composited on."""
     b = _brand_or_404(bid, user)
+    _gen_guard(bid)
     refs = [body.reference] if body.reference else None
     blob = ai_engine.generate_image(body.prompt, b["name"], ai_engine.brand_palette(b), references=refs)
     if not blob:
@@ -138,6 +208,7 @@ def studio_image(bid: str, body: StudioImageIn, user=Depends(current_user)):
 def studio_carousel(bid: str, body: StudioCarouselIn, user=Depends(current_user)):
     """Generate carousel slides, logo composited on EVERY slide."""
     b = _brand_or_404(bid, user)
+    _gen_guard(bid)
     out = []
     for i, pr in enumerate((body.prompts or [])[:6]):
         blob = ai_engine.generate_image(pr, b["name"], ai_engine.brand_palette(b))

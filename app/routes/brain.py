@@ -1,4 +1,6 @@
 """Master Prompt Brain routes: per-task agent team → blueprint → approve → proceed."""
+import os
+
 from fastapi import APIRouter
 from ._shared import *  # noqa: F401,F403
 from ..ai import brain
@@ -16,10 +18,7 @@ class BlueprintIn(BaseModel):
 
 
 def _patch(cid, **fields):
-    c = db.get_doc("creatives", cid) or {}
-    p = c.get("payload") or {}
-    p.update(fields)
-    db.update_doc("creatives", cid, payload=p)
+    db.merge_payload("creatives", cid, fields)
 
 
 def _run_brain(cid, b, topic, perspective, style):
@@ -54,9 +53,8 @@ def make_blueprint(bid: str, body: BlueprintIn, user=Depends(current_user)):
 @router.post("/api/brands/{bid}/creatives/{cid}/proceed")
 def proceed(bid: str, cid: str, user=Depends(current_user)):
     b = _brand_or_404(bid, user)
-    c = db.get_doc("creatives", cid)
-    if not c:
-        raise HTTPException(404, "Creative not found")
+    _gen_guard(bid)  # image + video + voice — the priciest chain in the app
+    c = _doc_or_404("creatives", cid, bid)
     p = c.get("payload") or {}
     if not p.get("blueprint"):
         raise HTTPException(400, "The blueprint is still being written — wait for the agents to finish.")
@@ -66,6 +64,35 @@ def proceed(bid: str, cid: str, user=Depends(current_user)):
     return {"started": True}
 
 
+def _stamp_logo(brand, image_url, logo_url, cid):
+    """Drop the real logo into the slot the art director reserved for it.
+
+    The model letters the brand name or invents a mark when asked to draw a logo, so
+    the file is always placed by us — into a light, empty slot that is part of the
+    composition, which reads as designed rather than pasted. Set LOGO_COMPOSITE=false
+    to skip it.
+    """
+    if os.environ.get("LOGO_COMPOSITE", "true").strip().lower() in ("0", "false", "no"):
+        return image_url
+    if not (brand and image_url):
+        return image_url
+    # An operator-uploaded logo has no public URL unless object storage is
+    # configured, but it is on disk — and the compositor accepts a local path,
+    # so a self-hosted brand still gets its real mark on the creative.
+    logo_ref = logo_url or _logo_path(brand)
+    if not logo_ref:
+        return image_url
+    blob = brain.composite_brand_logo(image_url, logo_ref)
+    if not blob:
+        return image_url
+    try:
+        rel = f"brain/assets/{cid}.png"
+        ref = _save_asset(brand, rel, blob)
+        return ref if ref.startswith("http") else f"/workspaces/{_wslug(brand)}/{ref}"
+    except Exception:
+        return image_url
+
+
 def _run_proceed(cid, bid=None):
     try:
         c = db.get_doc("creatives", cid)
@@ -73,7 +100,10 @@ def _run_proceed(cid, bid=None):
         brand = db.get_doc("brands", bid) if bid else None
         logo_url = brain.brand_logo_url(brand) if brand else None
         _patch(cid, gen_status="Rendering image…")
-        img = brain.fal_image(bp.get("static_image_prompt") or bp.get("core_idea") or "", logo_url=logo_url)
+        _check_budget(bid or c["brand_id"])
+        img = brain.fal_image(bp.get("static_image_prompt") or bp.get("core_idea") or "",
+                              logo_url=logo_url, brand=brand)
+        img = _stamp_logo(brand, img, logo_url, cid)
         _patch(cid, asset_path=img, gen_status="Rendering video…")
         video = None
         if bp.get("video_prompt") or bp.get("scenes"):

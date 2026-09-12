@@ -1,0 +1,101 @@
+{
+ "job": {
+  "id": "23d82bbb9e34",
+  "brand_id": "af4c0bd6fbbd",
+  "kind": "design_fix",
+  "state": "done",
+  "log": [
+   "09:28:16 started design_fix",
+   "09:28:16 art director reviewing",
+   "09:29:20 done: 45 \u00b7 regenerated file cropped/resized to the platform ratio, regenerated with the revised art direction",
+   "09:29:20 done"
+  ],
+  "submitted": 1789118896.6297476,
+  "started": 1789118896.6504724,
+  "finished": 1789118960.9254124,
+  "error": null,
+  "creative_id": "c63a8499fd8f"
+ },
+ "result": {
+  "ok": true,
+  "before": {
+   "asset": "instagram/assets/c63a8499fd8f-v1789118902.png",
+   "score": 45
+  },
+  "after": {
+   "asset": "instagram/assets/c63a8499fd8f-qa1789118956r.png",
+   "score": 45
+  },
+  "applied": [
+   "regenerated file cropped/resized to the platform ratio",
+   "regenerated with the revised art direction"
+  ],
+  "regen": {
+   "asset": "instagram/assets/c63a8499fd8f-qa1789118956r.png",
+   "score": 45,
+   "verdict": "The visual does not align with the caption's promise."
+  },
+  "review": {
+   "score": 45,
+   "verdict": "The visual does not align with the caption's promise.",
+   "issues": [
+    {
+     "area": "composition",
+     "severity": "high",
+     "problem": "The image does not visually represent the concept of affordable housing or cost breakdown.",
+     "fix": "Create an infographic-style visual that clearly shows cost comparisons."
+    },
+    {
+     "area": "brand_colours",
+     "severity": "high",
+     "problem": "Brand colors are not incorporated into the visual.",
+     "fix": "Use the specified brand colors in the infographic."
+    }
+   ],
+   "vision": {
+    "text_in_image": {
+     "present": false,
+     "legible": false,
+     "transcription": "",
+     "problems": []
+    },
+    "logo": {
+     "visible": false,
+     "placement_ok": false,
+     "note": "No logo present, but space for one is not utilized."
+    },
+    "brand_colours": {
+     "ok": false,
+     "note": "Brand colors are not used in the image."
+    },
+    "composition": {
+     "ok": false,
+     "note": "The composition does not convey the message of affordability or cost breakdown."
+    },
+    "safe_areas": {
+     "ok": true,
+     "note": "Safe areas are respected."
+    },
+    "generic_stock_look": true,
+    "matches_caption": {
+     "ok": false,
+     "note": "The visual does not support the caption's claim about savings."
+    }
+   },
+   "checks": {
+    "width": 1080,
+    "height": 1350,
+    "target": [
+     1080,
+     1350
+    ],
+    "issues": [],
+    "fixes": [],
+    "mean_luma": 83.4
+   }
+  },
+  "publish_ready": false,
+  "min_score": 75,
+  "at": 1789118960.8173883
+ }
+}

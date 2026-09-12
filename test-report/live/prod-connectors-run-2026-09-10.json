@@ -1,0 +1,39 @@
+{
+ "results": [
+  {
+   "test": "CONNECT_setup_guides_for_all_platforms",
+   "status": "PASS",
+   "detail": "200 platforms=['facebook', 'instagram', 'linkedin', 'twitter'] configured=[]"
+  },
+  {
+   "test": "CONNECT_unsupported_platform_rejected",
+   "status": "PASS",
+   "detail": "400 {\"detail\":\"Unsupported platform. Supported: ['instagram', 'facebook', 'linkedin', 'twitter']\"}"
+  },
+  {
+   "test": "CONNECT_save_instagram_credentials",
+   "status": "PASS",
+   "detail": "200 {\"ok\":true}"
+  },
+  {
+   "test": "CONNECT_status_shows_configured",
+   "status": "PASS",
+   "detail": "configured=['instagram']"
+  },
+  {
+   "test": "CONNECT_credentials_never_returned_by_api",
+   "status": "PASS",
+   "detail": "not echoed"
+  },
+  {
+   "test": "PUBLISH_live_bad_token_fails_gracefully",
+   "status": "PASS",
+   "detail": "200 status=failed keys=['id', 'brand_id', 'creative_id', 'channel', 'scheduled_for', 'mode', 'payload', 'status'] {'id': '479ac57225e0', 'brand_id': '4ab2df3b05be', 'creative_id': '84ffbc02f652', 'channel': 'instagram', 'scheduled_for': None, 'mode': 'live', 'payload': {'er"
+  },
+  {
+   "test": "PUBLISH_failed_attempt_recorded_not_published",
+   "status": "PASS",
+   "detail": "live rows=[('live', 'failed')]"
+  }
+ ]
+}

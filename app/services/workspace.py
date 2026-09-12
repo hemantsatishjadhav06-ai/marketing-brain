@@ -33,8 +33,22 @@ def create_workspace(slug, channels):
     return root
 
 
+def safe_path(slug, relpath):
+    """Resolve relpath inside the brand's workspace, refusing any escape.
+
+    Callers pass request-controlled segments (channel, platform, filenames), and
+    os.path.join happily walks out of the root: a relpath of "../../../../tmp/x"
+    wrote outside WORKSPACES_ROOT entirely.
+    """
+    base = os.path.realpath(brand_dir(slug))
+    target = os.path.realpath(os.path.join(base, relpath))
+    if target != base and not target.startswith(base + os.sep):
+        raise ValueError(f"path escapes the workspace: {relpath!r}")
+    return target
+
+
 def write_json(slug, relpath, data):
-    path = os.path.join(brand_dir(slug), relpath)
+    path = safe_path(slug, relpath)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
@@ -42,7 +56,7 @@ def write_json(slug, relpath, data):
 
 
 def write_text(slug, relpath, text):
-    path = os.path.join(brand_dir(slug), relpath)
+    path = safe_path(slug, relpath)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         f.write(text)
@@ -50,7 +64,7 @@ def write_text(slug, relpath, text):
 
 
 def write_bytes(slug, relpath, blob):
-    path = os.path.join(brand_dir(slug), relpath)
+    path = safe_path(slug, relpath)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "wb") as f:
         f.write(blob)

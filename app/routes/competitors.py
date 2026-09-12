@@ -31,6 +31,12 @@ def discover_competitors(bid: str, user=Depends(current_user)):
 @router.post("/api/brands/{bid}/competitors")
 def add_competitor(bid: str, body: CompetitorIn, user=Depends(current_user)):
     b = _brand_or_404(bid, user)
+    from ..core import guard
+    url_ok, _why = guard.url_is_safe(body.url)
+    if not url_ok:
+        # Private/loopback/metadata addresses were being stored as competitors and
+        # only blocked at fetch time. Reject them up front instead.
+        raise HTTPException(400, "Enter a public http(s) website URL for the competitor.")
     comp_scrape = scraper.scrape_company(body.url)
     name = body.name or (comp_scrape.get("meta") or {}).get("title") or body.url
     if not comp_scrape.get("ok"):

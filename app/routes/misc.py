@@ -9,8 +9,7 @@ def health():
     return {"ok": True, "model": ai_engine.MODEL,
             "key_configured": bool(os.environ.get("OPENROUTER_API_KEY")),
             "persistent_db": db.IS_REST or db.IS_PG,
-            "direct_access": os.environ.get("DIRECT_ACCESS", "").strip().lower()
-                             in {"1", "true", "yes", "on"}}
+            "direct_access": direct_access_enabled()}
 
 
 @router.get("/api/projects")

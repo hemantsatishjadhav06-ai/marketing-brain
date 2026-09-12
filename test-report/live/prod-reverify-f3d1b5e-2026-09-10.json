@@ -1,0 +1,50 @@
+{
+ "build": "f3d1b5e",
+ "results": [
+  {
+   "test": "AUTH_pwv_token_accepted",
+   "status": "PASS",
+   "detail": ""
+  },
+  {
+   "test": "PUBLISH_mode_LIVE_rejected",
+   "status": "PASS",
+   "detail": "400 {\"detail\":\"mode must be exactly 'simulated' or 'live'\"}"
+  },
+  {
+   "test": "PUBLISH_dry_run_status_simulated_not_published",
+   "status": "PASS",
+   "detail": "200 status=simulated"
+  },
+  {
+   "test": "API_2mb_json_body_413",
+   "status": "PASS",
+   "detail": "413"
+  },
+  {
+   "test": "SEC_svg_logo_rejected",
+   "status": "PASS",
+   "detail": "400 {\"detail\":\"Logo must be a PNG, JPG or WEBP (SVG is not accepted)\"}"
+  },
+  {
+   "test": "IDOR_B_cannot_create_creative_under_A",
+   "status": "PASS",
+   "detail": "403"
+  },
+  {
+   "test": "IDOR_creative_requires_idea_of_same_brand",
+   "status": "PASS",
+   "detail": "404"
+  },
+  {
+   "test": "STATE_idea_state_explicit_required",
+   "status": "PASS",
+   "detail": "404"
+  },
+  {
+   "test": "AUTH_per_account_throttle_trips_across_ips",
+   "status": "PASS",
+   "detail": "codes=[401, 401, 401, 401, 401, 401, 401, 401, 401, 401, 429, 429, 429, 429]"
+  }
+ ]
+}

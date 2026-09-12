@@ -1,9 +1,12 @@
 """MoreSpace project knowledge base — the master directory of every live / prelaunch
 project. Used to ground the AI coach chatbot, the reel/voice scripts, and the in-app
-Projects directory. morespace.ai is the MASTER website for all projects.
-Data sourced from morespace.ai (keep in sync with the site)."""
+Projects directory. morespace.netlify.app is the MASTER website for all projects;
+Neopolis Infra has its own site at neopolis-infra.netlify.app.
+Data sourced from those sites (keep in sync)."""
 
-MASTER_SITE = "https://morespace.ai/"
+import re
+
+MASTER_SITE = "https://morespace.netlify.app/"
 CONTACT = {
     "phone": "+91 73965 06318",
     "alt_phone": "+91 70751 68306",
@@ -12,9 +15,9 @@ CONTACT = {
     "whatsapp": "https://wa.me/917396506318",
 }
 INDEX_LINKS = {
-    "all_projects": "https://morespace.ai/httpsmorespaceailuxury-residential-projects-hyderabad",
-    "upcoming": "https://morespace.ai/httpsmorespaceaiprelaunch-apartments-hyderabad",
-    "contact": "https://morespace.ai/property-buying-contact",
+    "all_projects": "https://morespace.netlify.app/",
+    "upcoming": "https://morespace.netlify.app/",
+    "contact": "https://morespace.netlify.app/",
 }
 
 PROJECTS = [
@@ -33,7 +36,7 @@ PROJECTS = [
             "11 ft ceilings, private lobby per unit, double-height entrance lobbies",
             "Opposite CBIT College; Gandipet & Kokapet lake + skyline views",
         ],
-        "url": "https://morespace.ai/httpsmorespaceailuxury-apartments-neopolis",
+        "url": "https://neopolis-infra.netlify.app/",
     },
     {
         "name": "Rajendra Nagar — Luxury Gated Community",
@@ -50,7 +53,7 @@ PROJECTS = [
             "Only 91 flats/acre, 60% corner flats, 80% open area",
             "5 min PVNR Expressway, 10 min ORR, 10 min to Rajiv Gandhi airport",
         ],
-        "url": "https://morespace.ai/morespaceailuxury-gated-community-rajendra-nagar-3-4bhk",
+        "url": "https://morespace.netlify.app/",
     },
     {
         "name": "Manchirevula / Narsingi — Ultra-Luxury High-Rise",
@@ -67,7 +70,7 @@ PROJECTS = [
             "Beside ORR Exit 18A — 10 min Financial District, 12 min Wipro Circle, 11 min Neopolis",
             "Each flat tied to a proportional land share (land-backed investment)",
         ],
-        "url": "https://morespace.ai/httpsmorespaceaihigh-rise-gated-community-prelaunch-manchirevula-narsingi",
+        "url": "https://morespace.netlify.app/",
     },
     {
         "name": "Soul of Earth — Kukatpally Landmark",
@@ -84,49 +87,144 @@ PROJECTS = [
             "Private corridors, no two units face each other; 100% power backup, piped gas, 3-level basement",
             "5–10 min to Hitec City MMTS/Metro; near Mindspace, TCS, Infosys, KIMS, Apollo",
         ],
-        "url": "https://morespace.ai/prelaunch-3-and-4-bhk-apartments-kukatpally",
+        "url": "https://morespace.netlify.app/",
     },
 ]
 
 
+def _norm(s):
+    return re.sub(r"[^a-z0-9]", "", (s or "").lower())
+
+
 def is_morespace(brand_name=""):
-    return "morespace" in (brand_name or "").lower().replace(" ", "")
+    """True for the master MoreSpace brand (the multi-project portfolio account)."""
+    return "morespace" in _norm(brand_name)
+
+
+def brand_projects(brand_name=""):
+    """Projects that belong to this brand.
+
+    MoreSpace is the master portfolio account and owns every project. Any other
+    brand is treated as a SINGLE-COMPANY domain: it owns only the project whose
+    name/area matches its own name, so its prompts never see a competitor's
+    numbers. Returns [] when nothing matches.
+    """
+    if is_morespace(brand_name):
+        return list(PROJECTS)
+    n = _norm(brand_name)
+    if not n:
+        return []
+    # strip common suffixes so "Neopolis Infra" still matches the Neopolis project
+    for suffix in ("infra", "infrastructure", "realty", "realestate", "developers",
+                   "developer", "builders", "builder", "projects", "group", "llp",
+                   "pvtltd", "ltd", "homes", "estates"):
+        if n.endswith(suffix) and len(n) > len(suffix):
+            n = n[: -len(suffix)]
+            break
+    if not n:
+        return []
+    return [p for p in PROJECTS
+            if n in _norm(p["name"]) or n in _norm(p["area"]) or _norm(p["area"]).startswith(n)]
+
+
+def is_known(brand_name=""):
+    """True when we hold grounded facts for this brand."""
+    return bool(brand_projects(brand_name))
 
 
 def directory():
-    """Full master directory — for the /api/projects endpoint and the in-app Projects tab."""
-    return {"master_site": MASTER_SITE, "contact": CONTACT, "index": INDEX_LINKS, "projects": PROJECTS}
+    """Full master directory — for the /api/projects endpoint and the in-app Projects tab.
+
+    The `developer` field is sanitised so the API never emits an internal
+    placeholder like "Reputed developer": it is blanked unless a real builder
+    name is known (same rule the creative generator uses)."""
+    clean = []
+    for p in PROJECTS:
+        q = dict(p)
+        q["developer"] = developer_credit(p.get("developer"))
+        clean.append(q)
+    return {"master_site": MASTER_SITE, "contact": CONTACT, "index": INDEX_LINKS, "projects": clean}
+
+
+# Descriptors we hold in place of a builder's actual name. They read as internal
+# shorthand, so printing one on a public creative ("by Reputed developer") looks
+# like an unfilled template rather than a credit.
+_UNNAMED_DEVELOPER = ("reputed", "tier-1", "tier 1", "grade-a", "grade a", "leading", "renowned")
+
+
+def developer_credit(value):
+    """The builder's name if we actually have one, else "" — never a descriptor.
+
+    A creative may only print a developer credit when a real name is known;
+    otherwise the line has to be omitted, not filled with the placeholder.
+    """
+    v = (value or "").strip()
+    return "" if (not v or v.lower().startswith(_UNNAMED_DEVELOPER)) else v
+
+
+def _project_line(p):
+    named = developer_credit(p.get("developer"))
+    dev = f"developer: {named}" if named else \
+        "developer: NOT NAMED — print no developer credit for this project"
+    return (f"• {p['name']} — {p['area']} | corridor: {p['corridor']} | {dev} | "
+            f"{p['status']} | configs: {p['configs']} | sizes: {p['sizes']} | price: {p['price']} | "
+            f"official website: {p['url']}\n  " + "; ".join(p["highlights"]))
+
+
+FACT_RULES = (
+    "FACT RULES (non-negotiable): use ONLY the figures above. Never invent or round a price, "
+    "size, possession date, RERA number or phone number.\n"
+    "RERA NUMBER and POSSESSION DATE are NOT listed above for any project. They are therefore "
+    "UNKNOWN: do not print a RERA number, a 'RERA No.' row, a possession date or a handover "
+    "quarter anywhere — not even masked, partial or templated (no 'P1234567890', no "
+    "'P024000XXXX', no 'PXXXXXXXX', no 'Dec 2027', no 'Coming soon'). Omit the row entirely "
+    "and use the space for a fact that IS listed.\n"
+    "The ONLY phone number that may appear is the contact number given above, digit for digit. "
+    "Never write a specimen number such as '+91 98765 43210'.\n"
+    "The ONLY website that may appear is the 'official website' URL given above, character for "
+    "character. Never invent, shorten or guess a domain — do not write a plausible-looking address "
+    "such as 'www.<brandname>.com'. If no website is listed, print no website at all.\n"
+    "DEVELOPER CREDIT: print one only when the developer field gives an actual company "
+    "name. Where it says NOT NAMED, omit the credit entirely — write no 'by …' line, no "
+    "'Developer:' row, and do not fall back to a descriptor such as 'by Reputed developer' "
+    "or to the brand's own name.\n"
+    "DO NOT DERIVE NEW NUMBERS. Never multiply, total, average or otherwise compute a figure that "
+    "is not written above — no unit counts, no totals, no per-sq.ft rates, no percentages, no "
+    "'X residences in total'. Quote only the figures as given."
+)
 
 
 def pointer(brand_name=""):
-    """Short pointer appended to every prompt's brand context (keeps prompts lean while
-    making ideas / reels / voiceovers project-aware). Empty for non-MoreSpace brands."""
-    if not is_morespace(brand_name):
+    """Grounded fact block appended to every prompt's brand context.
+
+    Previously this emitted project *names* only, and only for the master
+    MoreSpace account — so a single-company brand got no facts at all and the
+    model invented prices, RERA numbers and phone numbers. It now emits the real
+    figures for whichever projects the brand actually owns.
+    """
+    rows = brand_projects(brand_name)
+    if not rows:
         return ""
-    names = ", ".join(p["name"].split(" — ")[0].split(" / ")[0] for p in PROJECTS)
-    return (f"\nMORESPACE PROJECTS (master site {MASTER_SITE} — cite project links when relevant): "
-            f"{names}. Combine corridor + developer details; never invent prices.")
+    head = ("\n\nGROUNDED PROJECT FACTS — the ONLY source of truth for this brand's numbers "
+            f"(contact: {CONTACT['phone']} · {CONTACT['email']}):")
+    return head + "\n" + "\n".join(_project_line(p) for p in rows) + "\n" + FACT_RULES
 
 
 def context_block(brand_name=""):
-    """Full project directory injected into the AI coach system prompt. Empty for non-MoreSpace."""
-    if not is_morespace(brand_name):
+    """Full project directory injected into the AI coach system prompt."""
+    rows = brand_projects(brand_name)
+    if not rows:
         return ""
+    owner = "MORESPACE PROJECT DIRECTORY" if is_morespace(brand_name) else f"{brand_name.upper()} PROJECT DIRECTORY"
     lines = [
-        "MORESPACE PROJECT DIRECTORY — morespace.ai is the MASTER website for every project.",
+        f"{owner} — morespace.netlify.app is the MASTER website for every project.",
         f"Master site: {MASTER_SITE}  |  Contact: {CONTACT['phone']} · {CONTACT['email']}",
         "When the user asks about properties, projects, areas/corridors, budgets, or where to buy, "
-        "recommend the most relevant project(s) below and ALWAYS include the project's morespace.ai "
+        "recommend the most relevant project(s) below and ALWAYS include the project's "
         "link plus concrete details (area, corridor, configs, sizes, price, key highlights). "
         "Combine the corridor (location/connectivity) with the developer/property details. "
-        "Use ONLY the facts below — never invent projects or prices. Always point buyers to the "
-        "master site and the contact number.",
+        + FACT_RULES,
         "",
     ]
-    for p in PROJECTS:
-        lines.append(
-            f"• {p['name']} — {p['area']} | corridor: {p['corridor']} | {p['status']} | "
-            f"{p['configs']} ({p['sizes']}) | {p['price']} | link: {p['url']}\n  "
-            + "; ".join(p["highlights"])
-        )
+    lines += [_project_line(p) for p in rows]
     return "\n".join(lines)

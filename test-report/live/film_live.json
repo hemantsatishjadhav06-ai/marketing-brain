@@ -1,0 +1,159 @@
+{
+ "run": "2026-09-12 06:20 UTC",
+ "brand_id": "af4c0bd6fbbd",
+ "pass": 10,
+ "fail": 0,
+ "steps": [
+  {
+   "step": "01 options: looks + aspects + limits",
+   "status": "PASS",
+   "detail": "['warm-neutral-premium', 'teal-orange-cinematic', 'golden-hour', 'bright-airy', 'moody-noir', 'documentary-natural', 'product-studio', 'editorial-mono']"
+  },
+  {
+   "step": "02 storyboard directed (no render)",
+   "status": "PASS",
+   "detail": "{'cuts': 6, 'total': 30, 'log': ['06:14:50 storyboard ready: Discover Affordable Living in Hyderabad \u00b7 30s \u00b7 no video generated yet', '06:14:50 done']}"
+  },
+  {
+   "step": "03 nothing rendered yet",
+   "status": "PASS",
+   "detail": "{'status': 'storyboard'}"
+  },
+  {
+   "step": "04 timecodes computed + durations clamped",
+   "status": "PASS",
+   "detail": "[(0, 4, 4), (4, 9, 5), (9, 14, 5), (14, 19, 5), (19, 24, 5), (24, 30, 6)]"
+  },
+  {
+   "step": "05 edit recomputes + re-opens approval gate",
+   "status": "PASS",
+   "detail": "{'approval': None}"
+  },
+  {
+   "step": "06 reorder renumbers",
+   "status": "PASS",
+   "detail": "[1, 2, 3, 4, 5, 6]"
+  },
+  {
+   "step": "07 render blocked before approval",
+   "status": "PASS",
+   "detail": "Approve the storyboard first \u2014 nothing renders until a human approves it"
+  },
+  {
+   "step": "08 render after approval \u2192 frames + VO",
+   "status": "PASS",
+   "detail": "{'frames': 6, 'log': ['06:20:14 film rendered \u00b7 6/6 frames + voiceover', '06:20:14 done']}"
+  },
+  {
+   "step": "09 rendered creative carries frames + VO + asset",
+   "status": "PASS",
+   "detail": "{'vo': True, 'asset': 'instagram/assets/bbe9bcd7c2be-cut1.png'}"
+  },
+  {
+   "step": "10 films list shows rendered film",
+   "status": "PASS",
+   "detail": "[('Discover Affordable Living in Hyderabad', 'rendered')]"
+  }
+ ],
+ "artefacts": {
+  "creative_id": "bbe9bcd7c2be",
+  "storyboard": {
+   "title": "Discover Affordable Living in Hyderabad",
+   "logline": "Explore landlord-share flats, direct from owners.",
+   "look": "warm-neutral-premium",
+   "total_seconds": 30,
+   "cuts": [
+    {
+     "n": 1,
+     "t_in": 0,
+     "t_out": 4,
+     "duration_s": 4,
+     "camera": "35mm, slow dolly-in",
+     "lighting": "controlled golden hour, soft key",
+     "vo_tone": "calm, confident",
+     "vo_line": "Why pay more for resale prices?",
+     "on_screen_text": "",
+     "visual": "A serene neighborhood scene with modern flats, framed by lush trees, with a warm golden glow highlighting the buildings. The camera slowly moves towards a group of people discussing.",
+     "transition": "cross dissolve"
+    },
+    {
+     "n": 2,
+     "t_in": 4,
+     "t_out": 9,
+     "duration_s": 5,
+     "camera": "50mm, static shot",
+     "lighting": "soft evening light, diffused key",
+     "vo_tone": "informative, inviting",
+     "vo_line": "Experience the landlord-share model.",
+     "on_screen_text": "",
+     "visual": "Close-up of a couple happily reviewing property documents in a well-lit living room with contemporary decor, exuding warmth and trust.",
+     "transition": "match cut"
+    },
+    {
+     "n": 3,
+     "t_in": 9,
+     "t_out": 14,
+     "duration_s": 5,
+     "camera": "24mm, medium shot",
+     "lighting": "bright daylight, natural key",
+     "vo_tone": "trustworthy, clear",
+     "vo_line": "Direct communication, no broker fees.",
+     "on_screen_text": "",
+     "visual": "A smiling real estate agent meeting with potential buyers at a stylish flat, engaging warmly with handshakes and gestures of openness.",
+     "transition": "whip pan"
+    },
+    {
+     "n": 4,
+     "t_in": 14,
+     "t_out": 19,
+     "duration_s": 5,
+     "camera": "35mm, slow zoom-in",
+     "lighting": "golden hour, warm backlight",
+     "vo_tone": "reassuring, sincere",
+     "vo_line": "Title-verified properties for peace of mind.",
+     "on_screen_text": "",
+     "visual": "A close-up of a title document being signed, with a backdrop of the flat's inviting interior, emphasizing trust.",
+     "transition": "speed ramp"
+    },
+    {
+     "n": 5,
+     "t_in": 19,
+     "t_out": 24,
+     "duration_s": 5,
+     "camera": "16mm, wide shot",
+     "lighting": "soft evening light, warm ambiance",
+     "vo_tone": "aspirational, enthusiastic",
+     "vo_line": "Live in your dream neighborhood today.",
+     "on_screen_text": "",
+     "visual": "A panoramic view of the vibrant community with families enjoying the park, children playing, and people socializing, capturing the essence of community living.",
+     "transition": "hard cut"
+    },
+    {
+     "n": 6,
+     "t_in": 24,
+     "t_out": 30,
+     "duration_s": 6,
+     "camera": "35mm, static shot",
+     "lighting": "evening twilight, warm glow",
+     "vo_tone": "encouraging, direct",
+     "vo_line": "Book your site visit now!",
+     "on_screen_text": "",
+     "visual": "A welcoming front entrance of a flat complex with bright lights and an inviting atmosphere, as a couple walks towards it, ready to explore their future home.",
+     "transition": "fade out"
+    }
+   ]
+  },
+  "rendered": {
+   "vo_asset": "instagram/assets/bbe9bcd7c2be-vo.wav",
+   "first_frame": "instagram/assets/bbe9bcd7c2be-cut1.png",
+   "cut_assets": [
+    "instagram/assets/bbe9bcd7c2be-cut1.png",
+    "instagram/assets/bbe9bcd7c2be-cut2.png",
+    "instagram/assets/bbe9bcd7c2be-cut3.png",
+    "instagram/assets/bbe9bcd7c2be-cut4.png",
+    "instagram/assets/bbe9bcd7c2be-cut5.png",
+    "instagram/assets/bbe9bcd7c2be-cut6.png"
+   ]
+  }
+ }
+}

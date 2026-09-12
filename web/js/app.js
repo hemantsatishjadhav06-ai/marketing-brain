@@ -3,16 +3,27 @@ let ME = JSON.parse(localStorage.getItem("mb_me") || "null");
 let state = { view:"dash", brand:null, tab:"overview", wizard:null };
 let BRANDS = [];
 
+class ApiError extends Error{ constructor(msg,status){ super(msg); this.status=status; } }
+const API_TIMEOUT_MS = 180000; // generation calls run 12–40s; never let a button spin forever
 async function api(path, method="GET", body=null, raw=false){
   const opt = {method, headers:{}};
   if(TOKEN) opt.headers["Authorization"] = "Bearer "+TOKEN;
   if(body && !raw){ opt.headers["Content-Type"]="application/json"; opt.body = JSON.stringify(body); }
   if(body && raw){ opt.body = body; }
-  const r = await fetch("/api"+path, opt);
-  if(r.status===401){ showLogin(); throw new Error("Access is not configured"); }
-  if(!r.ok){ let d; try{d=await r.json()}catch{d={detail:r.statusText}}; throw new Error(typeof d.detail==="string"?d.detail:JSON.stringify(d.detail)); }
+  const ctl = new AbortController(); opt.signal = ctl.signal;
+  const timer = setTimeout(()=>ctl.abort(), API_TIMEOUT_MS);
+  let r;
+  try{ r = await fetch("/api"+path, opt); }
+  catch(e){ clearTimeout(timer); throw new ApiError(e.name==="AbortError"?"The server took too long to respond. Please try again.":"Network error — check your connection.", 0); }
+  clearTimeout(timer);
+  if(r.status===401){ showLogin(); throw new ApiError("Your session has expired — please sign in again.",401); }
+  if(r.status===429){ let d; try{d=await r.json()}catch{d={}}; throw new ApiError(d.detail||"Generation is paused for today (daily limit reached). Try again tomorrow or contact your admin.",429); }
+  if(!r.ok){ let d; try{d=await r.json()}catch{d={detail:r.statusText}}; const m=typeof d.detail==="string"?d.detail:JSON.stringify(d.detail); throw new ApiError(r.status>=500?"Something went wrong on our side. Please try again.":m, r.status); }
   return r.json();
 }
+// Only ever inject a validated hex color into a style attribute — brand colors are
+// scraped from third-party websites, so an unvalidated value is an XSS sink.
+function safeColor(c, fb="#6366f1"){ return /^#[0-9a-fA-F]{3,8}$/.test(String(c||""))?c:fb; }
 function toast(msg, err=false){
   const t=document.createElement("div"); t.className="toast"+(err?" err":""); t.textContent=msg;
   document.getElementById("toasts").appendChild(t); setTimeout(()=>t.remove(), err?7000:4000);
@@ -52,19 +63,95 @@ async function loadBrands(){ BRANDS = await api("/brands"); renderSidebar(); }
 function renderSidebar(){
   let h="";
   h+=`<div class="navitem ${state.view==='dash'?'on':''}" onclick="nav('dash')">📊 Dashboard</div>`;
+  h+=`<div class="navitem ${state.view==='approvals'?'on':''}" onclick="nav('approvals')">✅ Approvals${APPROVAL_COUNT?` <span class="tag y" style="margin:0 0 0 6px">${APPROVAL_COUNT}</span>`:""}</div>`;
   if(isAdmin()) h+=`<div class="navitem" onclick="startWizard()">➕ New Brand</div>`;
   const groups={};
   BRANDS.forEach(b=>{ (groups[b.grp||""]=groups[b.grp||""]||[]).push(b); });
   for(const [g,list] of Object.entries(groups)){
     h+=`<div class="navsec">${g?("📁 "+esc(g)):"Brands"}</div>`;
     list.forEach(b=>{
-      const col=(((b.profile||{}).brand_kit||{}).colors||[])[0]||"#6366f1";
-      h+=`<div class="navitem ${state.brand&&state.brand.id===b.id?'on':''}" onclick="openBrand('${b.id}')"><span class="bdot" style="background:${col}"></span>${esc(b.name)}</div>`;
+      const col=safeColor((((b.profile||{}).brand_kit||{}).colors||[])[0]);
+      h+=`<div class="navitem ${state.brand&&state.brand.id===b.id?'on':''}" onclick="openBrand('${esc(b.id)}')"><span class="bdot" style="background:${col}"></span>${esc(b.name)}</div>`;
     });
   }
   $("sidenav").innerHTML=h;
 }
-function nav(view){ state.view=view; state.brand=null; renderSidebar(); if(view==="dash") renderDash(); }
+function nav(view){
+  state.view=view; state.brand=null; renderSidebar();
+  if(view==="dash") renderDash();
+  else if(view==="approvals") renderApprovals();
+}
+
+/* ---------- approvals: the one queue a human works from ---------- */
+let APPROVAL_COUNT = 0;
+
+async function refreshApprovalCount(){
+  try{ const q = await api("/approvals"); APPROVAL_COUNT = q.counts.waiting + q.counts.changes_requested; renderSidebar(); }
+  catch(e){ /* badge is cosmetic — never block the UI on it */ }
+}
+
+function approvalCard(it, needsDecision){
+  const img = it.asset_path ? (it.asset_path.startsWith("http") ? it.asset_path : it.asset_path) : null;
+  return `<div class="card" style="display:flex;gap:14px;align-items:flex-start">
+    ${img?`<img src="${esc(img)}" alt="" style="width:132px;border-radius:10px;flex:none">`
+         :`<div style="width:132px;height:165px;border-radius:10px;background:var(--line);display:flex;align-items:center;justify-content:center;flex:none" class="sub">${it.ready?"no image":"generating…"}</div>`}
+    <div style="flex:1;min-width:0">
+      <span class="tag y" style="margin:0">${esc(it.brand||"")}</span>
+      <span class="tag" style="margin:0 0 0 6px">${esc(it.format||"")}</span>
+      <h2 style="margin:8px 0 4px">${esc(it.title||"Untitled")}</h2>
+      <p class="sub" style="white-space:pre-wrap;margin:0 0 10px">${esc((it.caption||"").slice(0,240))}</p>
+      ${it.comment?`<p class="sub" style="color:var(--warn)">Your note: ${esc(it.comment)}</p>`:""}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+        ${needsDecision?`<button class="sm" onclick="decide('${it.brand_id}','${it.id}','approved',this)">Approve</button>`:""}
+        <button class="sm ghost" onclick="askRevision('${it.brand_id}','${it.id}')">Change this…</button>
+      </div>
+    </div></div>`;
+}
+
+async function renderApprovals(){
+  const m=$("main");
+  m.innerHTML=`<h1 style="font-size:21px;margin-bottom:4px">Approvals</h1>
+    <p class="sub">The agents do the work. This is the only screen you have to act on.</p>
+    <div id="apBody"><span class="spinner"></span></div>`;
+  let q;
+  try{ q = await api("/approvals"); }
+  catch(e){ $("apBody").innerHTML=`<div class="card"><p class="sub">Could not load the queue: ${esc(e.message||e)}</p></div>`; return; }
+  APPROVAL_COUNT = q.counts.waiting + q.counts.changes_requested;
+  renderSidebar();
+  let h="";
+  if(!APPROVAL_COUNT){
+    h = `<div class="card"><h2>All clear 🎉</h2><p class="sub">Nothing is waiting on you. New work will appear here as the agents finish it.</p></div>`;
+  }else{
+    if(q.waiting_for_approval.length){
+      h+=`<h2 style="margin:18px 0 8px">Waiting for you (${q.waiting_for_approval.length})</h2>`;
+      h+=q.waiting_for_approval.map(it=>approvalCard(it,true)).join("");
+    }
+    if(q.changes_requested.length){
+      h+=`<h2 style="margin:22px 0 8px">Changes you asked for (${q.changes_requested.length})</h2>`;
+      h+=q.changes_requested.map(it=>approvalCard(it,true)).join("");
+    }
+  }
+  $("apBody").innerHTML=h;
+}
+
+async function decide(bid, cid, state_, btn){
+  if(btn){ btn.disabled=true; btn.textContent="…"; }
+  try{
+    await api(`/brands/${bid}/creatives/${cid}/approval`,"POST",{state:state_,comment:""});
+    toast(state_==="approved"?"Approved — the agents learned from it":"Saved");
+    renderApprovals();
+  }catch(e){ toast(e.message||"Failed",true); if(btn){ btn.disabled=false; btn.textContent="Approve"; } }
+}
+
+async function askRevision(bid, cid){
+  const what = prompt("What should change? Be specific — the agents will remember this for next time.");
+  if(!what || !what.trim()) return;
+  try{
+    await api(`/brands/${bid}/creatives/${cid}/revise`,"POST",{instruction:what.trim(),remember:true});
+    toast("Redoing it with your change — and remembering it");
+    renderApprovals();
+  }catch(e){ toast(e.message||"Failed",true); }
+}
 
 /* ---------- dashboard ---------- */
 async function renderDash(){
@@ -241,20 +328,20 @@ function logoUrl(b){ const k=kitOf(b); return k.logo?`/workspaces/${b.grp?b.grp+
 function renderBrand(){
   const b=state.brand, k=kitOf(b);
   const SEC=[["create","✨ Create"],["content","🗂 Content"],["plan","🗓 Plan"],["grow","📈 Grow"],["settings","⚙ Settings"]];
-  const SUBS={create:[["create","Create"],["brief","✦ Master brief"]],content:[["board","Board"],["reel studio","Reel studio"],["publish","Published"]],plan:[["ideas","Ideas"],["calendar","Calendar"],["campaigns","Campaigns"]],grow:[["growth","Growth"],["competitors","Competitors"],["analytics","Analytics"],["playbook","Playbook"]],settings:[["brand kit","Brand kit"],["connectors","Connectors"],["overview","Overview"]]};
+  const SUBS={create:[["create","Create"],["brief","✦ Master brief"]],content:[["board","Board"],["reel studio","Reel studio"],["film studio","🎬 Film studio"],["publish","Published"]],plan:[["ideas","Ideas"],["calendar","Calendar"],["campaigns","Campaigns"]],grow:[["growth","Growth"],["ads","Paid ads"],["mail","Mail"],["competitors","Competitors"],["analytics","Analytics"],["playbook","Playbook"]],settings:[["brand kit","Brand kit"],["memory","🧠 Memory"],["connectors","Connectors"],["overview","Overview"]]};
   const S2S={}; Object.entries(SUBS).forEach(([sec,arr])=>arr.forEach(([t])=>S2S[t]=sec));
-  const TABFN={create:tabCreate,brief:tabBrief,board:tabBoard,"reel studio":tabReelStudio,publish:tabPublish,ideas:tabIdeas,calendar:tabCalendar,campaigns:tabCampaigns,growth:tabGrowth,competitors:tabCompetitors,analytics:tabAnalytics,playbook:tabPlaybook,"brand kit":tabKit,connectors:tabConnectors,overview:tabOverview,coach:tabCoach,creatives:tabCreatives};
+  const TABFN={create:tabCreate,brief:tabBrief,board:tabBoard,"reel studio":tabReelStudio,"film studio":tabFilmStudio,publish:tabPublish,ideas:tabIdeas,calendar:tabCalendar,campaigns:tabCampaigns,growth:tabGrowth,ads:tabAds,mail:tabMail,competitors:tabCompetitors,analytics:tabAnalytics,playbook:tabPlaybook,"brand kit":tabKit,memory:tabMemory,connectors:tabConnectors,overview:tabOverview,coach:tabCoach,creatives:tabCreatives};
   if(!TABFN[state.tab]) state.tab="create";
   const sec = state.tab==="coach" ? "" : (S2S[state.tab]||"content");
   const subnav = sec ? `<div class="subnav">${SUBS[sec].map(([t,l])=>`<button class="${state.tab===t?'on':''}" onclick="state.tab='${t}';renderBrand()">${esc(l)}</button>`).join("")}</div>` : "";
   $("main").innerHTML=`
     <div class="brandhd">
-      ${logoUrl(b)?`<img class="brandlogo" alt="${esc(b.name)} logo" src="${logoUrl(b)}">`:""}
+      ${logoUrl(b)?`<img class="brandlogo" alt="${esc(b.name)} logo" src="${esc(logoUrl(b))}">`:""}
       <div style="min-width:0">
         <h1 style="font-size:20px;margin:0">${esc(b.name)}</h1>
         <p class="sub" style="margin:2px 0 0">${esc(b.website||"")}${b.grp?` · 📁 ${esc(b.grp)}`:""}${(b.setup&&b.setup.channels&&b.setup.channels.length)?` · ${esc(b.setup.channels.join(" · "))}`:""}</p>
       </div>
-      ${(k.colors||[]).slice(0,4).map(c=>`<span class="swatch" style="width:16px;height:16px;background:${c}" title="${c}"></span>`).join("")}
+      ${(k.colors||[]).slice(0,4).map(c=>`<span class="swatch" style="width:16px;height:16px;background:${safeColor(c)}" title="${esc(c)}"></span>`).join("")}
       <span style="flex:1"></span>
       <button class="ghost sm" onclick="state.tab='coach';renderBrand()">💬 Coach</button>
       <button class="grn sm" onclick="runAutopilot(this)">🤖 Autopilot</button>
@@ -294,10 +381,10 @@ async function tabKit(){
     <div class="card"><h2>🎨 Brand kit</h2>
       <p class="sub">These colors and this logo are injected into every AI prompt and composited onto generated visuals.</p>
       <h3>Palette</h3>
-      <p>${(k.colors||[]).map(c=>`<span class="swatch" style="background:${c}" title="${c}"></span>`).join("")||'<span class="sub">no colors set</span>'}</p>
+      <p>${(k.colors||[]).map(c=>`<span class="swatch" style="background:${safeColor(c)}" title="${esc(c)}"></span>`).join("")||'<span class="sub">no colors set</span>'}</p>
       <label>Colors (hex, comma separated)</label>
       <input id="kitColors" value="${esc((k.colors||scraped.slice(0,4)).join(", "))}">
-      ${scraped.length?`<p class="sub">Found on your website: ${scraped.map(c=>`<span class="swatch" style="width:16px;height:16px;background:${c}" title="${c}"></span>`).join("")} <button class="sm ghost" onclick="$('kitColors').value='${scraped.slice(0,4).join(", ")}'">use these</button></p>`:""}
+      ${scraped.length?`<p class="sub">Found on your website: ${scraped.map(c=>`<span class="swatch" style="width:16px;height:16px;background:${safeColor(c)}" title="${esc(c)}"></span>`).join("")} <button class="sm ghost" onclick="$('kitColors').value='${esc(scraped.slice(0,4).map(c=>safeColor(c,'')).filter(Boolean).join(", "))}'">use these</button></p>`:""}
       <label>Visual style notes (optional — e.g. "minimal, airy, premium; flat illustration; no stock photos")</label>
       <textarea id="kitStyle" rows="2">${esc(k.style||"")}</textarea>
       <button onclick="saveKit(this)">Save brand kit</button>
@@ -553,18 +640,44 @@ async function pollReelJob(jid,btn){
       (j.state==="done"&&j.creative_id?`<div class="row" style="margin-top:10px"><button class="grn" onclick="state.tab='creatives';renderBrand()">Open in Creatives \u2192 Build video</button></div>`:"");
     if(j.state==="running"){ RS_TIMER=setTimeout(()=>pollReelJob(jid,btn),4000); }
     else { busy(btn,false); if(j.state==="done") toast("Reel generated \u2014 scenes + voiceover ready"); }
-  }catch(e){ busy(btn,false); toast(e.message,true); }
+  }catch(e){ busy(btn,false); toast(e.status===404?"This reel job is no longer available (the server may have restarted). Please start it again.":e.message,true); }
 }
+let CAL_VIEW="month", CAL_MONTH=null;
 async function tabCalendar(){
-  const b=state.brand; const cal=await api(`/brands/${b.id}/calendar`);
-  $("tabBody").innerHTML=`
-    <div class="card"><div class="row"><button onclick="genCalendar(this)">📅 Build 30-day calendar</button>
-      <span class="sub" style="margin:0">Optimal times per platform; re-running replaces planned items.</span></div></div>
-    <div class="card" style="padding:0">${cal.map(c=>`
+  const b=state.brand; const [cal,at]=await Promise.all([api(`/brands/${b.id}/calendar`), api(`/brands/${b.id}/airtable`).catch(()=>null)]);
+  const byDate={}; cal.forEach(c=>{ (byDate[c.date||""]=byDate[c.date||""]||[]).push(c); });
+  const first=cal.map(c=>c.date).filter(Boolean).sort()[0]; if(!CAL_MONTH) CAL_MONTH=(first||new Date().toISOString().slice(0,10)).slice(0,7);
+  const [Y,M]=CAL_MONTH.split("-").map(Number); const start=new Date(Date.UTC(Y,M-1,1)); const days=new Date(Date.UTC(Y,M,0)).getUTCDate(); const pad=(start.getUTCDay()+6)%7;
+  const STC={planned:"",drafting:"",in_review:"y",approved:"g",scheduled:"y",published:"g",cancelled:""};
+  let grid=`<div class="calgrid">${["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d=>`<div class="calhd">${d}</div>`).join("")}${"<div class=\"calcell off\"></div>".repeat(pad)}`;
+  for(let d=1;d<=days;d++){ const key=`${CAL_MONTH}-${String(d).padStart(2,"0")}`; const items=byDate[key]||[];
+    grid+=`<div class="calcell"><div class="caldn">${d}</div>${items.map(c=>`<div class="calit ${STC[c.status]||""}" title="${esc(c.payload?.title||"")}"><span class="calch">${esc((c.channel||"").slice(0,2))}</span>${esc(c.time||"")} ${esc(c.payload?.title||"")}</div>`).join("")}</div>`; }
+  grid+=`</div>`;
+  const list=`<div class="card" style="padding:0">${cal.map(c=>`
       <div class="calrow"><b>${esc(c.date||"")}</b><span>${esc(c.time||"")}</span>
         <span class="tag y" style="margin:0">${esc(c.channel||"")}</span>
-        <span><b>${esc(c.payload?.title||"")}</b> <span class="sub" style="margin:0">· ${esc(c.payload?.format||"")}</span></span>
-        <span class="tag">${c.status}</span></div>`).join("")||'<p class="sub" style="padding:16px">No calendar yet.</p>'}</div>`;
+        <span><b>${esc(c.payload?.title||"")}</b> <span class="sub" style="margin:0">· ${esc(c.payload?.format||"")}</span>${c.payload?.notes?`<div class="sub" style="margin:0">📝 ${esc(c.payload.notes)}</div>`:""}</span>
+        <span class="tag ${STC[c.status]||""}">${esc(c.status)}</span></div>`).join("")||'<p class="sub" style="padding:16px">No calendar yet.</p>'}</div>`;
+  const atCard = at ? `<div class="card"><div class="row"><h2 style="margin:0">🗂 Airtable</h2><span style="flex:1"></span>
+      ${at.base_id?`<a class="sm ghost" style="text-decoration:none;display:inline-block" href="${esc(at.url)}" target="_blank" rel="noopener">Open base ↗</a>`:""}
+      ${at.connected?`<button class="sm" onclick="atSync('push',this)">${at.base_id?"Push to Airtable":"Create base & push"}</button>`:""}
+      ${at.base_id?`<button class="sm ghost" onclick="atSync('pull',this)">Pull edits</button>`:""}</div>
+      <p class="sub">${at.connected?(at.base_id?`Synced base <b>${esc(at.base_id)}</b>${at.last_push?` · pushed ${ago2(at.last_push)}`:""}${at.last_pull?` · pulled ${ago2(at.last_pull)}`:""}. Edit Status, Date, Time, Notes or Caption in Airtable and pull them back here; everything else is pushed from the app.`:(at.can_create?"Connected. The first push creates a base for this client with Content Calendar, Ideas and Creatives tables.":"Connected, but no workspace ID — add one under Settings → Connections → Airtable so a base can be created, or paste an existing base ID.")):"Not connected. Settings → Connections → Airtable (personal access token + workspace ID) and every calendar you build lands in the client's own base."}</p>
+      ${at.base_id?`<details><summary class="sub" style="cursor:pointer">Add the Calendar and Board views (once, in Airtable)</summary><ol class="checklist">${(at.views_howto||[]).map(x=>`<li>${esc(x)}</li>`).join("")}</ol></details>`:""}</div>`:"";
+  $("tabBody").innerHTML=`
+    <div class="card"><div class="row"><button onclick="genCalendar(this)">📅 Build 30-day calendar</button>
+      <span class="sub" style="margin:0">Optimal times per platform; re-running replaces planned items${at&&at.connected?" and syncs to Airtable":""}.</span>
+      <span style="flex:1"></span><button class="sm ghost" onclick="calNav(-1)">‹</button><b>${CAL_MONTH}</b><button class="sm ghost" onclick="calNav(1)">›</button>
+      <button class="sm ${CAL_VIEW==="month"?"":"ghost"}" onclick="CAL_VIEW='month';tabCalendar()">Month</button><button class="sm ${CAL_VIEW==="list"?"":"ghost"}" onclick="CAL_VIEW='list';tabCalendar()">List</button></div></div>
+    ${atCard}
+    ${CAL_VIEW==="month"?`<div class="card" style="padding:12px">${grid}</div>`:list}`;
+}
+function ago2(ts){ const d=(Date.now()/1000-ts)/3600; return d<1?"just now":d<24?Math.round(d)+"h ago":Math.round(d/24)+"d ago"; }
+function calNav(n){ const [Y,M]=CAL_MONTH.split("-").map(Number); const d=new Date(Date.UTC(Y,M-1+n,1)); CAL_MONTH=d.toISOString().slice(0,7); tabCalendar(); }
+async function atSync(kind,btn){
+  busy(btn,true,kind==="push"?"Syncing…":"Pulling…");
+  try{ const r=await api(`/brands/${state.brand.id}/airtable/${kind}`,"POST"); toast(kind==="push"?`Pushed ${r.pushed.calendar} slots, ${r.pushed.ideas} ideas, ${r.pushed.creatives} creatives${r.created?" — base created":""}`:`Pulled: ${r.calendar} slot change(s), ${r.captions} caption(s)`); tabCalendar(); }
+  catch(e){ toast(e.message,true); busy(btn,false); }
 }
 async function genCalendar(btn){
   busy(btn,true,"Planning…");
@@ -592,7 +705,8 @@ async function tabCreatives(){
         </div>`:""}
       <div class="row" style="margin-top:12px">
         <button class="sm" onclick="genImage('${c.id}',this)">🎨 Generate branded visual</button>
-        ${c.channel==="instagram"?`<button class="sm ghost" onclick="algoAudit('${c.id}',this)">📈 IG algo audit</button>`:""}
+        ${c.asset_path?`<button class="sm" onclick="designFix('${c.id}',this)">🎨 Design review & fix</button>`:""}
+    ${c.channel==="instagram"?`<button class="sm ghost" onclick="algoAudit('${c.id}',this)">📈 IG algo audit</button>`:""}
         ${p.slides?`<button class="sm" onclick="genSlides('${c.id}',this)">🖼 Generate ${p.slides.length} slide images</button>`:""}
         ${(p.format==="reel"||p.script)?`<button class="sm" onclick="genVO('${c.id}',this)">🎙 Generate voiceover</button>`:""}
         ${c.asset_path&&(p.format==="reel"||p.script)?`<button class="sm" onclick="buildVideo('${c.id}',this)">🎬 Build video</button>`:""}
@@ -1052,7 +1166,7 @@ async function tabCampaigns(){
         <button onclick="runEmail(this)">Write email(s)</button></div>
       <div id="emailOut"></div></div>
     <div class="card"><div class="row"><h2>\ud83c\udfaf Marketing tactics playbook</h2>
-      <button class="grn sm" onclick="runPlaybook(this)">Generate playbook</button></div>
+      <button class="grn sm" onclick="runTactics(this)">Generate playbook</button></div>
       <p class="sub">10 concrete growth tactics beyond posting \u2014 acquisition, retention, referral, community \u2014 ranked by impact vs effort, each with first-week actions.</p>
       <div id="pbOut"></div></div>`;
 }
@@ -1094,7 +1208,7 @@ function renderEmailPkg(p){
     <pre>${esc(p.body_markdown||"")}</pre>
     <p class="sub">\u23f0 ${esc(p.best_send_time||"")} \u00b7 \ud83c\udfaf ${esc(p.segmentation_tip||"")}</p>`;
 }
-async function runPlaybook(btn){
+async function runTactics(btn){
   busy(btn,true,"Strategizing\u2026");
   try{
     const r=await api(`/brands/${state.brand.id}/playbook`,"POST");
@@ -1110,17 +1224,71 @@ async function runPlaybook(btn){
 }
 
 async function tabConnectors(){
-  const b=state.brand; const st=await api(`/brands/${b.id}/connectors`);
+  const b=state.brand;
+  $("tabBody").innerHTML=`<div class="card"><h2>🔗 Connections</h2><p class="sub">Every channel your marketing can reach — social, paid, email, WhatsApp, data. Connect once with your own accounts; test proves the token works without posting anything.</p><div id="hub"><span class="spinner"></span></div></div>`;
+  try{ const hub=await api(`/brands/${b.id}/channels/hub`); GrowthUI.brandId=b.id; GrowthUI.onHubChange=tabConnectors;
+    const canEdit=ME&&(ME.role==="admin"||ME.role==="manager"||ME.role==="owner");
+    $("hub").innerHTML=GrowthUI.renderHub(hub,{canEdit}); }
+  catch(e){ $("hub").innerHTML=`<p style="color:var(--err)">${esc(e.message)}</p>`; }
+}
+async function tabMail(){
+  $("tabBody").innerHTML=`<div class="card"><h2>✉️ Mail</h2><p class="sub">Your own email marketing: contacts with tags, AI-drafted broadcasts and multi-step sequences, test sends, approval, scheduling, open/click/unsubscribe tracking — sent from the brand's own mailbox so the reputation stays with the brand.</p><div id="mailMount"><span class="spinner"></span></div></div>`;
+  await MailUI.mount($("mailMount"), state.brand.id, {canEdit: ME && ME.role!=="client"});
+}
+let ADS_NET="meta", ADS_CUR=null;
+async function tabAds(){
+  const b=state.brand; let hub={channels:[],limits:{max_daily_ad_budget:5000}};
+  try{ hub=await api(`/brands/${b.id}/channels/hub`); }catch{}
+  const conn=id=>(hub.channels.find(c=>c.id===id)||{}).connected;
+  const cap=hub.limits.max_daily_ad_budget;
   $("tabBody").innerHTML=`
-    <div class="card"><h2>Auto-posting connectors</h2>
-      <p class="sub">Simulated mode works out of the box. For live auto-posting, connect each platform once (guides below).</p>
-      <p>Configured: ${st.configured.length?st.configured.map(c=>`<span class="tag g">${c}</span>`).join(""):'<span class="tag">none — simulated mode</span>'}</p>
-      ${Object.entries(st.setup_guides).map(([pf,steps])=>`
-        <details><summary>${pf} setup guide</summary>
-          <ol class="checklist">${steps.map(s=>`<li>${esc(s)}</li>`).join("")}</ol>
-          <label>Credentials JSON</label><textarea id="cred_${pf}" rows="3" placeholder='{"access_token":"..."}'></textarea>
-          <button class="sm" onclick="saveCreds('${pf}',this)">Save ${pf}</button></details>`).join("")}
-    </div>`;
+    <div class="card"><div class="row"><h2>🎯 Paid ads</h2><span style="flex:1"></span>
+      <button class="sm ${ADS_NET==="meta"?"":"ghost"}" onclick="ADS_NET='meta';tabAds()">Meta ${conn("meta_ads")?"●":""}</button>
+      <button class="sm ${ADS_NET==="google"?"":"ghost"}" onclick="ADS_NET='google';tabAds()">Google ${conn("google_ads")?"●":""}</button></div>
+      <p class="sub">Your marketing team drafts the full media plan — audiences, budget split, placements, schedule, ads, tracking and benchmark estimates. You review and edit; launch creates it <b>paused</b>; activation needs your approval and stays under the ${cap}/day ceiling.${conn(ADS_NET+"_ads")?"":" <b>"+(ADS_NET==="meta"?"Meta":"Google")+" Ads is not connected yet</b> — you can still plan; connect it under Settings → Connections to launch."}</p>
+      <div class="row" style="flex-wrap:wrap">
+        ${ADS_NET==="meta"?`<select id="adObj" style="width:170px;margin:0"><option value="OUTCOME_LEADS">Leads</option><option value="OUTCOME_TRAFFIC">Traffic</option><option value="OUTCOME_ENGAGEMENT">Engagement</option><option value="OUTCOME_AWARENESS">Awareness</option><option value="OUTCOME_SALES">Sales</option></select>`:""}
+        <input id="adBudget" type="number" min="0" value="${Math.round(cap/2)}" style="width:140px;margin:0" title="daily budget">
+        <input id="adPrompt" placeholder="direction, e.g. site visits for Kokapet 3BHK, NRI investors" style="flex:1;min-width:200px;margin:0">
+        <button onclick="planAds(this)">Draft media plan</button></div></div>
+    <div id="adsPlan"></div><div id="adsList" class="card"><span class="spinner"></span></div>`;
+  loadAds();
+}
+async function planAds(btn){
+  const b=state.brand; busy(btn,true,"Planning…");
+  try{ const r=await api(`/brands/${b.id}/ads/${ADS_NET}/plan`,"POST",{objective:$("adObj")?$("adObj").value:"OUTCOME_LEADS",daily_budget:+$("adBudget").value||0,prompt:$("adPrompt").value});
+    showAdsPlan({id:r.campaign_id,status:"draft",payload:r.plan,daily_budget:r.plan.daily_budget}); loadAds(); toast("Media plan drafted — nothing is live"); }
+  catch(e){ toast(e.message,true); }
+  busy(btn,false);
+}
+function showAdsPlan(c){
+  ADS_CUR=c; const b=state.brand; const canEdit=ME&&ME.role!=="client"&&(c.status==="draft"||c.status==="approved"||c.status==="paused");
+  $("adsPlan").innerHTML=`<div class="card">${GrowthUI.renderPlan(c.payload,{campaignId:c.id,status:c.status,editable:canEdit,network:ADS_NET})}</div>`;
+  const acts=$("gpActs"); if(!acts) return;
+  let h=`<input data-budget type="number" min="0" value="${Number(c.daily_budget||c.payload.daily_budget||0)}" style="width:150px;margin:0" title="total daily budget" ${canEdit?"":"disabled"}>`;
+  if(canEdit) h+=`<button class="sm ghost" onclick="saveAdsEdits(this)">Save edits</button>`;
+  if(c.status==="draft") h+=`<button class="sm" onclick="adsAct('launch','${c.id}',this)">Launch (paused, no spend)</button>`;
+  if(c.status==="approved"||c.status==="paused") h+=`<button class="sm grn" onclick="adsAct('activate','${c.id}',this)">Activate — starts spend</button>`;
+  if(c.status==="live") h+=`<button class="sm ghost" onclick="adsAct('pause','${c.id}',this)">Pause</button>`;
+  acts.innerHTML=h;
+}
+async function saveAdsEdits(btn){
+  const b=state.brand, c=ADS_CUR; const root=document.querySelector("#adsPlan .gp"); const plan=GrowthUI.collectEdits(root,c.payload,ADS_NET); busy(btn,true);
+  try{ const r=await api(`/brands/${b.id}/ads/${ADS_NET}/campaigns/${c.id}`,"PUT",{plan}); toast("Saved — budget re-capped, compliance re-applied"); showAdsPlan({...c,payload:r.plan,daily_budget:r.plan.daily_budget}); loadAds(); }
+  catch(e){ toast(e.message,true); busy(btn,false); }
+}
+async function adsAct(action,cid,btn){
+  const b=state.brand; const spends=action==="launch"||action==="activate";
+  if(action==="activate"&&!confirm("Activate this campaign? Real ad spend starts, within your daily ceiling.")) return;
+  if(action==="launch"&&!confirm("Create this campaign on the platform? It is created PAUSED — no spend yet.")) return;
+  busy(btn,true);
+  try{ await api(`/brands/${b.id}/ads/${ADS_NET}/${action}`,"POST",{campaign_id:cid,approve:spends}); toast(action==="activate"?"Campaign is live":action==="launch"?"Created (paused)":"Paused"); const c=await api(`/brands/${b.id}/ads/${ADS_NET}/campaigns/${cid}`); showAdsPlan(c); loadAds(); }
+  catch(e){ toast(e.message,true); busy(btn,false); }
+}
+async function loadAds(){
+  const b=state.brand; try{ const cs=await api(`/brands/${b.id}/ads/${ADS_NET}/campaigns`);
+    $("adsList").innerHTML=`<h2>Campaigns</h2>`+(cs.length?cs.map(c=>`<div class="row" style="border-bottom:1px solid var(--line);padding:8px 0"><div><b>${esc((c.payload||{}).name||"Campaign")}</b><div class="sub">${esc(c.status)} · ${c.daily_budget} ${esc(c.currency||"")}/day · ${((c.payload||{}).ad_sets||(c.payload||{}).ad_groups||[]).length} audience(s)</div></div><span style="flex:1"></span><button class="sm ghost" onclick='showAdsPlan(${JSON.stringify(c).replace(/'/g,"&#39;")})'>Open plan</button></div>`).join(""):`<p class="sub">No campaigns yet — draft a media plan above.</p>`);
+  }catch(e){ $("adsList").innerHTML=`<p class="sub">${esc(e.message)}</p>`; }
 }
 async function saveCreds(pf,btn){
   let creds; try{ creds=JSON.parse($("cred_"+pf).value); }catch{ return toast("Invalid JSON",true); }
@@ -1141,6 +1309,7 @@ function renderCreativeDetail(c){
     ${p.slides?`<button class="sm" onclick="genSlides('${c.id}',this)">🖼 Generate ${p.slides.length} slides</button>`:""}
     ${(p.format==="reel"||p.script)?`<button class="sm" onclick="genVO('${c.id}',this)">🎙 Voiceover</button>`:""}
     ${c.asset_path&&(p.format==="reel"||p.script)?`<button class="sm" onclick="buildVideo('${c.id}',this)">🎬 Build video</button>`:""}
+    ${c.asset_path?`<button class="sm" onclick="designFix('${c.id}',this)">🎨 Design review & fix</button>`:""}
     ${c.channel==="instagram"?`<button class="sm ghost" onclick="algoAudit('${c.id}',this)">📈 IG algo audit</button>`:""}
     <button class="sm grn" onclick="publishCreative('${c.id}','simulated',this)">📤 Publish (simulated)</button>
     <button class="sm ghost" onclick="publishCreative('${c.id}','live',this)">🔴 Publish live</button>
@@ -1148,6 +1317,7 @@ function renderCreativeDetail(c){
   const gal=`${p.slide_assets?`<p class="sub" style="margin:12px 0 4px">Slide images</p><div class="row" style="overflow-x:auto;flex-wrap:nowrap">${p.slide_assets.map((a,i)=>`<img alt="Slide ${i+1}" loading="lazy" src="${assetUrl(b,a)}" style="width:120px;border-radius:9px;border:1px solid var(--line)">`).join("")}</div>`:""}
     ${p.scene_assets?`<p class="sub" style="margin:12px 0 4px">Storyboard</p><div class="row" style="overflow-x:auto;flex-wrap:nowrap">${p.scene_assets.map((a,i)=>`<img alt="Scene ${i+1}" loading="lazy" src="${assetUrl(b,a)}" style="width:110px;border-radius:9px;border:1px solid var(--line)">`).join("")}</div>`:""}
     ${p.vo_asset?`<div class="row" style="margin-top:10px"><audio controls src="${assetUrl(b,p.vo_asset)}" style="height:32px"></audio></div>`:""}
+    ${p.design_qa?renderDesignQA(b,p.design_qa):(p.design_review?renderDesignQA(b,{review:p.design_review,after:{asset:c.asset_path,score:p.design_review.score},before:{},applied:[]}):"")}
     ${p.algo_audit?renderAudit(p.algo_audit):""}
     <div id="vout_${c.id}"></div>`;
   return `
@@ -1160,6 +1330,24 @@ function renderCreativeDetail(c){
     ${note}
     <div class="rvhead"><h2 style="margin:0">${esc(p.title||"Untitled")}</h2><span class="tag y">${esc(c.channel||"")}</span><span class="tag">${esc(p.format||"")}</span></div>
     <div class="rvgrid"><div class="rvmain">${renderPackage(p)}</div><div class="rvside">${phone}${acts}${gal}</div></div>`;
+}
+function renderDesignQA(b,q){
+  const rv=q.review||{}; const sc=(q.after||{}).score; const col=sc==null?"var(--mut)":sc>=85?"var(--grn)":sc>=70?"var(--warn)":"var(--err)";
+  const iss=(rv.issues||[]).map(i=>`<li><b style="text-transform:uppercase;font-size:10.5px;letter-spacing:.04em;color:${i.severity==="high"?"var(--err)":i.severity==="medium"?"var(--warn)":"var(--mut)"}">${esc(i.area||"")} · ${esc(i.severity||"")}</b><br>${esc(i.problem||"")}<br><span class="sub" style="margin:0">Fix: ${esc(i.fix||"")}</span></li>`).join("");
+  const ba=(q.before||{}).asset, aa=(q.after||{}).asset, changed=ba&&aa&&ba!==aa;
+  return `<div class="pkg" style="margin-top:12px"><div class="row" style="gap:10px"><b style="font-size:26px;color:${col}">${sc==null?"—":sc}</b><div><b>Design review</b><div class="sub" style="margin:0">${esc(rv.verdict||"")}</div></div><span style="flex:1"></span>${q.publish_ready?'<span class="tag g">publish-ready</span>':(sc!=null?'<span class="tag">needs work</span>':"")}</div>
+    ${(q.applied||[]).length?`<p class="sub" style="margin:6px 0">Applied: ${q.applied.map(esc).join(" · ")}</p>`:""}
+    ${changed?`<div class="row" style="gap:8px;margin:8px 0"><div style="flex:1"><div class="sub" style="margin:0 0 4px">Before · ${esc(String((q.before||{}).score??"—"))}</div><img alt="before" loading="lazy" src="${assetUrl(b,ba)}" style="width:100%;border-radius:8px;border:1px solid var(--line);opacity:.8"></div><div style="flex:1"><div class="sub" style="margin:0 0 4px">After · ${esc(String(sc??"—"))}</div><img alt="after" loading="lazy" src="${assetUrl(b,aa)}?t=${Date.now()}" style="width:100%;border-radius:8px;border:2px solid var(--grn)"></div></div>`:""}
+    ${iss?`<ul style="padding-left:16px;margin:6px 0;font-size:12.5px">${iss}</ul>`:""}
+    ${rv.checks?`<div class="sub" style="margin:0">File: ${rv.checks.width}×${rv.checks.height} · target ${(rv.checks.target||[]).join("×")}</div>`:""}</div>`;
+}
+async function designFix(cid,btn){
+  busy(btn,true,"Art director reviewing…");
+  try{ let r=await api(`/brands/${state.brand.id}/creatives/${cid}/design-fix`,"POST");
+    let n=0; while(r.job_id && !["done","failed"].includes(r.state) && n<90){ await new Promise(x=>setTimeout(x,3000)); const j=await api(`/agency/jobs/${r.job_id}`); r={...r,state:j.state,...(j.result||{}),error:j.error}; if(btn&&j.log&&j.log.length) btn.innerHTML='<span class="spinner"></span>'+esc(j.log[j.log.length-1].slice(9,60)); n++; }
+    if(r.state==="failed") throw new Error(r.error||"Design fix failed");
+    const sc=(r.after||{}).score; toast(r.publish_ready?`Design ${sc}/100 — publish-ready`:`Design ${sc??"—"}/100 — see issues`, !r.publish_ready); openReview(cid); }
+  catch(e){ toast(e.message,true); busy(btn,false); }
 }
 async function openReview(cid){
   REVIEW_CID=cid;
@@ -1224,8 +1412,9 @@ async function proceed(cid,btn){
     (async function poll(){
       while(Date.now()-t0<12*60*1000){
         await new Promise(r=>setTimeout(r,6000));
-        let crs; try{crs=await api(`/brands/${state.brand.id}/creatives`);}catch(e){continue;}
-        const c=crs.find(x=>x.id===cid); const gs=(((c||{}).payload)||{}).gen_status||"";
+        let crs; try{crs=await api(`/brands/${state.brand.id}/creatives`);}catch(e){ if(e.status===401||e.status===404){toast(e.status===401?"Session expired — sign in to keep watching this generation.":"This job is no longer available (the server may have restarted).",true); break;} continue;}
+        const c=crs.find(x=>x.id===cid); if(!c){ toast("This creative is no longer available.",true); break; }
+        const gs=(((c||{}).payload)||{}).gen_status||"";
         if(REVIEW_CID===cid) await openReview(cid);
         if(gs.indexOf("done")===0||gs.indexOf("error")===0) break;
       }
@@ -1244,9 +1433,207 @@ async function pollBrain(cid){
   const t0=Date.now();
   while(Date.now()-t0<10*60*1000){
     await new Promise(r=>setTimeout(r,5000));
-    let crs; try{crs=await api(`/brands/${state.brand.id}/creatives`);}catch(e){continue;}
-    const c=crs.find(x=>x.id===cid); const st=(((c||{}).payload)||{}).brain_status||"";
+    let crs; try{crs=await api(`/brands/${state.brand.id}/creatives`);}catch(e){ if(e.status===401||e.status===404){ toast(e.status===401?"Session expired — sign in to keep watching.":"This job is no longer available (the server may have restarted).",true); break;} continue;}
+    const c=crs.find(x=>x.id===cid); if(!c){ toast("This creative is no longer available.",true); break; }
+    const st=(((c||{}).payload)||{}).brain_status||"";
     if(REVIEW_CID===cid) await openReview(cid);
     if(st.indexOf("done")===0||st.indexOf("error")===0) break;
   }
+}
+
+
+/* ---------- memory: what the agents have learned, and who is driving ---------- */
+async function tabMemory(){
+  const b = state.brand, host = $("tabBody");
+  host.innerHTML = '<span class="spinner"></span>';
+  let mem, mode;
+  try{
+    [mem, mode] = await Promise.all([api(`/brands/${b.id}/memory`), api(`/brands/${b.id}/mode`)]);
+  }catch(e){ host.innerHTML = `<div class="card"><p class="sub">Could not load memory: ${esc(e.message||e)}</p></div>`; return; }
+
+  const rows = mem.memory || [];
+  const badge = {rule:"y", correction:"", learning:""};
+  host.innerHTML = `
+  <div class="card">
+    <h2>Who is driving</h2>
+    <p class="sub">In <b>auto</b> the agents generate on their own and you only approve. Switch to <b>manual</b> to stop automatic generation and drive each step yourself. You can always change a single post without leaving auto — use “Change this…” in Approvals.</p>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="${mode.mode==='auto'?'':'ghost'}" onclick="setMode('auto')">Auto — agents work, I approve</button>
+      <button class="${mode.mode==='manual'?'':'ghost'}" onclick="setMode('manual')">Manual — I drive</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Brand memory (${rows.length})</h2>
+    <p class="sub">Everything the system has learned about this brand. The top ${mem.prompt_limit} go into every prompt. Rules you set here are never broken; corrections come from what you rejected.</p>
+    <div style="display:flex;gap:8px;margin:10px 0">
+      <input id="memText" placeholder="e.g. Never use the word luxury more than once" style="flex:1">
+      <button onclick="addMemory(this)">Add rule</button>
+    </div>
+    ${rows.length ? rows.map(mm=>`
+      <div class="feeditem">
+        <span class="tag ${badge[mm.kind]||''}" style="margin:0">${esc(mm.kind)}</span>
+        <span style="flex:1">${esc(mm.content)}</span>
+        <span class="sub" style="white-space:nowrap">×${mm.hits}</span>
+        <button class="sm ghost" onclick="dropMemory('${mm.id}')">forget</button>
+      </div>`).join("")
+    : '<p class="sub">Nothing learned yet. Approve or reject a few creatives and this fills in on its own.</p>'}
+  </div>`;
+}
+
+async function setMode(m){
+  try{ await api(`/brands/${state.brand.id}/mode`,"POST",{mode:m}); toast(`Switched to ${m}`); tabMemory(); }
+  catch(e){ toast(e.message||"Failed",true); }
+}
+
+async function addMemory(btn){
+  const el=$("memText"), v=(el.value||"").trim();
+  if(!v) return toast("Type the rule first",true);
+  btn.disabled=true;
+  try{ await api(`/brands/${state.brand.id}/memory`,"POST",{content:v,kind:"rule",weight:5}); el.value=""; toast("Rule saved"); tabMemory(); }
+  catch(e){ toast(e.message||"Failed",true); }
+  finally{ btn.disabled=false; }
+}
+
+async function dropMemory(mid){
+  try{ await api(`/brands/${state.brand.id}/memory/${mid}`,"DELETE"); toast("Forgotten"); tabMemory(); }
+  catch(e){ toast(e.message||"Failed",true); }
+}
+
+/* ============================ Cinematic Storyboard Film ============================
+   Storyboard first, video second. The director plans reorderable cuts; you edit
+   every cut; a human approves; only then does the film render. Mirrors the same
+   approval gate as every other creative. */
+const LOOK_ICON={"warm-neutral-premium":"🎞","teal-orange-cinematic":"🎬","golden-hour":"🌅","bright-airy":"☀️","moody-noir":"🌑","documentary-natural":"📷","product-studio":"📦","editorial-mono":"⬛"};
+let FILM_CID=null, FILM_TIMER=null;
+async function tabFilmStudio(){
+  const b=state.brand; const [opts,films]=await Promise.all([api("/film-studio/options"),api(`/brands/${b.id}/films`).catch(()=>[])]);
+  const cfg=((b.profile||{}).config||{}).film||{look:"warm-neutral-premium",aspect:"9:16",cuts:6,target_seconds:30};
+  const ro=ME&&ME.role==="client";
+  $("tabBody").innerHTML=`
+    <div class="card filmhero"><h2>🎬 Cinematic storyboard film</h2>
+      <p class="sub">Storyboard first, video second. The director writes a cut-by-cut plan — camera, lighting, voice, visual, transition — and <b>renders nothing</b>. You refine every cut, approve, and only then does the film generate. 9:16, ~30s.</p>
+      ${ro?'<p class="sub">You can review and approve a storyboard; your agency directs and renders it.</p>':`
+      <label>Describe the film (or start from an existing creative)</label>
+      <textarea id="fmPrompt" rows="3" placeholder="e.g. 30s launch film: why landlord-share flats in Kokapet cost 8–14% less than resale, direct from the landowner, end on a site-visit CTA"></textarea>
+      <div class="row" style="flex-wrap:wrap">
+        <div style="width:120px"><label>Cuts</label><select id="fmCuts">${[3,4,5,6,7,8].map(n=>`<option ${n===(cfg.cuts||6)?"selected":""}>${n}</option>`).join("")}</select></div>
+        <div style="width:130px"><label>Duration (s)</label><input id="fmDur" type="number" min="${opts.limits.target_min}" max="${opts.limits.target_max}" value="${cfg.target_seconds||30}"></div>
+        <div style="width:110px"><label>Aspect</label><select id="fmAspect">${opts.aspects.map(a=>`<option ${a===(cfg.aspect||"9:16")?"selected":""}>${a}</option>`).join("")}</select></div>
+        <div style="width:140px"><label>Voice</label><select id="fmVoice">${opts.voices.map(v=>`<option>${v}</option>`).join("")}</select></div>
+      </div>
+      <label>Look</label>
+      <div class="chooser" id="fmLook">${opts.looks.map(l=>`<div class="choice ${l.id===(cfg.look||"warm-neutral-premium")?"on":""}" data-l="${l.id}" title="${esc(l.desc)}" onclick="[...this.parentNode.children].forEach(x=>x.classList.remove('on'));this.classList.add('on')">${LOOK_ICON[l.id]||"🎞"} ${l.id.replace(/-/g," ")}</div>`).join("")}</div>
+      <button onclick="planFilm(this)">🎬 Direct storyboard</button>`}
+      <div id="fmOut"></div></div>
+    <div class="card"><h2>Films</h2><div id="fmList">${films.length?films.map(f=>filmRow(b,f)).join(""):'<p class="sub">No films yet.</p>'}</div></div>`;
+  if(FILM_CID && films.some(f=>f.id===FILM_CID)) openFilm(FILM_CID);
+}
+function filmRow(b,f){
+  const st=f.status==="rendered"?"g":f.status==="rendering"?"y":"";
+  return `<div class="calrow"><b>${esc(f.title||"Untitled")}</b><span class="tag ${st}">${esc(f.status)}</span>
+    <span class="sub" style="margin:0">${f.cuts} cuts · ${f.total_seconds}s · ${esc((f.look||"").replace(/-/g," "))}${f.approval?` · ${esc(f.approval)}`:""}</span>
+    <span style="flex:1"></span><button class="sm ghost" onclick="openFilm('${f.id}')">Open storyboard</button></div>`;
+}
+async function planFilm(btn){
+  const look=(document.querySelector("#fmLook .choice.on")||{}).dataset?.l||"warm-neutral-premium";
+  const body={prompt:$("fmPrompt").value.trim(),look,aspect:$("fmAspect").value,cuts:+$("fmCuts").value,target_seconds:+$("fmDur").value,voice:$("fmVoice").value};
+  if(body.prompt.length<10) return toast("Describe the film in a sentence or two",true);
+  busy(btn,true,"Director at work…");
+  try{ let r=await api(`/brands/${state.brand.id}/film/plan`,"POST",body);
+    r=await pollFilmJob(r,btn,"Directing storyboard");
+    if(r.creative_id){ FILM_CID=r.creative_id; toast("Storyboard ready — no video generated yet"); tabFilmStudio(); }
+  }catch(e){ toast(e.message,true); busy(btn,false); }
+}
+async function pollFilmJob(r,btn,label){
+  let n=0; while(r.job_id && !["done","failed"].includes(r.state) && n<120){ await new Promise(x=>setTimeout(x,3000));
+    const j=await api(`/agency/jobs/${r.job_id}`); r={...r,state:j.state,...(j.result||{}),error:j.error};
+    if(btn&&j.log&&j.log.length) btn.innerHTML='<span class="spinner"></span>'+esc((j.log[j.log.length-1]||"").slice(9,52)); n++; }
+  if(r.state==="failed") throw new Error(r.error||label+" failed");
+  return r;
+}
+async function openFilm(cid){
+  FILM_CID=cid; const el=$("fmOut")||$("tabBody"); el.innerHTML='<div class="card"><span class="spinner"></span> Loading storyboard…</div>';
+  try{ const f=await api(`/brands/${state.brand.id}/film/${cid}`); renderFilmBoard(f); }
+  catch(e){ el.innerHTML=`<div class="card"><p class="sub">${esc(e.message)}</p></div>`; }
+}
+function renderFilmBoard(f){
+  const b=state.brand, film=f.film, ap=(f.approval||{}).state, approved=ap==="approved", ed=f.editable, ren=film.status;
+  const total=film.total_seconds, tgt=film.target_seconds;
+  const barw=Math.min(100,Math.round(100*total/Math.max(tgt,total)));
+  const gate = ren==="rendered"
+    ? `<div class="filmbanner ok">✅ Film rendered — ${film.cuts.length} frames + voiceover. Review below, then publish from Creatives.</div>`
+    : `<div class="filmbanner">🎬 <b>Storyboard first. No video generated yet.</b> Refine every cut${ed?"":""}, ${approved?"then render the film.":"then approve the storyboard."}</div>`;
+  let h=`<div class="card filmcard"><div class="row" style="align-items:flex-start">
+      <div style="flex:1"><h2 style="margin:0">${esc(f.title||"Film")}</h2>
+        <div class="sub" style="margin:2px 0">${esc(film.logline||"")}</div>
+        <div class="sub" style="margin:0">${LOOK_ICON[film.look]||"🎞"} ${esc((film.look||"").replace(/-/g," "))} · ${esc(film.aspect)} · ${film.cuts.length} cuts · <b>${total}s</b> / ${tgt}s target${film.music?` · 🎵 ${esc(film.music)}`:""}</div></div>
+      <span class="tag ${ren==="rendered"?"g":ren==="rendering"?"y":""}">${esc(ren)}</span></div>
+    <div class="filmtl"><i style="width:${barw}%"></i></div>
+    ${gate}
+    ${apBadge?`<div class="rvbar" style="margin:8px 0">${apBadge({approval:f.approval})}<span style="flex:1"></span>
+      <button class="grn sm" onclick="filmApprove('${f.id}','approved')">✓ Approve storyboard</button>
+      <button class="ghost sm" onclick="filmApprove('${f.id}','changes_requested')">✎ Request changes</button></div>`:""}
+    <div class="filmboard">`;
+  film.cuts.forEach((c,i)=>{ h+=filmCut(f.id,c,i,film.cuts.length,ed,ren); });
+  h+=`</div>`;
+  if(ed) h+=`<div class="row" style="margin-top:10px"><button class="sm ghost" onclick="filmAddCut('${f.id}')">＋ Add cut</button>
+      <span style="flex:1"></span>
+      <button class="sm accent" ${approved?"":"disabled title='Approve the storyboard first'"} onclick="filmRender('${f.id}',this)">${ren==="rendered"?"Re-render film":"🎬 Render film"}</button></div>`;
+  if(film.vo_asset) h+=`<div class="row" style="margin-top:10px"><audio controls src="${assetUrl(b,film.vo_asset)}" style="height:34px"></audio><span class="sub" style="margin:0 0 0 8px">Voiceover · ${esc(film.voice||"")}</span></div>`;
+  h+=`<div class="sub" style="margin-top:8px">${esc(f.caption||"")}</div></div>`;
+  const el=$("fmOut")||$("tabBody"); el.innerHTML=h;
+}
+function filmCut(cid,c,i,total,ed,status){
+  const b=state.brand; const frame=c.asset?`<img class="cutframe" alt="cut ${c.n}" loading="lazy" src="${assetUrl(b,c.asset)}${c.asset.startsWith("http")?"":"?t="+Date.now()}">`:`<div class="cutframe empty">${status==="rendered"?"—":"visual renders on approval"}</div>`;
+  return `<div class="filmcut" id="cut-${cid}-${i}">
+    <div class="cuthd"><span class="tc">${c.t_in}–${c.t_out}s</span><b>Cut ${c.n}</b><span class="dur">${c.duration_s}s</span>
+      ${ed?`<span class="cutmove">${i>0?`<button title="Move up" onclick="filmMove('${cid}',${i},-1)">▲</button>`:""}${i<total-1?`<button title="Move down" onclick="filmMove('${cid}',${i},1)">▼</button>`:""}${total>1?`<button title="Remove" onclick="filmRemoveCut('${cid}',${i})">✕</button>`:""}</span>`:""}</div>
+    ${frame}
+    <div class="cutmeta">
+      <div class="kv2"><span>🎥 ${esc(c.camera||"")}</span><span>💡 ${esc(c.lighting||"")}</span></div>
+      ${c.on_screen_text?`<div class="ost">“${esc(c.on_screen_text)}”</div>`:""}
+      <div class="vo">🎙 <b>${esc(c.vo_tone||"")}</b> — ${esc(c.vo_line||"")}</div>
+      <div class="sub" style="margin:4px 0 0">${esc(c.visual||"")}</div>
+      <div class="sub" style="margin:2px 0 0">↳ ${esc(c.transition||"")}${c.negatives?` · 🚫 ${esc(c.negatives)}`:""}</div>
+      ${ed?`<button class="sm ghost" style="margin-top:6px" onclick="filmEditCut('${cid}',${i})">✎ Edit cut</button>`:""}
+    </div></div>`;
+}
+async function filmMove(cid,i,dir){
+  const f=await api(`/brands/${state.brand.id}/film/${cid}`); const n=f.film.cuts.length; const j=i+dir; if(j<0||j>=n) return;
+  const order=[...Array(n).keys()]; [order[i],order[j]]=[order[j],order[i]];
+  try{ await api(`/brands/${state.brand.id}/film/${cid}/reorder`,"POST",{order}); openFilm(cid); }catch(e){ toast(e.message,true); }
+}
+async function filmAddCut(cid){ try{ await api(`/brands/${state.brand.id}/film/${cid}/cut`,"POST",{}); openFilm(cid); }catch(e){ toast(e.message,true); } }
+async function filmRemoveCut(cid,i){ if(!confirm("Remove this cut?"))return; try{ await api(`/brands/${state.brand.id}/film/${cid}/cut/${i}`,"DELETE"); openFilm(cid); }catch(e){ toast(e.message,true); } }
+async function filmEditCut(cid,i){
+  const f=await api(`/brands/${state.brand.id}/film/${cid}`); const c=f.film.cuts[i]; if(!c)return;
+  const cell=document.getElementById(`cut-${cid}-${i}`); if(!cell)return;
+  cell.querySelector(".cutmeta").innerHTML=`
+    <div class="row2"><div class="fld"><label>Duration (3–15s)</label><input id="ec_dur" type="number" min="3" max="15" value="${c.duration_s}"></div>
+    <div class="fld"><label>Transition</label><input id="ec_tr" value="${esc(c.transition||"")}"></div></div>
+    <div class="fld"><label>Camera</label><input id="ec_cam" value="${esc(c.camera||"")}"></div>
+    <div class="fld"><label>Lighting</label><input id="ec_lit" value="${esc(c.lighting||"")}"></div>
+    <div class="row2"><div class="fld"><label>VO tone</label><input id="ec_tone" value="${esc(c.vo_tone||"")}"></div>
+    <div class="fld"><label>On-screen text</label><input id="ec_ost" maxlength="60" value="${esc(c.on_screen_text||"")}"></div></div>
+    <div class="fld"><label>Voiceover line</label><textarea id="ec_vo" rows="2">${esc(c.vo_line||"")}</textarea></div>
+    <div class="fld"><label>Visual (text-free)</label><textarea id="ec_vis" rows="3">${esc(c.visual||"")}</textarea></div>
+    <div class="fld"><label>Must NOT appear</label><input id="ec_neg" value="${esc(c.negatives||"")}"></div>
+    <div class="row"><button class="sm" onclick="filmSaveCut('${cid}',${i})">Save cut</button><button class="sm ghost" onclick="openFilm('${cid}')">Cancel</button></div>`;
+}
+async function filmSaveCut(cid,i){
+  const g=id=>document.getElementById(id)?document.getElementById(id).value:undefined;
+  const patch={duration_s:+g("ec_dur"),transition:g("ec_tr"),camera:g("ec_cam"),lighting:g("ec_lit"),vo_tone:g("ec_tone"),on_screen_text:g("ec_ost"),vo_line:g("ec_vo"),visual:g("ec_vis"),negatives:g("ec_neg")};
+  try{ await api(`/brands/${state.brand.id}/film/${cid}/cut/${i}`,"PUT",patch); toast("Cut saved — re-approve before rendering"); openFilm(cid); }catch(e){ toast(e.message,true); }
+}
+async function filmApprove(cid,st){
+  let comment=""; if(st==="changes_requested"){ comment=prompt("What should change?")||""; if(!comment) return; }
+  try{ await api(`/brands/${state.brand.id}/creatives/${cid}/approval`,"POST",{state:st,comment}); toast(st==="approved"?"Storyboard approved — you can render":"Change request saved"); openFilm(cid); }catch(e){ toast(e.message,true); }
+}
+async function filmRender(cid,btn){
+  if(!confirm("Render the film now? This generates the reference frames and voiceover for the approved storyboard.")) return;
+  busy(btn,true,"Rendering…");
+  try{ let r=await api(`/brands/${state.brand.id}/film/${cid}/render`,"POST"); r=await pollFilmJob(r,btn,"Rendering film");
+    toast(`Film rendered — ${r.frames} frames`); openFilm(cid); }
+  catch(e){ toast(e.message,true); busy(btn,false); }
 }

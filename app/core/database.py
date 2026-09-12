@@ -164,6 +164,23 @@ CREATE TABLE IF NOT EXISTS competitors (
     payload TEXT NOT NULL,
     created_at REAL
 );
+CREATE TABLE IF NOT EXISTS brand_memory (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    kind TEXT DEFAULT 'learning',
+    payload TEXT NOT NULL,
+    weight REAL DEFAULT 1.0,
+    created_at REAL
+);
+CREATE TABLE IF NOT EXISTS agent_runs (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    creative_id TEXT DEFAULT '',
+    stage TEXT DEFAULT '',
+    status TEXT DEFAULT 'running',
+    payload TEXT NOT NULL,
+    created_at REAL
+);
 CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     email TEXT NOT NULL,
@@ -172,6 +189,165 @@ CREATE TABLE IF NOT EXISTS users (
     brand_id TEXT DEFAULT '',
     created_at REAL
 );
+CREATE TABLE IF NOT EXISTS conversations (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    channel TEXT,
+    contact_ref TEXT,
+    status TEXT DEFAULT 'open',
+    payload TEXT NOT NULL,
+    created_at REAL
+);
+CREATE TABLE IF NOT EXISTS messages (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    conversation_id TEXT,
+    direction TEXT,
+    status TEXT DEFAULT 'received',
+    payload TEXT NOT NULL,
+    created_at REAL
+);
+CREATE TABLE IF NOT EXISTS invites (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    email TEXT,
+    role TEXT DEFAULT 'client',
+    token TEXT,
+    status TEXT DEFAULT 'pending',
+    payload TEXT NOT NULL,
+    created_at REAL
+);
+CREATE TABLE IF NOT EXISTS password_resets (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    token TEXT,
+    status TEXT DEFAULT 'pending',
+    payload TEXT NOT NULL,
+    created_at REAL
+);
+CREATE TABLE IF NOT EXISTS gen_usage (
+    brand_id TEXT NOT NULL,
+    day TEXT NOT NULL,
+    count INTEGER DEFAULT 0,
+    PRIMARY KEY (brand_id, day)
+);
+CREATE TABLE IF NOT EXISTS jobs (
+    kind TEXT NOT NULL,
+    job_key TEXT NOT NULL,
+    state TEXT,
+    log TEXT,
+    extra TEXT,
+    updated_at REAL,
+    PRIMARY KEY (kind, job_key)
+);
+CREATE TABLE IF NOT EXISTS campaigns (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    network TEXT NOT NULL,            -- meta | google
+    objective TEXT,
+    status TEXT DEFAULT 'draft',      -- draft|pending_approval|approved|live|paused|failed
+    daily_budget REAL DEFAULT 0,
+    currency TEXT DEFAULT 'INR',
+    external_id TEXT,
+    payload TEXT,
+    created_at REAL
+);
+CREATE TABLE IF NOT EXISTS email_campaigns (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    provider TEXT NOT NULL,           -- mailchimp | smartlead
+    kind TEXT DEFAULT 'broadcast',    -- broadcast | sequence
+    status TEXT DEFAULT 'draft',      -- draft|pending_approval|approved|sent|failed
+    external_id TEXT,
+    payload TEXT,
+    created_at REAL
+);
+CREATE TABLE IF NOT EXISTS seo_audits (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    url TEXT,
+    score INTEGER DEFAULT 0,
+    payload TEXT,
+    created_at REAL
+);
+CREATE TABLE IF NOT EXISTS spend_log (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    action TEXT,                      -- launch|budget_change|pause|resume
+    amount REAL DEFAULT 0,
+    actor TEXT,
+    payload TEXT,
+    created_at REAL
+);
+CREATE TABLE IF NOT EXISTS brand_assignments (
+    user_id TEXT NOT NULL,
+    brand_id TEXT NOT NULL,
+    created_at REAL,
+    PRIMARY KEY (user_id, brand_id)
+);
+CREATE TABLE IF NOT EXISTS reports (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    period TEXT,
+    kind TEXT DEFAULT 'monthly',
+    payload TEXT NOT NULL,
+    created_at REAL
+);
+CREATE TABLE IF NOT EXISTS agency_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT,
+    updated_at REAL
+);
+CREATE TABLE IF NOT EXISTS mail_contacts (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    email TEXT NOT NULL,
+    status TEXT DEFAULT 'subscribed',   -- subscribed | unsubscribed | bounced
+    tags TEXT DEFAULT '',                -- comma-separated, lowercase
+    payload TEXT NOT NULL,               -- {name, first_name, fields{}, source}
+    created_at REAL
+);
+CREATE TABLE IF NOT EXISTS mail_campaigns (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    kind TEXT DEFAULT 'broadcast',       -- broadcast | sequence
+    status TEXT DEFAULT 'draft',         -- draft | approved | scheduled | sending | sent | paused | failed
+    subject TEXT,
+    payload TEXT NOT NULL,               -- {subject, preview, html, text, steps[], segment{tags,exclude}, schedule, stats}
+    created_at REAL
+);
+CREATE TABLE IF NOT EXISTS mail_events (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    campaign_id TEXT,
+    contact_id TEXT,
+    kind TEXT,                           -- sent | open | click | unsubscribe | bounce | fail | test
+    step INTEGER DEFAULT 0,
+    payload TEXT NOT NULL,
+    created_at REAL
+);
+CREATE INDEX IF NOT EXISTS idx_mailcontacts_brand ON mail_contacts(brand_id, email);
+CREATE INDEX IF NOT EXISTS idx_mailcampaigns_brand ON mail_campaigns(brand_id, status);
+CREATE INDEX IF NOT EXISTS idx_mailevents_campaign ON mail_events(brand_id, campaign_id, kind);
+CREATE INDEX IF NOT EXISTS idx_assign_brand ON brand_assignments(brand_id);
+CREATE INDEX IF NOT EXISTS idx_reports_brand ON reports(brand_id, period);
+CREATE INDEX IF NOT EXISTS idx_campaigns_brand ON campaigns(brand_id, status);
+CREATE INDEX IF NOT EXISTS idx_emailcampaigns_brand ON email_campaigns(brand_id, status);
+CREATE INDEX IF NOT EXISTS idx_seoaudits_brand ON seo_audits(brand_id);
+CREATE INDEX IF NOT EXISTS idx_spendlog_brand ON spend_log(brand_id);
+CREATE INDEX IF NOT EXISTS idx_ideas_brand ON ideas(brand_id);
+CREATE INDEX IF NOT EXISTS idx_calendar_brand ON calendar_items(brand_id);
+CREATE INDEX IF NOT EXISTS idx_creatives_brand ON creatives(brand_id);
+CREATE INDEX IF NOT EXISTS idx_publish_brand ON publish_queue(brand_id, status);
+CREATE INDEX IF NOT EXISTS idx_metrics_brand ON metrics(brand_id);
+CREATE INDEX IF NOT EXISTS idx_memory_brand ON brand_memory(brand_id);
+CREATE INDEX IF NOT EXISTS idx_runs_brand ON agent_runs(brand_id);
+CREATE INDEX IF NOT EXISTS idx_competitors_brand ON competitors(brand_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_brand ON conversations(brand_id, channel, contact_ref);
+CREATE INDEX IF NOT EXISTS idx_messages_convo ON messages(brand_id, conversation_id);
+CREATE INDEX IF NOT EXISTS idx_invites_token ON invites(token);
+CREATE INDEX IF NOT EXISTS idx_resets_token ON password_resets(token);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 """
 
 
@@ -245,16 +421,27 @@ def list_brands():
     return [_brand_row(r) for r in rows]
 
 
+BRAND_SCOPED_TABLES = ("ideas", "calendar_items", "creatives", "publish_queue", "metrics",
+                       "connector_settings", "competitors", "brand_memory", "agent_runs",
+                       "conversations", "messages", "invites", "password_resets", "gen_usage", "users",
+                       "campaigns", "email_campaigns", "seo_audits", "spend_log", "reports", "brand_assignments",
+                       "mail_contacts", "mail_campaigns", "mail_events")
+
+
 def delete_brand(bid):
+    """Delete a company and everything scoped to it. Only 6 of 15 brand-scoped tables
+    used to be cleaned, leaving memory, conversations, runs, invites and — worst — the
+    company's users (who could still log in) pointing at a brand that no longer existed."""
     if IS_REST:
-        for t in ("ideas", "calendar_items", "creatives", "publish_queue", "metrics", "connector_settings"):
+        for t in BRAND_SCOPED_TABLES:
             _rest("DELETE", t, params={"brand_id": f"eq.{bid}"})
+        _rest("DELETE", "jobs", params={"job_key": f"eq.{bid}"})
         _rest("DELETE", "brands", params={"id": f"eq.{bid}"})
         return
     with _lock, _conn() as c:
-        for t in ("ideas", "calendar_items", "creatives", "publish_queue", "metrics"):
+        for t in BRAND_SCOPED_TABLES:
             c.execute(f"DELETE FROM {t} WHERE brand_id=?", (bid,))
-        c.execute("DELETE FROM connector_settings WHERE brand_id=?", (bid,))
+        c.execute("DELETE FROM jobs WHERE job_key=? OR extra LIKE ?", (bid, f'%"brand_id": "{bid}"%'))
         c.execute("DELETE FROM brands WHERE id=?", (bid,))
 
 
@@ -310,6 +497,109 @@ def list_docs(table, brand_id, **where):
     return out
 
 
+def save_job(kind, job_key, state, log, extra=None):
+    """Persist a background-job's state so it survives redeploys and is visible
+    across workers. Best-effort on the Supabase REST backend (skipped)."""
+    if IS_REST:
+        return
+    with _lock, _conn() as c:
+        c.execute(
+            "INSERT INTO jobs (kind, job_key, state, log, extra, updated_at) VALUES (?,?,?,?,?,?) "
+            "ON CONFLICT(kind, job_key) DO UPDATE SET "
+            "state=excluded.state, log=excluded.log, extra=excluded.extra, updated_at=excluded.updated_at",
+            (kind, job_key, state, json.dumps(log or []), json.dumps(extra or {}), _now()),
+        )
+
+
+def _job_row(d):
+    out = {"state": d.get("state"), "log": json.loads(d.get("log") or "[]"),
+           "updated_at": d.get("updated_at")}
+    out.update(json.loads(d.get("extra") or "{}"))
+    return out
+
+
+def get_job(kind, job_key):
+    if IS_REST:
+        return None
+    with _conn() as c:
+        r = c.execute("SELECT * FROM jobs WHERE kind=? AND job_key=?", (kind, job_key)).fetchone()
+    return _job_row(dict(r)) if r else None
+
+
+def list_jobs(kind):
+    if IS_REST:
+        return {}
+    with _conn() as c:
+        rows = c.execute("SELECT * FROM jobs WHERE kind=? ORDER BY updated_at DESC LIMIT 200", (kind,)).fetchall()
+    return {dict(r)["job_key"]: _job_row(dict(r)) for r in rows}
+
+
+def interrupt_stale_jobs(older_than_s=3600):
+    """On boot, mark jobs a killed process left 'running' as 'interrupted' — but
+    only stale ones, so a fresh job started by another worker isn't clobbered."""
+    if IS_REST:
+        return
+    try:
+        with _lock, _conn() as c:
+            c.execute("UPDATE jobs SET state='interrupted' WHERE state IN ('running','queued') AND updated_at < ?",
+                      (_now() - older_than_s,))
+    except Exception:
+        pass
+
+
+def bump_gen_usage(brand_id, day):
+    """Increment and return this brand's generation count for `day`.
+
+    Returns the new count, or None when the counter backend is unavailable
+    (Supabase REST) so callers treat the cap as best-effort, never blocking.
+    """
+    if IS_REST:
+        return None
+    with _lock, _conn() as c:
+        c.execute(
+            "INSERT INTO gen_usage (brand_id, day, count) VALUES (?,?,1) "
+            "ON CONFLICT(brand_id, day) DO UPDATE SET count = count + 1",
+            (brand_id, day),
+        )
+        r = c.execute("SELECT count FROM gen_usage WHERE brand_id=? AND day=?", (brand_id, day)).fetchone()
+    return (dict(r)["count"] if r else 1)
+
+
+def gen_usage_count(brand_id, day):
+    if IS_REST:
+        return 0
+    with _conn() as c:
+        r = c.execute("SELECT count FROM gen_usage WHERE brand_id=? AND day=?", (brand_id, day)).fetchone()
+    return dict(r)["count"] if r else 0
+
+
+def get_doc_by(table, **where):
+    """Fetch the first document matching arbitrary column filters (e.g. a token).
+
+    Works across all three backends. Used where the lookup key is not the id and
+    not the brand (invite/reset tokens). Returns the decoded row or None.
+    """
+    if IS_REST:
+        params = {k: f"eq.{v}" for k, v in where.items()}
+        params["limit"] = 1
+        rows = _rest("GET", table, params=params)
+        if not rows:
+            return None
+        d = rows[0]
+        if d.get("payload"):
+            d["payload"] = json.loads(d["payload"])
+        return d
+    q = f"SELECT * FROM {table} WHERE " + " AND ".join(f"{k}=?" for k in where) + " LIMIT 1"
+    with _conn() as c:
+        r = c.execute(q, list(where.values())).fetchone()
+    if not r:
+        return None
+    d = dict(r)
+    if d.get("payload"):
+        d["payload"] = json.loads(d["payload"])
+    return d
+
+
 def get_doc(table, did):
     if IS_REST:
         rows = _rest("GET", table, params={"id": f"eq.{did}", "limit": 1})
@@ -343,6 +633,24 @@ def update_doc(table, did, **fields):
         c.execute(f"UPDATE {table} SET {','.join(keys)} WHERE id=?", vals)
 
 
+def merge_payload(table, did, patch):
+    """Atomically merge keys into a document's JSON payload. Route handlers used to
+    read the payload, mutate it and write it back — two concurrent writers (an
+    approval and an algo-audit) each erased the other's field."""
+    if IS_REST:
+        rows = _rest("GET", table, params={"id": f"eq.{did}", "select": "payload"})
+        cur = json.loads(rows[0]["payload"] or "{}") if rows else {}
+        cur.update(patch)
+        _rest("PATCH", table, params={"id": f"eq.{did}"}, body={"payload": json.dumps(cur)})
+        return cur
+    with _lock, _conn() as c:
+        r = c.execute(f"SELECT payload FROM {table} WHERE id=?", (did,)).fetchone()
+        cur = json.loads((dict(r)["payload"] if r else None) or "{}")
+        cur.update(patch)
+        c.execute(f"UPDATE {table} SET payload=? WHERE id=?", (json.dumps(cur), did))
+    return cur
+
+
 def delete_docs(table, brand_id, **where):
     if IS_REST:
         params = {"brand_id": f"eq.{brand_id}"}
@@ -356,6 +664,15 @@ def delete_docs(table, brand_id, **where):
         vals.append(v)
     with _lock, _conn() as c:
         c.execute(q, vals)
+
+
+def delete_doc(table, did):
+    """Delete a single document by id, on whichever backend is configured."""
+    if IS_REST:
+        _rest("DELETE", table, params={"id": f"eq.{did}"})
+        return
+    with _lock, _conn() as c:
+        c.execute(f"DELETE FROM {table} WHERE id=?", (did,))
 
 
 # ---------- connectors ----------
@@ -378,6 +695,14 @@ def set_connector(brand_id, platform, credentials):
                 "INSERT OR REPLACE INTO connector_settings (brand_id,platform,credentials) VALUES (?,?,?)",
                 (brand_id, platform, json.dumps(credentials)),
             )
+
+
+def delete_connector(brand_id, platform):
+    if IS_REST:
+        _rest("DELETE", "connector_settings", params={"brand_id": f"eq.{brand_id}", "platform": f"eq.{platform}"})
+        return
+    with _lock, _conn() as c:
+        c.execute("DELETE FROM connector_settings WHERE brand_id=? AND platform=?", (brand_id, platform))
 
 
 # ---------- users ----------
@@ -414,12 +739,25 @@ def list_users():
     return [dict(r) for r in rows]
 
 
+def get_user(uid):
+    if not uid:
+        return None
+    if IS_REST:
+        rows = _rest("GET", "users", params={"id": f"eq.{uid}"})
+        return dict(rows[0]) if rows else None
+    with _conn() as c:
+        r = c.execute("SELECT id,email,role,brand_id,pw_hash,created_at FROM users WHERE id=?", (uid,)).fetchone()
+    return dict(r) if r else None
+
+
 def delete_user(uid):
     if IS_REST:
         _rest("DELETE", "users", params={"id": f"eq.{uid}"})
+        _rest("DELETE", "brand_assignments", params={"user_id": f"eq.{uid}"})
         return
     with _lock, _conn() as c:
         c.execute("DELETE FROM users WHERE id=?", (uid,))
+        c.execute("DELETE FROM brand_assignments WHERE user_id=?", (uid,))
 
 
 def update_user_password(uid, pw_hash):
@@ -437,3 +775,93 @@ def get_connectors(brand_id):
     with _conn() as c:
         rows = c.execute("SELECT platform, credentials FROM connector_settings WHERE brand_id=?", (brand_id,)).fetchall()
     return {r["platform"]: json.loads(r["credentials"]) for r in rows}
+
+
+# ---------- agency: manager ↔ brand assignments ----------
+# A `manager` is an agency account-manager who runs a *subset* of the portfolio.
+# Visibility is the assignment list, nothing else — the same tenant wall the
+# owner/client roles already have, just for N brands instead of one.
+
+def set_assignments(user_id, brand_ids):
+    """Replace a user's brand assignments with exactly `brand_ids`."""
+    ids = sorted({b for b in (brand_ids or []) if b})
+    if IS_REST:
+        _rest("DELETE", "brand_assignments", params={"user_id": f"eq.{user_id}"})
+        for b in ids:
+            _rest("POST", "brand_assignments", body={"user_id": user_id, "brand_id": b, "created_at": _now()})
+        return ids
+    with _lock, _conn() as c:
+        c.execute("DELETE FROM brand_assignments WHERE user_id=?", (user_id,))
+        for b in ids:
+            c.execute("INSERT INTO brand_assignments (user_id, brand_id, created_at) VALUES (?,?,?)",
+                      (user_id, b, _now()))
+    return ids
+
+
+def get_assignments(user_id):
+    if not user_id:
+        return []
+    if IS_REST:
+        return [r["brand_id"] for r in _rest("GET", "brand_assignments", params={"user_id": f"eq.{user_id}"})]
+    with _conn() as c:
+        rows = c.execute("SELECT brand_id FROM brand_assignments WHERE user_id=? ORDER BY created_at",
+                         (user_id,)).fetchall()
+    return [dict(r)["brand_id"] for r in rows]
+
+
+def assignments_by_brand(brand_id):
+    if IS_REST:
+        return [r["user_id"] for r in _rest("GET", "brand_assignments", params={"brand_id": f"eq.{brand_id}"})]
+    with _conn() as c:
+        rows = c.execute("SELECT user_id FROM brand_assignments WHERE brand_id=?", (brand_id,)).fetchall()
+    return [dict(r)["user_id"] for r in rows]
+
+
+def all_assignments():
+    """{user_id: [brand_id, ...]} for the whole agency (admin roster view)."""
+    if IS_REST:
+        rows = _rest("GET", "brand_assignments", params={"order": "created_at.asc"})
+    else:
+        with _conn() as c:
+            rows = [dict(r) for r in c.execute("SELECT user_id, brand_id FROM brand_assignments").fetchall()]
+    out = {}
+    for r in rows:
+        out.setdefault(r["user_id"], []).append(r["brand_id"])
+    return out
+
+
+# ---------- agency: key/value settings (branding, defaults) ----------
+
+def get_setting(key, default=None):
+    if IS_REST:
+        rows = _rest("GET", "agency_settings", params={"key": f"eq.{key}", "limit": 1})
+        return json.loads(rows[0]["value"]) if rows and rows[0].get("value") else default
+    with _conn() as c:
+        r = c.execute("SELECT value FROM agency_settings WHERE key=?", (key,)).fetchone()
+    return json.loads(dict(r)["value"]) if r and dict(r)["value"] else default
+
+
+def set_setting(key, value):
+    blob = json.dumps(value)
+    if IS_REST:
+        _rest("POST", "agency_settings", body={"key": key, "value": blob, "updated_at": _now()},
+              prefer="resolution=merge-duplicates")
+        return
+    with _lock, _conn() as c:
+        c.execute("INSERT INTO agency_settings (key, value, updated_at) VALUES (?,?,?) "
+                  "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at",
+                  (key, blob, _now()))
+
+
+def all_settings():
+    if IS_REST:
+        rows = _rest("GET", "agency_settings")
+    else:
+        with _conn() as c:
+            rows = [dict(r) for r in c.execute("SELECT key, value FROM agency_settings").fetchall()]
+    return {r["key"]: (json.loads(r["value"]) if r.get("value") else None) for r in rows}
+
+
+def gen_usage_today(brand_id):
+    """Convenience: this brand's generation count for the current UTC day."""
+    return gen_usage_count(brand_id, time.strftime("%Y-%m-%d", time.gmtime()))

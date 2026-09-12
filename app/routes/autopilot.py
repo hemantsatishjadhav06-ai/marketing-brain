@@ -2,15 +2,25 @@ from fastapi import APIRouter
 from ._shared import *  # noqa: F401,F403
 
 router = APIRouter()
+_AP_START = threading.Lock()
+
+
+def _start_autopilot(bid, body):
+    """Check-and-start under one lock: two simultaneous clicks used to both pass
+    the 'already running' test and launch two overlapping runs."""
+    with _AP_START:
+        if (_ap_get(bid) or {}).get("state") == "running":
+            return False
+        _ap_set(bid, state="running", log=[], started=time.time())
+        threading.Thread(target=_run_autopilot, args=(bid, body), daemon=True).start()
+        return True
 
 
 @router.post("/api/brands/{bid}/autopilot")
 def autopilot(bid: str, body: AutopilotIn, user=Depends(current_user)):
     b = _brand_or_404(bid, user)
-    if AUTOPILOT.get(bid, {}).get("state") == "running":
+    if not _start_autopilot(bid, body):
         raise HTTPException(400, "Autopilot already running for this brand")
-    t = threading.Thread(target=_run_autopilot, args=(bid, body), daemon=True)
-    t.start()
     return {"ok": True, "started": bid}
 
 
@@ -19,8 +29,7 @@ def autopilot_all(body: AutopilotIn, user=Depends(current_user)):
     _admin_only(user)
     started = []
     for b in db.list_brands():
-        if b.get("status") == "ready" and AUTOPILOT.get(b["id"], {}).get("state") != "running":
-            threading.Thread(target=_run_autopilot, args=(b["id"], body), daemon=True).start()
+        if b.get("status") == "ready" and _start_autopilot(b["id"], body):
             started.append(b["name"])
             time.sleep(1)
     return {"ok": True, "started": started}
@@ -29,9 +38,13 @@ def autopilot_all(body: AutopilotIn, user=Depends(current_user)):
 @router.get("/api/autopilot/status")
 def autopilot_status(user=Depends(current_user)):
     if user["role"] == "admin":
-        return AUTOPILOT
-    bid = user.get("brand_id") or ""
-    return {bid: AUTOPILOT.get(bid)} if bid in AUTOPILOT else {}
+        return _ap_all()
+    out = {}
+    for b in _visible_brands(user):
+        j = _ap_get(b["id"])
+        if j:
+            out[b["id"]] = j
+    return out
 
 
 @router.get("/api/cron")
@@ -55,7 +68,23 @@ def cron(key: str = ""):
             threading.Thread(target=_auto_cycle, args=(b["id"],), daemon=True).start()
             kicked.append(b["name"])
             break  # one brand per ping keeps load tiny
-    return {"ok": True, "alive": True, "cycled": kicked}
+    # Agency weekly cycle: queue every due client into the bounded pool (it
+    # runs at most AGENCY_MAX_WORKERS at a time, so twenty clients are fine).
+    cycle = None
+    try:
+        from ..services import agency_cycle
+        c = agency_cycle.kick_due(by="cron")
+        cycle = {"id": c["id"], "brands": len(c.get("brand_ids") or [])} if c else None
+    except Exception:
+        cycle = None
+    # Built-in mailer: advance scheduled / in-flight campaigns within each client's daily cap.
+    mail = None
+    try:
+        from ..services import mailer
+        mail = mailer.tick(os.environ.get("PUBLIC_BASE_URL", "").rstrip("/"))
+    except Exception:
+        mail = None
+    return {"ok": True, "alive": True, "cycled": kicked, "agency_cycle": cycle, "mail": mail}
 
 
 @router.get("/api/digest")
@@ -63,8 +92,7 @@ def digest(user=Depends(current_user)):
     """Command-center data: today's calendar items + creatives awaiting approval."""
     from datetime import date as _date
     today = _date.today().isoformat()
-    brand_list = db.list_brands() if user["role"] == "admin" else \
-        [b for b in [db.get_brand(user.get("brand_id") or "")] if b]
+    brand_list = _visible_brands(user)
     due_today, needs_approval, changes_requested = [], [], []
     for b in brand_list:
         for c in db.list_docs("calendar_items", b["id"]):
@@ -87,8 +115,7 @@ def digest(user=Depends(current_user)):
 
 @router.get("/api/activity")
 def activity(user=Depends(current_user)):
-    brand_list = db.list_brands() if user["role"] == "admin" else \
-        [b for b in [db.get_brand(user.get("brand_id") or "")] if b]
+    brand_list = _visible_brands(user)
     feed = []
     for b in brand_list:
         for table, verb in (("ideas", "idea"), ("creatives", "creative"), ("publish_queue", "publish"), ("metrics", "metrics")):

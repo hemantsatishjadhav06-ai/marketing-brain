@@ -1,9 +1,12 @@
-fastapi>=0.110
-uvicorn[standard]>=0.27
-httpx>=0.25
-beautifulsoup4>=4.12
-python-dotenv>=1.0
-python-multipart>=0.0.9
-pillow>=10.0
+# Exact pins to the versions currently running in production and covered by the
+# test suite — reproducible builds, and no surprise upgrade OR downgrade on the
+# next redeploy. Bump deliberately, together, with tests.
+fastapi==0.141.1
+uvicorn[standard]==0.52.3
+httpx==0.28.1
+beautifulsoup4==4.15.0
+python-dotenv==1.2.3
+python-multipart==0.0.32
+pillow==12.3.0
 # Optional: only needed if you point DB_PATH at Postgres instead of SQLite
-psycopg2-binary>=2.9
+psycopg2-binary==2.9.12

@@ -1,7 +1,7 @@
 """Pydantic request models."""
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class LoginIn(BaseModel):
@@ -14,11 +14,12 @@ class UserIn(BaseModel):
     password: str
     role: str = "client"
     brand_id: str = ""
+    brand_ids: list[str] = []   # manager role: the clients this account runs
 
 
 class BrandIn(BaseModel):
-    name: str
-    website: str
+    name: str = Field(min_length=1, max_length=200)
+    website: str = Field(max_length=2048)
     socials: dict = {}
     group: str = ""
 
@@ -143,6 +144,39 @@ class ReelStudioIn(BaseModel):
     style: str = "cinematic"
     voice: str = "alloy"
     scenes: int = 4
+
+
+class FilmPlanIn(BaseModel):
+    prompt: str = ""            # the film idea / brief
+    creative_id: str = ""       # or start from an existing creative's script/caption
+    look: str = "warm-neutral-premium"
+    aspect: str = "9:16"
+    cuts: int = 6
+    target_seconds: int = 30
+    voice: str = "alloy"
+
+
+class FilmCutIn(BaseModel):
+    duration_s: int | None = None
+    camera: str | None = None
+    lighting: str | None = None
+    vo_line: str | None = None
+    vo_tone: str | None = None
+    on_screen_text: str | None = None
+    visual: str | None = None
+    transition: str | None = None
+    negatives: str | None = None
+
+
+class FilmReorderIn(BaseModel):
+    order: list[int]
+
+
+class FilmMetaIn(BaseModel):
+    target_seconds: int | None = None
+    look: str | None = None
+    voice: str | None = None
+    music: str | None = None
 
 
 class ApprovalIn(BaseModel):

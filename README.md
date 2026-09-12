@@ -47,9 +47,11 @@ without a sign-in screen. Remove that variable to restore bearer-token login.
 
 | Env var | Default | Purpose |
 |---|---|---|
-| `OPENROUTER_API_KEY` | — | Required. Powers all generation. |
+| `OPENROUTER_API_KEY` | — | Required. Powers all text generation (blueprints, captions, blogs). |
+| `FAL_KEY` | — | Required by the Brain. Renders the post creative, carousel slides, reel video, voiceover. |
 | `OPENROUTER_MODEL` | `openai/gpt-4o-mini` | Text model (any OpenRouter id). |
-| `OPENROUTER_IMAGE_MODEL` | `openai/gpt-image-1` | Image model. |
+| `OPENROUTER_IMAGE_MODEL` | `openai/gpt-image-1` | Image model used by Studio routes. |
+| `FAL_IMAGE_MODEL` | `fal-ai/nano-banana-pro` | fal image model used by the Brain. |
 | `DB_PATH` | `data/marketing_brain.db` | SQLite location (or Postgres URL). |
 | `WORKSPACES_ROOT` | `workspaces/` | Per-brand output folders. |
 | `DIRECT_ACCESS` | — | Set to `true` to open the admin workspace without login. |
@@ -69,6 +71,31 @@ the row to QA or approval.
 
 See [`docs/AIRTABLE_CONTENT_SYSTEM.md`](docs/AIRTABLE_CONTENT_SYSTEM.md) for the
 table map, endpoint contract, n8n wiring, and deployment checklist.
+
+## Two image paths (important)
+
+Visual generation is **not** one pipeline — which key you need depends on the route:
+
+| Route | Renderer | Key |
+|---|---|---|
+| `POST /api/brands/{bid}/blueprint` → `/proceed` (Master Prompt Brain) | fal.ai (`app/ai/brain.py`) | `FAL_KEY` |
+| `POST /api/brands/{bid}/studio/image` · `/studio/carousel` · `/creatives/{cid}/slides` | OpenRouter Images (`app/ai/engine.py`) | `OPENROUTER_API_KEY` |
+| `POST /api/brands/{bid}/blog` (blog tool) | text only — no image is rendered | `OPENROUTER_API_KEY` |
+| `POST /api/airtable/content/{id}/run` | text only — writes slide *specs*, renders nothing | `OPENROUTER_API_KEY` |
+
+The blog tool never calls fal. Adding `FAL_KEY` does not change blog output.
+
+## End-to-end live test
+
+`scripts/e2e_neopolis.py` runs the real production path for Neopolis Infra —
+post, carousel and blog — and saves every artefact (JSON, markdown, downloaded
+images) to a timestamped folder.
+
+```bash
+python -m scripts.e2e_neopolis --check all      # preflight keys, spends nothing
+python -m scripts.e2e_neopolis all              # full live run
+python -m scripts.e2e_neopolis blog --no-images # text only, no fal calls
+```
 
 ## Tests
 

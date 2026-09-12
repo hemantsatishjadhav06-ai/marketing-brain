@@ -1,0 +1,11 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 880, "h": 1500, "title": "Start here", "print": "flow" },
+    { "file": "Screens.dc.html", "x": 1000, "y": 0, "w": 760, "h": 1040, "title": "What every screen is for", "print": "flow" },
+    { "file": "WhenToStepIn.dc.html", "x": 1880, "y": 0, "w": 720, "h": 1100, "title": "When to step in", "print": "flow" }
+  ],
+  "annotations": [
+    { "id": "read-order", "x": 0, "y": -130, "w": 380, "text": "Read left to right.\nStart here → what the screens are → when to take over." }
+  ],
+  "launch": { "view": "focused", "file": "Main.dc.html" }
+}

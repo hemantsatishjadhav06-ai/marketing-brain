@@ -29,6 +29,91 @@ REEL_JOBS = {}  # job_id -> {state, log, creative_id}
 CYCLE_SECS = 7 * 86400  # weekly self-refresh per brand
 
 
+# ---------- durable background-job state ----------
+# The dicts above are a fast in-process cache; every write is mirrored to a
+# Postgres `jobs` table so results/logs survive Railway's frequent redeploys and
+# are visible across workers. Reads fall back to the DB when the cache is cold.
+
+def _persist_job(kind, key, j):
+    try:
+        db.save_job(kind, key, j.get("state"), j.get("log", []),
+                    {k: v for k, v in j.items() if k not in ("state", "log")})
+    except Exception:
+        pass
+
+
+def _reel_set(job_id, **fields):
+    j = REEL_JOBS.setdefault(job_id, {"state": "running", "log": [], "creative_id": None, "brand_id": None})
+    j.update(fields)
+    _persist_job("reel", job_id, j)
+    return j
+
+
+def _reel_get(job_id):
+    return REEL_JOBS.get(job_id) or db.get_job("reel", job_id)
+
+
+def _ap_set(bid, **fields):
+    j = AUTOPILOT.setdefault(bid, {"state": "running", "log": []})
+    j.update(fields)
+    _persist_job("autopilot", bid, j)
+    return j
+
+
+def _ap_get(bid):
+    return AUTOPILOT.get(bid) or db.get_job("autopilot", bid)
+
+
+def _ap_all():
+    out = dict(AUTOPILOT)
+    try:
+        for k, v in db.list_jobs("autopilot").items():
+            out.setdefault(k, v)
+    except Exception:
+        pass
+    return out
+
+
+
+def _on_a_public_host() -> bool:
+    """True when this process is reachable from the internet.
+
+    Each PaaS advertises its own public hostname; if any of them is set, the
+    deployment is not a laptop.
+    """
+    for var in ("RAILWAY_PUBLIC_DOMAIN", "RENDER_EXTERNAL_HOSTNAME", "PUBLIC_BASE_URL"):
+        if os.environ.get(var, "").strip():
+            return True
+    return False
+
+
+def _assert_auth_is_enabled():
+    """Refuse to boot a publicly reachable instance with authentication off.
+
+    DIRECT_ACCESS makes every request an unauthenticated admin. On Render that
+    was guarded by a test over render.yaml, but Railway keeps its environment in
+    the platform rather than in the repo, so the guarantee has to live in the
+    app to survive the move.
+    """
+    if direct_access_enabled() and _on_a_public_host():
+        raise RuntimeError(
+            "DIRECT_ACCESS is enabled on a publicly reachable deployment: every "
+            "request would be an unauthenticated admin. Set DIRECT_ACCESS=false "
+            "and provide ADMIN_EMAIL / ADMIN_PASSWORD instead."
+        )
+    if _on_a_public_host():
+        # Two more silent-failure traps that only bite once real customers exist:
+        # a forgeable default signing key, and an SQLite file inside an ephemeral
+        # container that is wiped on every redeploy.
+        if os.environ.get("SECRET_KEY", "").strip() in ("", auth.DEFAULT_SECRET):
+            raise RuntimeError("SECRET_KEY is unset on a public deployment: bearer tokens would be forgeable. Set a long random SECRET_KEY.")
+        if not (db.IS_PG or db.IS_REST) and os.environ.get("ALLOW_EPHEMERAL_DB", "").lower() not in {"1", "true", "yes"}:
+            raise RuntimeError("No durable database on a public deployment (DATABASE_URL / SUPABASE_* unset): all data would be lost on redeploy. Set DATABASE_URL, or ALLOW_EPHEMERAL_DB=true to override.")
+
+
+def direct_access_enabled() -> bool:
+    return os.environ.get("DIRECT_ACCESS", "").strip().lower() in {"1", "true", "yes", "on"}
+
 
 def _bootstrap_admin():
     email = os.environ.get("ADMIN_EMAIL", "").strip().lower()
@@ -38,7 +123,7 @@ def _bootstrap_admin():
 
 
 def current_user(authorization: str = Header(default="")):
-    if os.environ.get("DIRECT_ACCESS", "").strip().lower() in {"1", "true", "yes", "on"}:
+    if direct_access_enabled():
         return {
             "uid": "direct-access",
             "role": "admin",
@@ -51,7 +136,62 @@ def current_user(authorization: str = Header(default="")):
     payload = auth.verify_token(authorization[7:])
     if not payload:
         raise HTTPException(401, "Invalid or expired session")
+    # Stateless HMAC tokens can't be revoked by themselves: without this, a deleted
+    # or demoted user kept full access for up to 30 days. Re-read the user so the
+    # token dies with the account and role/brand changes take effect immediately.
+    u = db.get_user(payload.get("uid", ""))
+    if not u:
+        raise HTTPException(401, "This account no longer exists")
+    if payload.get("pwv") and payload["pwv"] != auth.pw_version(u.get("pw_hash", "")):
+        raise HTTPException(401, "Your password changed — please sign in again")
+    payload["role"] = u.get("role") or payload.get("role")
+    payload["brand_id"] = u.get("brand_id") or ""
+    payload["email"] = u.get("email") or payload.get("email", "")
+    # Agency account-managers see exactly the brands assigned to them. Read on
+    # every request (like the role) so an un-assignment takes effect at once.
+    if payload["role"] == "manager":
+        try:
+            payload["brand_ids"] = db.get_assignments(payload.get("uid", ""))
+        except Exception:
+            payload["brand_ids"] = []
     return payload
+
+
+ROLES = ("admin", "manager", "owner", "client")
+OPERATOR_ROLES = ("admin", "manager")
+
+
+def _can_see(user, bid) -> bool:
+    """The single tenancy predicate. admin: everything; manager: assigned brands;
+    owner/client: their own brand. Every visibility check routes through here."""
+    if not user or not bid:
+        return False
+    role = user.get("role")
+    if role == "admin":
+        return True
+    if role == "manager":
+        return bid in (user.get("brand_ids") or [])
+    return user.get("brand_id") == bid
+
+
+def _visible_brands(user):
+    """Brand rows this user may see, in portfolio order."""
+    if not user:
+        return []
+    role = user.get("role")
+    if role == "admin":
+        return db.list_brands()
+    if role == "manager":
+        allowed = set(user.get("brand_ids") or [])
+        return [b for b in db.list_brands() if b["id"] in allowed]
+    b = db.get_brand(user.get("brand_id") or "")
+    return [b] if b else []
+
+
+def _operator_only(user):
+    """Agency-level screens (portfolio, cycles, bulk actions): admin or manager."""
+    if user.get("role") not in OPERATOR_ROLES:
+        raise HTTPException(403, "Agency operator access required")
 
 
 def _wslug(b):
@@ -62,7 +202,7 @@ def _brand_or_404(bid, user=None):
     b = db.get_brand(bid)
     if not b:
         raise HTTPException(404, "Brand not found")
-    if user and user["role"] != "admin" and user.get("brand_id") != bid:
+    if user and not _can_see(user, bid):
         raise HTTPException(403, "This login can only access its own brand")
     return b
 
@@ -70,6 +210,14 @@ def _brand_or_404(bid, user=None):
 def _admin_only(user):
     if user["role"] != "admin":
         raise HTTPException(403, "Admin access required")
+
+
+def _gen_guard(bid):
+    """Gate a paid generation: global kill-switch + per-brand daily cap."""
+    from ..core import guard
+    ok, msg = guard.check_generation(bid)
+    if not ok:
+        raise HTTPException(429, msg)
 
 
 def _logo_path(b):
@@ -86,6 +234,19 @@ def _logo_path(b):
         except Exception:
             return None
     return path if os.path.exists(path) else None
+
+
+def _doc_or_404(table, did, bid):
+    """Fetch a document and prove it belongs to this brand.
+
+    Routes previously fetched by raw id, so any brand's URL could read or modify
+    another brand's creative, idea or competitor — an approve on /brands/A/... with
+    B's creative id returned and mutated B's content.
+    """
+    row = db.get_doc(table, did)
+    if not row or row.get("brand_id") != bid:
+        raise HTTPException(404, f"{table[:-1].capitalize()} not found for this brand")
+    return row
 
 
 def _save_asset(b, rel, blob):
@@ -144,7 +305,14 @@ def _build_calendar(b, days, start=None):
                             channel=entry.get("channel"), date=entry.get("date"), time=entry.get("time"))
         items.append(db.get_doc("calendar_items", cid))
     ws.write_json(_wslug(b), "brand-profile/content-calendar.json", cal)
-    return {"calendar": items}
+    out = {"calendar": items}
+    try:
+        from ..services import airtable_calendar
+        if airtable_calendar.connected(bid):
+            out["airtable"] = airtable_calendar.push(bid)
+    except Exception as e:  # the calendar is built; a sync failure is reported, never fatal
+        out["airtable"] = {"ok": False, "error": str(e)[:200]}
+    return out
 
 
 def _produce_creative(b, idea_id):
@@ -165,12 +333,25 @@ def _produce_creative(b, idea_id):
     return c
 
 
+def _check_budget(bid):
+    """Background loops bypass the route guard, so re-check the per-brand cap here."""
+    from ..core import guard
+    ok, msg = guard.check_generation(bid)
+    if not ok:
+        raise RuntimeError(msg)
+
+
 def _generate_image(b, creative_id, prompt_override=None):
+    _check_budget(b["id"])
     c = db.get_doc("creatives", creative_id)
     if not c:
         raise HTTPException(404, "Creative not found")
     prompt = prompt_override or c["payload"].get("image_prompt") or c["payload"].get("title")
-    blob = ai_engine.generate_image(prompt, b["name"], ai_engine.brand_palette(b))
+    # Ask for the platform's own ratio (4:5 for an Instagram post, 9:16 for a reel…)
+    # so the Design QA crop has little to remove.
+    from ..services import design_qa
+    aspect = ai_engine.aspect_for(design_qa.target_for(c.get("channel") or "instagram", c.get("format") or (c["payload"].get("format") or "post")))
+    blob = ai_engine.generate_image(prompt, b["name"], ai_engine.brand_palette(b), aspect=aspect)
     if not blob:
         raise HTTPException(502, "Image generation failed (model returned no image). Retry, or use the visual direction text with any image tool.")
     blob = _composite_logo(b, blob)
@@ -226,7 +407,9 @@ def _workspace_digest(b):
 
 
 def _rs_log(job_id, msg):
-    REEL_JOBS[job_id]["log"].append(f"{time.strftime('%H:%M:%S')} {msg}")
+    j = REEL_JOBS.setdefault(job_id, {"state": "running", "log": [], "creative_id": None, "brand_id": None})
+    j["log"].append(f"{time.strftime('%H:%M:%S')} {msg}")
+    _persist_job("reel", job_id, j)
 
 
 def _run_reel_studio(job_id, bid, source, cfg: ReelStudioIn):
@@ -248,7 +431,7 @@ def _run_reel_studio(job_id, bid, source, cfg: ReelStudioIn):
                             "cta_text": sb.get("cta_text", ""), "scenes": sb.get("scenes", [])},
         }
         cid = db.insert_doc("creatives", bid, payload, channel="instagram", format="reel")
-        REEL_JOBS[job_id]["creative_id"] = cid
+        _reel_set(job_id, creative_id=cid)
         _rs_log(job_id, f"Storyboard ready: {payload['title']}")
 
         palette = ai_engine.brand_palette(b)
@@ -257,6 +440,7 @@ def _run_reel_studio(job_id, bid, source, cfg: ReelStudioIn):
             _rs_log(job_id, f"Painting scene {s.get('n')} ({cfg.style})…")
             prompt = (f"{s.get('image_prompt','')} . Vertical 9:16 composition. "
                       f"Strictly no text, no letters, no words, no watermarks anywhere in the image.")
+            _check_budget(bid)
             blob = ai_engine.generate_image(prompt, b["name"], palette)
             if blob:
                 blob = _composite_logo(b, blob)
@@ -280,18 +464,21 @@ def _run_reel_studio(job_id, bid, source, cfg: ReelStudioIn):
         db.update_doc("creatives", cid, payload=payload,
                       asset_path=scene_assets[0] if scene_assets else None)
         _rs_log(job_id, f"Done — {len(scene_assets)} scenes + voiceover. Open Creatives → Build video.")
-        REEL_JOBS[job_id]["state"] = "done"
+        _reel_set(job_id, state="done")
     except Exception as e:
         _rs_log(job_id, f"Failed: {e}")
-        REEL_JOBS[job_id]["state"] = "failed"
+        _reel_set(job_id, state="failed")
 
 
 def _ap_log(bid, msg):
-    AUTOPILOT.setdefault(bid, {"log": []})["log"].append(f"{time.strftime('%H:%M:%S')} {msg}")
+    j = AUTOPILOT.setdefault(bid, {"state": "running", "log": []})
+    j["log"].append(f"{time.strftime('%H:%M:%S')} {msg}")
+    _persist_job("autopilot", bid, j)
 
 
 def _run_autopilot(bid, cfg: AutopilotIn):
     AUTOPILOT[bid] = {"state": "running", "log": [], "started": time.time()}
+    _persist_job("autopilot", bid, AUTOPILOT[bid])
     try:
         b = db.get_brand(bid)
         _ap_log(bid, f"Autopilot engaged for {b['name']}")
@@ -319,10 +506,10 @@ def _run_autopilot(bid, cfg: AutopilotIn):
                     except Exception as e:
                         _ap_log(bid, f"  visual skipped: {e}")
         _ap_log(bid, f"Done — {produced} production-ready creatives. Review and publish.")
-        AUTOPILOT[bid]["state"] = "done"
+        _ap_set(bid, state="done")
     except Exception as e:
         _ap_log(bid, f"Stopped: {e}")
-        AUTOPILOT[bid]["state"] = "failed"
+        _ap_set(bid, state="failed")
 
 
 def _auto_cycle(bid):

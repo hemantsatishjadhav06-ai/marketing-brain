@@ -63,9 +63,65 @@ def update_kit(bid: str, body: KitIn, user=Depends(current_user)):
     return profile["brand_kit"]
 
 
+@router.post("/api/brands/{bid}/logo")
+async def upload_logo(bid: str, file: UploadFile = File(...), user=Depends(current_user)):
+    """Store the brand's own logo.
+
+    The UI has always offered this upload but the endpoint did not exist, so every
+    attempt 404'd and only the two hard-coded logos ever reached a creative.
+
+    The file is kept three ways because each covers a different failure: on disk
+    for local serving, base64 in the brand kit so an ephemeral container can
+    restore it, and — when object storage is configured — a public URL, which is
+    the only form fal.ai can take as a reference.
+    """
+    import base64 as _b64
+
+    b = _brand_or_404(bid, user)
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(400, "Empty file")
+    if len(raw) > 5 * 1024 * 1024:
+        raise HTTPException(400, "Logo must be 5 MB or smaller")
+
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in (".png", ".jpg", ".jpeg", ".webp"):
+        # SVG can carry <script> and is served from this origin: a stored XSS vector.
+        raise HTTPException(400, "Logo must be a PNG, JPG or WEBP (SVG is not accepted)")
+    try:
+        if True:
+            from PIL import Image
+            Image.open(io.BytesIO(raw)).verify()   # reject anything that is not really an image
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(400, "That file is not a readable image")
+
+    rel = f"brand/logo{ext}"
+    ref = _save_asset(b, rel, raw)
+
+    profile = b.get("profile") or {}
+    kit = dict(profile.get("brand_kit") or {})
+    kit["logo"] = rel
+    kit["logo_b64"] = _b64.b64encode(raw).decode()
+    if ref.startswith("http"):
+        kit["logo_url"] = ref          # publicly reachable — usable as a fal reference
+    else:
+        kit.pop("logo_url", None)
+    profile["brand_kit"] = kit
+    db.update_brand(bid, profile=profile)
+
+    return {"ok": True, "logo": rel, "logo_url": kit.get("logo_url"),
+            "hosted": bool(kit.get("logo_url")),
+            "note": None if kit.get("logo_url") else
+                    "Stored locally. Configure Supabase storage to give it a public URL "
+                    "so the image model can use it as a reference."}
+
+
 @router.post("/api/brands/{bid}/ideas")
 def ideas(bid: str, body: IdeasIn, user=Depends(current_user)):
     b = _brand_or_404(bid, user)
+    _gen_guard(bid)
     options = {k: getattr(body, k) for k in ("formats", "funnel_stage", "pillar", "topic", "tone", "instructions") if getattr(body, k)}
     return _generate_ideas(b, body.channels, body.count, options)
 
@@ -79,7 +135,17 @@ def list_ideas(bid: str, user=Depends(current_user)):
 @router.post("/api/brands/{bid}/ideas/{iid}/state")
 def idea_state(bid: str, iid: str, body: dict, user=Depends(current_user)):
     _brand_or_404(bid, user)
-    db.update_doc("ideas", iid, state=body.get("state", "approved"))
+    # Ownership check: without it, any brand's URL could flip another brand's idea
+    # (the id alone was trusted). Also constrain the state to the known lifecycle.
+    _doc_or_404("ideas", iid, bid)
+    if not isinstance(body, dict) or "state" not in body:
+        raise HTTPException(400, "state is required")
+    state = str(body.get("state"))
+    # Lifecycle: proposed -> selected -> approved/rejected -> archived. Production and
+    # publishing states belong to creatives/publish_queue and cannot be set here.
+    if state not in ("proposed", "selected", "approved", "rejected", "archived"):
+        raise HTTPException(400, "state must be one of proposed, selected, approved, rejected, archived")
+    db.update_doc("ideas", iid, state=state)
     return db.get_doc("ideas", iid)
 
 
@@ -100,6 +166,7 @@ def get_calendar(bid: str, user=Depends(current_user)):
 @router.post("/api/brands/{bid}/creatives")
 def creative(bid: str, body: CreativeIn, user=Depends(current_user)):
     b = _brand_or_404(bid, user)
+    _doc_or_404("ideas", body.idea_id, bid)  # the idea must belong to THIS brand
     return _produce_creative(b, body.idea_id)
 
 
@@ -112,5 +179,7 @@ def list_creatives(bid: str, user=Depends(current_user)):
 @router.post("/api/brands/{bid}/images")
 def image(bid: str, body: ImageIn, user=Depends(current_user)):
     b = _brand_or_404(bid, user)
+    _doc_or_404("creatives", body.creative_id, bid)  # no spending on another brand's creative
+    _gen_guard(bid)
     return _generate_image(b, body.creative_id, body.prompt_override)
 
